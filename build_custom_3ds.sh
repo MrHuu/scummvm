@@ -1,0 +1,152 @@
+#!/bin/sh
+
+## Setup environment
+## ---------------------
+
+export DEVKITPRO=/opt/devkitpro
+export DEVKITARM=$DEVKITPRO/devkitARM
+export CTRULIB=$DEVKITPRO/libctru
+
+export PATH=$DEVKITARM/bin:$PATH
+export PATH=$DEVKITPRO/tools/bin:$PATH
+export PORTLIBS=$DEVKITPRO/portlibs/3ds
+
+GAMEID=$1
+GAMEDAT=NONE
+
+mkdir -p ./pkg
+mkdir -p ./pkg/ROMFS
+mkdir -p ./pkg/ROMFS/scummvm
+mkdir -p ./pkg/ROMFS/scummvm/kb
+mkdir -p ./pkg/ROMFS/scummvm/themes
+
+if [ $# -eq 0 ] ; then
+	GAMEID=NOTSET
+fi
+
+if [ $GAMEID = "ALL" ] ; then
+
+	for GAMEID in COMI DIG FT SAMNMAX MONKEY MONKEY2 TENTACLE DW DW2 BBVS MYST NEVERHOOD QUEEN RIVEN TOON
+	do
+		./build_custom_3ds.sh $GAMEID
+	done
+	exit
+
+
+elif [ $GAMEID = "BBVS" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=bbvs
+
+elif [ $GAMEID = "COMI" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm-7-8
+
+elif [ $GAMEID = "DIG" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm-7-8
+
+elif [ $GAMEID = "DW" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=tinsel
+	
+elif [ $GAMEID = "DW2" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=tinsel
+
+elif [ $GAMEID = "FT" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm-7-8
+
+elif [ $GAMEID = "MONKEY" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm
+
+elif [ $GAMEID = "MONKEY2" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm
+
+elif [ $GAMEID = "MYST" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=myst
+
+elif [ $GAMEID = "NEVERHOOD" ] ; then
+	
+	./configure --host=3ds --disable-all-engines --enable-engine=neverhood
+	
+	GAMEDAT=neverhood.dat
+	
+elif [ $GAMEID = "QUEEN" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=queen
+
+	GAMEDAT=queen.tbl
+
+elif [ $GAMEID = "RIVEN" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=riven
+
+elif [ $GAMEID = "SAMNMAX" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm-7-8
+
+elif [ $GAMEID = "TENTACLE" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm
+
+elif [ $GAMEID = "TOON" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=toon
+
+	GAMEDAT=toon.dat
+
+else
+
+	echo
+	echo -------------------------------------------------------------------------------------------
+	echo Usage: ./build_custom_3ds.sh *Argument
+	echo -------------------------------------------------------------------------------------------
+	echo *ONLY single Arguments
+	echo
+	echo Arguments available: 
+	echo ALL BBVS COMI DIG DW DW2 FT MONKEY MONKEY2 MYST NEVERHOOD QUEEN RIVEN SAMNMAX TENTACLE TOON
+	echo
+	echo --USELESS INFO--
+	echo Engines available:
+	echo agi,agos,agos2,cruise,gob,hugo,kyra,lure,myst,riven,queen,saga,ihnm,scumm,scumm-7-8,he,sci,sci32,
+	echo sherlock,sky,sword1,sword2,sword25,teenagent,tinsel,toon,touche,zvision
+	echo access,adl,bbvs,cge,cge2,cine,composer,draci,drascula,dreamweb,fullpipe,gnap,groovie,hopkins,
+	echo illusions,lol,eob,lab,made,mads,mohawk,mortevielle,neverhood,parallaction,pegasus,plumbers,
+	echo titanic,toltecs,tony,tsage,tucker,voyeur,wintermute,xeen
+	echo
+	echo Unstable:
+	echo avalanche,bladerunner,chewy,cryo,director,dm,groovie2,lastexpress,lilliput,macventure,cstime,
+	echo mutationofjb,pink,prince,sludge,startrek,supernova,testbed,wage
+	echo -------------------------------------------------------------------------------------------
+	echo Current:
+	echo [ENGINE] HE - does not build
+	echo
+	exit
+
+fi
+
+cp -R ./backends/platform/3ds/app/${GAMEID}/game ./pkg/ROMFS/
+
+if [ $GAMEDAT = "NONE" ] ; then
+	GAMEDAT=NONE
+else
+	cp ./dists/engine-data/${GAMEDAT} ./pkg/ROMFS/game/${GAMEDAT}
+fi
+
+cp ./gui/themes/scummmodern.zip ./pkg/ROMFS/scummvm/themes/scummmodern.zip
+cp ./gui/themes/translations.dat ./pkg/ROMFS/scummvm/themes/translations.dat
+cp ./backends/vkeybd/packs/vkeybd_small.zip ./pkg/ROMFS/scummvm/kb/vkeybd_small.zip
+
+make .cia GAME=${GAMEID} || exit 1
+
+mv -f ./${GAMEID}[ScummVM].cia ./pkg/${GAMEID}[ScummVM].cia
+
+rm -r ./pkg/ROMFS
+rm -f ./scummvm.elf
+rm -f ./${GAMEID}[ScummVM].bnr
+rm -f ./${GAMEID}[ScummVM].icn
+rm -f ./${GAMEID}[ScummVM].smdh

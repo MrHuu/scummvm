@@ -1,0 +1,79 @@
+ifeq ($(GAME),)
+	TARGET			:= scummvm
+	APP_TITLE       := ScummVM
+	APP_DESCRIPTION := Point-and-click adventure game engines
+	APP_UNIQUE_ID   := 0xFF321
+	APP_ICON        := $(srcdir)/backends/platform/3ds/app/icon.png
+	APP_BANNER_IMAGE:= $(srcdir)/backends/platform/3ds/app/banner.png
+
+else ifneq ($(GAME),)
+	TARGET			:= $(GAME)[ScummVM]
+	APP_DESCRIPTION := $(TARGET)
+	APP_ICON        := $(srcdir)/backends/platform/3ds/app/$(GAME)/icon.png
+	APP_BANNER_IMAGE:= $(srcdir)/backends/platform/3ds/app/$(GAME)/banner.png
+	CXXFLAGS += -D_GAME -D_$(GAME)
+
+endif
+
+ifeq ($(GAME), BBVS)
+	APP_TITLE       := Beavis & Butt-head in Virtual Stupidity
+	APP_UNIQUE_ID   := 0xFF322
+
+else ifeq ($(GAME), COMI)
+	APP_TITLE       := The Curse of Monkey Island
+	APP_UNIQUE_ID   := 0xFF323
+
+else ifeq ($(GAME), DW)
+	APP_TITLE       := Discworld
+	APP_UNIQUE_ID   := 0xFF324
+
+else ifeq ($(GAME), DW2)
+	APP_TITLE       := Discworld II: Missing Presumed...!?
+	APP_UNIQUE_ID   := 0xFF325
+
+else ifeq ($(GAME), DIG)
+	APP_TITLE       := The Dig
+	APP_UNIQUE_ID   := 0xFF326
+
+else ifeq ($(GAME), FT)
+	APP_TITLE       := Full Throttle
+	APP_UNIQUE_ID   := 0xFF327
+
+else ifeq ($(GAME), MONKEY)
+	APP_TITLE       := The Secret of Monkey Island
+	APP_UNIQUE_ID   := 0xFF328
+
+else ifeq ($(GAME), MONKEY2)
+	APP_TITLE       := Monkey Island II: Le Chuck's Revenge
+	APP_UNIQUE_ID   := 0xFF329
+	
+else ifeq ($(GAME), MYST)
+	APP_TITLE       := Myst
+	APP_UNIQUE_ID   := 0xFF32A
+
+else ifeq ($(GAME), NEVERHOOD)
+	APP_TITLE       := The Neverhood Chronicles
+	APP_UNIQUE_ID   := 0xFF32B
+	CXXFLAGS		+= -D_NEVERHOOD_MENU
+
+else ifeq ($(GAME), QUEEN)
+	APP_TITLE       := Flight of the Amazon Queen
+	APP_UNIQUE_ID   := 0xFF32C
+
+else ifeq ($(GAME), RIVEN)
+	APP_TITLE       := Riven: A Sequel to Myst
+	APP_UNIQUE_ID   := 0xFF32D
+
+else ifeq ($(GAME), SAMNMAX)
+	APP_TITLE       := Sam & Max Hit the Road
+	APP_UNIQUE_ID   := 0xFF32E
+	
+else ifeq ($(GAME), TENTACLE)
+	APP_TITLE       := Day of the Tentacle
+	APP_UNIQUE_ID   := 0xFF32F
+
+else ifeq ($(GAME), TOON)
+	APP_TITLE       := Toonstruck
+	APP_UNIQUE_ID   := 0xFF330
+
+endif

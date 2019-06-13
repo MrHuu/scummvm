@@ -78,7 +78,57 @@ OSystem_3DS::OSystem_3DS():
 {
 	chdir("sdmc:/");
 	_fsFactory = new POSIXFilesystemFactory();
-	Posix::assureDirectoryExists("/3ds/scummvm/saves/");
+	
+//-- Standalone builds
+#ifdef _GAME
+	#ifdef _BBVS
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/BBVS/");
+	#endif
+	#ifdef _COMI
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/COMI/");
+	#endif
+	#ifdef _DIG
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/DIG/");
+	#endif
+	#ifdef _DW
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/DW/");
+	#endif
+	#ifdef _DW2
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/DW2/");
+	#endif
+	#ifdef _FT
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/FT/");
+	#endif
+	#ifdef _MONKEY
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/MONKEY/");
+	#endif
+	#ifdef _MONKEY2
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/MONKEY2/");
+	#endif
+	#ifdef _MYST
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/MYST/");
+	#endif
+	#ifdef _NEVERHOOD
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/NEVERHOOD/");
+	#endif
+	#ifdef _QUEEN
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/QUEEN/");
+	#endif
+	#ifdef _RIVEN
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/RIVEN/");
+	#endif
+	#ifdef _SAMNMAX
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/SAMNMAX/");
+	#endif
+	#ifdef _TENTACLE
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/TENTACLE/");
+	#endif
+	#ifdef _TOON
+		Posix::assureDirectoryExists("/3ds/data/ScummVM/TOON/");
+	#endif
+#else
+	Posix::assureDirectoryExists("/3ds/ScummVM/");
+#endif
 }
 
 OSystem_3DS::~OSystem_3DS() {
@@ -101,15 +151,73 @@ void OSystem_3DS::initBackend() {
 	ConfMan.registerDefault("aspect_ratio", true);
 	if (!ConfMan.hasKey("vkeybd_pack_name"))
 		ConfMan.set("vkeybd_pack_name", "vkeybd_small");
+//-- Standalone builds
+#ifdef _GAME
 	if (!ConfMan.hasKey("vkeybdpath"))
-		ConfMan.set("vkeybdpath", "/3ds/scummvm/kb");
+		ConfMan.set("vkeybdpath", "romfs:/scummvm/kb");
 	if (!ConfMan.hasKey("themepath"))
-		ConfMan.set("themepath", "/3ds/scummvm");
+		ConfMan.set("themepath", "romfs:/scummvm/themes");
+#else
+	if (!ConfMan.hasKey("vkeybdpath"))
+		ConfMan.set("vkeybdpath", "scummvm/kb");
+	if (!ConfMan.hasKey("themepath"))
+		ConfMan.set("themepath", "scummvm");
+#endif
 	if (!ConfMan.hasKey("gui_theme"))
 		ConfMan.set("gui_theme", "builtin");
 
 	_timerManager = new DefaultTimerManager();
-	_savefileManager = new DefaultSaveFileManager("/3ds/scummvm/saves/");
+
+//-- Standalone builds
+#ifdef _GAME
+	#ifdef _BBVS
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/BBVS");
+	#endif
+	#ifdef _COMI
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/COMI");
+	#endif
+	#ifdef _DIG
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/DIG");
+	#endif
+	#ifdef _DW
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/DW");
+	#endif
+	#ifdef _DW2
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/DW2");
+	#endif
+	#ifdef _FT
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/FT");
+	#endif
+	#ifdef _MONKEY
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/MONKEY");
+	#endif
+	#ifdef _MONKEY2
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/MONKEY2");
+	#endif
+	#ifdef _MYST
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/MYST");
+	#endif
+	#ifdef _NEVERHOOD
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/NEVERHOOD");
+	#endif
+	#ifdef _QUEEN
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/QUEEN");
+	#endif
+	#ifdef _RIVEN
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/RIVEN");
+	#endif
+	#ifdef _SAMNMAX
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/SAMNMAX");
+	#endif
+	#ifdef _TENTACLE
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/TENTACLE");
+	#endif
+	#ifdef _TOON
+		_savefileManager = new DefaultSaveFileManager("/3ds/data/ScummVM/TOON");
+	#endif
+#else
+	_savefileManager = new DefaultSaveFileManager("/3ds/ScummVM");
+#endif
 
 	initGraphics();
 	initAudio();
@@ -125,7 +233,56 @@ void OSystem_3DS::updateConfig() {
 }
 
 Common::String OSystem_3DS::getDefaultConfigFileName() {
-	return "/3ds/scummvm/scummvm.ini";
+//-- Standalone builds
+#ifdef _GAME
+	#ifdef _BBVS
+		return "/3ds/data/ScummVM/BBVS/scummvm.ini";
+	#endif
+	#ifdef _COMI
+		return "/3ds/data/ScummVM/COMI/scummvm.ini";
+	#endif
+	#ifdef _DIG
+		return "/3ds/data/ScummVM/DIG/scummvm.ini";
+	#endif
+	#ifdef _DW
+		return "/3ds/data/ScummVM/DW/scummvm.ini";
+	#endif
+	#ifdef _DW2
+		return "/3ds/data/ScummVM/DW2/scummvm.ini";
+	#endif
+	#ifdef _FT
+		return "/3ds/data/ScummVM/FT/scummvm.ini";
+	#endif
+	#ifdef _MONKEY
+		return "/3ds/data/ScummVM/MONKEY/scummvm.ini";
+	#endif
+	#ifdef _MONKEY2
+		return "/3ds/data/ScummVM/MONKEY2/scummvm.ini";
+	#endif
+	#ifdef _MYST
+		return "/3ds/data/ScummVM/MYST/scummvm.ini";
+	#endif
+	#ifdef _NEVERHOOD
+		return "/3ds/data/ScummVM/NEVERHOOD/scummvm.ini";
+	#endif
+	#ifdef _QUEEN
+		return "/3ds/data/ScummVM/QUEEN/scummvm.ini";
+	#endif
+	#ifdef _RIVEN
+		return "/3ds/data/ScummVM/RIVEN/scummvm.ini";
+	#endif
+	#ifdef _SAMNMAX
+		return "/3ds/data/ScummVM/SAMNMAX/scummvm.ini";
+	#endif
+	#ifdef _TENTACLE
+		return "/3ds/data/ScummVM/TENTACLE/scummvm.ini";
+	#endif
+	#ifdef _TOON
+		return "/3ds/data/ScummVM/TOON/scummvm.ini";
+	#endif
+#else
+	return "/3ds/ScummVM/scummvm.ini";
+#endif
 }
 
 uint32 OSystem_3DS::getMillis(bool skipRecord) {

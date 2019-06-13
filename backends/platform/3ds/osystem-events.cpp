@@ -179,16 +179,33 @@ static void eventThreadFunc(void *arg) {
 			event.type = Common::EVENT_VIRTUAL_KEYBOARD;
 			pushEventQueue(eventQueue, event);
 		}
+//-- Standalone builds
+#ifdef _NEVERHOOD_MENU
+		/* DISABLED for now
 		if (keysPressed & KEY_START) {
 			event.type = Common::EVENT_MAINMENU;
 			pushEventQueue(eventQueue, event);
 		}
+		*/
+#else
+		if (keysPressed & KEY_START) {
+			event.type = Common::EVENT_MAINMENU;
+			pushEventQueue(eventQueue, event);
+		}
+#endif
 		if (keysPressed & KEY_SELECT) {
 			if (!optionMenuOpened)
 				optionMenuOpening = true;
 		}
+		
+#ifdef _NEVERHOOD_MENU
+		if (keysPressed & KEY_START || keysReleased & KEY_START) {
+			if (keysPressed & KEY_START)
+#else
 		if (keysPressed & KEY_B || keysReleased & KEY_B || keysPressed & KEY_DDOWN || keysReleased & KEY_DDOWN) {
 			if (keysPressed & KEY_B || keysPressed & KEY_DDOWN)
+#endif
+			
 				event.type = Common::EVENT_KEYDOWN;
 			else
 				event.type = Common::EVENT_KEYUP;
