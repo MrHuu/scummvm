@@ -45,17 +45,40 @@ void CryOmni3DEngine_Versailles::drawMenuTitle(Graphics::ManagedSurface *surface
 	int offY;
 
 	int oldFont = _fontManager.getCurrentFont();
+
+	int titleX, titleY, subtitleX, subtitleY;
+	if (getLanguage() == Common::FR_FRA ||
+	        getLanguage() == Common::ES_ESP) {
+		titleX = 144;
+		titleY = 160;
+		subtitleX = 305;
+		subtitleY = 160;
+	} else if (getLanguage() == Common::DE_DEU) {
+		titleX = 122;
+		titleY = 80;
+		subtitleX = 283;
+		subtitleY = 80;
+	} else {
+		titleX = 100;
+		titleY = 80;
+		subtitleX = 261;
+		subtitleY = 80;
+	}
+
 	_fontManager.setSurface(surface);
 	_fontManager.setForeColor(color);
 	_fontManager.setCurrentFont(1);
 	offY = _fontManager.getFontMaxHeight();
-	_fontManager.displayStr(144, 160 - offY, _messages[23]);
+	_fontManager.displayStr(titleX, titleY - offY, _messages[23]);
 	_fontManager.setCurrentFont(3);
 	offY = _fontManager.getFontMaxHeight();
-	_fontManager.displayStr(305, 160 - offY, _messages[24]);
+	_fontManager.displayStr(subtitleX, subtitleY - offY, _messages[24]);
 
-	surface->vLine(100, 146, 172, color);
-	surface->hLine(100, 172, 168, color); // minus 1 because hLine draws inclusive
+	if (getLanguage() == Common::FR_FRA ||
+	        getLanguage() == Common::ES_ESP) {
+		surface->vLine(100, 146, 172, color);
+		surface->hLine(100, 172, 168, color); // minus 1 because hLine draws inclusive
+	}
 
 	_fontManager.setCurrentFont(oldFont);
 }
@@ -98,10 +121,10 @@ uint CryOmni3DEngine_Versailles::displayOptions() {
 	setCursor(181);
 	showMouse(true);
 
-	uint hoveredBox = -1;
-	uint selectedBox;
+	uint hoveredBox = uint(-1);
+	uint selectedBox = uint(-1);
 	int selectedMsg = 0;
-	uint volumeBox;
+	uint volumeBox = uint(-1);
 	bool resetScreen = true;
 	bool forceEvents = true;
 
@@ -283,8 +306,8 @@ uint CryOmni3DEngine_Versailles::displayOptions() {
 						} while (false);
 					}
 				} else {
-					if (hoveredBox != -1u) {
-						hoveredBox = -1;
+					if (hoveredBox != uint(-1)) {
+						hoveredBox = uint(-1);
 						drawState = 2;
 					}
 					if (volumeForeColor != 243) {
@@ -301,12 +324,19 @@ uint CryOmni3DEngine_Versailles::displayOptions() {
 				if (!_isPlaying || _isVisiting) {
 					end = true;
 				} else {
-					end = displayYesNoBox(optionsSurface, Common::Rect(235, 420, 505, 465), 57);
+					Common::Rect rct;
+					if (getLanguage() == Common::DE_DEU) {
+						rct = Common::Rect(286, 433, 555, 475);
+					} else if (getLanguage() == Common::ES_ESP ||
+					           getLanguage() == Common::IT_ITA) {
+						rct = Common::Rect(250, 420, 530, 465);
+					} else {
+						rct = Common::Rect(235, 420, 505, 465);
+					}
+					end = displayYesNoBox(optionsSurface, rct, 57);
 				}
 				drawState = 1;
-				if (end) {
-					_isPlaying = false;
-				} else {
+				if (!end) {
 					selectedMsg = 0;
 				}
 			}
@@ -326,13 +356,12 @@ uint CryOmni3DEngine_Versailles::displayOptions() {
 				bool wasVisiting = _isVisiting;
 				_isVisiting = false;
 				uint saveNumber = displayFilePicker(bgFrame, false, saveName);
-				if (saveNumber == -1u) {
+				if (saveNumber == uint(-1)) {
 					_isVisiting = wasVisiting;
 					drawState = 1;
 					selectedMsg = 0;
 				} else {
 					_loadedSave = saveNumber;
-					_isPlaying = false;
 					end = true;
 				}
 				waitMouseRelease();
@@ -341,20 +370,19 @@ uint CryOmni3DEngine_Versailles::displayOptions() {
 				bool wasVisiting = _isVisiting;
 				_isVisiting = true;
 				uint saveNumber = displayFilePicker(bgFrame, false, saveName);
-				if (saveNumber == -1u) {
+				if (saveNumber == uint(-1)) {
 					_isVisiting = wasVisiting;
 					drawState = 1;
 					selectedMsg = 0;
 				} else {
 					_loadedSave = saveNumber;
-					_isPlaying = false;
 					end = true;
 				}
 				waitMouseRelease();
 			} else if (selectedMsg == 29) {
 				Common::String saveName;
 				uint saveNumber = displayFilePicker(bgFrame, true, saveName);
-				if (saveNumber != -1u) {
+				if (saveNumber != uint(-1)) {
 					saveGame(_isVisiting, saveNumber, saveName);
 				}
 				drawState = 1;
@@ -508,7 +536,7 @@ uint CryOmni3DEngine_Versailles::displayYesNoBox(Graphics::ManagedSurface &surfa
 
 	bool end = false;
 	bool redraw = true;
-	uint result = -1u;
+	uint result = uint(-1);
 
 	while (!end || redraw) {
 		if (redraw) {
@@ -529,7 +557,7 @@ uint CryOmni3DEngine_Versailles::displayYesNoBox(Graphics::ManagedSurface &surfa
 
 		if (pollEvents()) {
 			Common::Point mouse = getMousePos();
-			uint hit_result = -1u;
+			uint hit_result = uint(-1);
 			if (boxes.hitTest(1, mouse)) {
 				hit_result = 1;
 			} else if (boxes.hitTest(0, mouse)) {
@@ -539,7 +567,7 @@ uint CryOmni3DEngine_Versailles::displayYesNoBox(Graphics::ManagedSurface &surfa
 				result = hit_result;
 				redraw = true;
 			}
-			if ((getCurrentMouseButton() == 1) && (result != -1u)) {
+			if ((getCurrentMouseButton() == 1) && (result != uint(-1))) {
 				end = true;
 			}
 			Common::KeyCode keyPressed = getNextKey().keycode;
@@ -605,12 +633,12 @@ uint CryOmni3DEngine_Versailles::displayFilePicker(const Graphics::Surface *bgFr
 	uint fileListOffset = CLIP(ConfMan.getInt(_isVisiting ? "visits_list_off" :
 	                           "saves_list_off"), 0, 100 - 6);
 
-	uint boxHovered = -1;
-	uint boxSelected = -1;
+	uint boxHovered = uint(-1);
+	uint boxSelected = uint(-1);
 
 	bool textCursorState = false;
 	uint textCursorNextState = 0;
-	uint textCursorPos = -1;
+	uint textCursorPos = uint(-1);
 
 	bool autoRepeatInhibit = false;
 	uint autoRepeatDelay = 250;
@@ -634,7 +662,7 @@ uint CryOmni3DEngine_Versailles::displayFilePicker(const Graphics::Surface *bgFr
 				if (box == boxSelected) {
 					// Selected
 					_fontManager.setForeColor(240);
-				} else if (box == 6 && boxSelected == -1u) {
+				} else if (box == 6 && boxSelected == uint(-1)) {
 					// Ok and no file selected
 					_fontManager.setForeColor(245);
 				} else if (box == boxHovered) {
@@ -686,14 +714,14 @@ uint CryOmni3DEngine_Versailles::displayFilePicker(const Graphics::Surface *bgFr
 					}
 				}
 			}
-			if (!boxFound && boxHovered != -1u) {
-				boxHovered = -1;
+			if (!boxFound && boxHovered != uint(-1)) {
+				boxHovered = uint(-1);
 				redraw = true;
 			}
 		}
 		if (key == Common::KEYCODE_RETURN || (mousePressed == 1 && boxHovered == 6)) {
 			// OK
-			if (boxSelected != -1u) {
+			if (boxSelected != uint(-1)) {
 				Common::String &selectedSaveName = savesList[boxSelected + fileListOffset];
 				if (!selectedSaveName.size()) {
 					selectedSaveName = _messages[56]; // No name
@@ -704,16 +732,16 @@ uint CryOmni3DEngine_Versailles::displayFilePicker(const Graphics::Surface *bgFr
 		} else if (mousePressed == 1) {
 			if (boxHovered == 7) {
 				// Cancel
-				boxSelected = -1;
+				boxSelected = uint(-1);
 				finished = true;
-			} else if (boxHovered != -1u && boxHovered != boxSelected) {
+			} else if (boxHovered != uint(-1) && boxHovered != boxSelected) {
 				// This can only be a file
 				bool existingSave = (savesList[boxHovered + fileListOffset] != _messages[55]);
 				// Don't allow to save on slot 0 when visiting to avoid problems with original visit save
 				bool validSave = !(_isVisiting && saveMode && boxSelected == 0);
 				if ((saveMode || existingSave) && validSave) {
 					// Restore old name
-					if (saveMode && boxSelected != -1u) {
+					if (saveMode && boxSelected != uint(-1)) {
 						savesList[boxSelected + fileListOffset] = saveNameBackup;
 						filesListChanged = true;
 					}
@@ -728,7 +756,7 @@ uint CryOmni3DEngine_Versailles::displayFilePicker(const Graphics::Surface *bgFr
 				}
 			}
 		}
-		if (boxSelected != -1u && saveMode) {
+		if (boxSelected != uint(-1) && saveMode) {
 			if (key.keycode != Common::KEYCODE_INVALID) {
 				// Reference means we edit in place
 				Common::String &selectedSaveName = savesList[boxSelected + fileListOffset];
@@ -787,11 +815,11 @@ uint CryOmni3DEngine_Versailles::displayFilePicker(const Graphics::Surface *bgFr
 			}
 			if (autoRepeatTrigger) {
 				// Restore old name
-				if (saveMode && boxSelected != -1u) {
+				if (saveMode && boxSelected != uint(-1)) {
 					savesList[boxSelected + oldFileListOffset] = saveNameBackup;
 				}
-				boxHovered = -1;
-				boxSelected = -1;
+				boxHovered = uint(-1);
+				boxSelected = uint(-1);
 				autoRepeatInhibit = true;
 				autoRepeatEndInhibit = g_system->getMillis() + autoRepeatDelay;
 				filesListChanged = true;
@@ -806,12 +834,12 @@ uint CryOmni3DEngine_Versailles::displayFilePicker(const Graphics::Surface *bgFr
 			autoRepeatDelay = 250;
 		}
 	}
-	if (boxSelected != -1u) {
+	if (boxSelected != uint(-1)) {
 		saveName = savesList[boxSelected + fileListOffset];
 		ConfMan.setInt(_isVisiting ? "visits_list_off" : "saves_list_off", fileListOffset);
 		return boxSelected + fileListOffset + 1;
 	} else {
-		return -1;
+		return uint(-1);
 	}
 }
 
@@ -960,8 +988,9 @@ void CryOmni3DEngine_Versailles::displayCredits() {
 	_fontManager.setSurface(&creditsSurface);
 
 	Common::File creditsFile;
-	if (!creditsFile.open("credits.txt")) {
-		warning("Failed to open credits file: %s", "credits.txt");
+	if (!creditsFile.open(_localizedFilenames[LocalizedFilenames::kCredits])) {
+		warning("Failed to open credits file: %s",
+		        _localizedFilenames[LocalizedFilenames::kCredits].c_str());
 		delete imageDecoder;
 		return;
 	}

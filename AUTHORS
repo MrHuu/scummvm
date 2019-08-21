@@ -100,6 +100,9 @@ ScummVM Team
        Paul Gilbert
        Vincent Hamm                 - (retired)
 
+    Cryomni3D:
+       Philippe Valembois
+
     Draci:
        Denis Kasak
        Robert Spalek
@@ -235,6 +238,7 @@ ScummVM Team
        Eugene Sandulenko
 
     SCI:
+       Chris Benshoof
        Greg Frieger
        Paul Gilbert
        Max Horn                     - (retired)
@@ -254,6 +258,11 @@ ScummVM Team
        Robert Goeffringmann         - (retired)
        Oliver Kiehl                 - (retired)
        Joost Peters
+
+    Supernova:
+       Joseph-Eugene Winzer
+       Jaromir Wysoglad
+       Thierry Crozat
 
     Sword1:
        Fabio Battaglia              - PSX version support
@@ -349,6 +358,7 @@ ScummVM Team
     iPhone / iPad:
        Oystein Eftevaag
        Vincent Benony
+       Thierry Crozat
 
     LinuxMoto:
        Lubomyr Lisen
@@ -510,7 +520,7 @@ Other contributions
     Haiku:
        Luc Schrijvers
 
-    Mac OS X:
+    macOS:
        Max Horn                     - (retired)
        Oystein Eftevaag
        Thierry Crozat
@@ -630,6 +640,10 @@ Other contributions
     Mortevielle:
        Hugo Labrande                - Improve English translation
        Thierry Crozat               - Improve English translation
+
+    Supernova:
+       Joseph-Eugene Winzer         - English translation
+       Thierry Crozat               - English translation
 
   Websites (design)
   -----------------

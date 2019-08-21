@@ -93,8 +93,10 @@ void Versailles_DialogsManager::playDialog(const Common::String &video, const Co
 	Common::String videoFName(_engine->prepareFileName(video, "hnm"));
 	Common::String soundFName(sound);
 
-	while (soundFName.size() < 8) {
-		soundFName += '_';
+	if (_padAudioFileName) {
+		while (soundFName.size() < 8) {
+			soundFName += '_';
+		}
 	}
 	soundFName = _engine->prepareFileName(soundFName, "wav");
 
@@ -249,7 +251,7 @@ uint Versailles_DialogsManager::askPlayerQuestions(const Common::String &video,
 	}
 
 	if (questions.size() == 0 || questions.size() > 5) {
-		return -1;
+		return uint(-1);
 	}
 
 	FontManager &fontManager = _engine->_fontManager;
@@ -292,7 +294,7 @@ uint Versailles_DialogsManager::askPlayerQuestions(const Common::String &video,
 
 	bool finished = false;
 	bool update = true;
-	uint selectedQuestion = -1;
+	uint selectedQuestion = uint(-1);
 	while (!finished) {
 		if (update) {
 			update = false;
@@ -313,15 +315,15 @@ uint Versailles_DialogsManager::askPlayerQuestions(const Common::String &video,
 			_engine->clearKeys();
 			if (_engine->shouldAbort()) {
 				finished = true;
-				selectedQuestion = -1;
+				selectedQuestion = uint(-1);
 				break;
 			}
 			Common::Point mousePos = _engine->getMousePos();
-			if (_engine->getDragStatus() == kDragStatus_Finished && selectedQuestion != -1u) {
+			if (_engine->getDragStatus() == kDragStatus_Finished && selectedQuestion != uint(-1)) {
 				finished = true;
 			} else if (mousePos.x >= 608 || mousePos.y < offsetY) {
-				if (selectedQuestion != -1u) {
-					selectedQuestion = -1;
+				if (selectedQuestion != uint(-1)) {
+					selectedQuestion = uint(-1);
 					update = true;
 				}
 			} else {
@@ -336,7 +338,7 @@ uint Versailles_DialogsManager::askPlayerQuestions(const Common::String &video,
 						update = true;
 					}
 				} else {
-					selectedQuestion = -1;
+					selectedQuestion = uint(-1);
 					update = true;
 				}
 			}

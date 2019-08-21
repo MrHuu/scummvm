@@ -452,6 +452,12 @@ void Set::overrideSceneObjectInfo(int objectId) const {
 			_objects[objectId].bbox.setXYZ(-75.17f, -1239.29f, 108340.13f, -56.32f, -1221.16f, 108365.65f);
 		}
 		break;
+	case kSceneCT04:
+		// prevent McCoy or transient from blending/glitching with the right wall
+		if (objectId == 6 && _objects[objectId].name == "BOX04") {
+			_objects[objectId].bbox.setXYZ(-251.80f, -636.49f, 414.38f, -206.66f, -445.84f, 900.44f);
+		}
+		break;
 	case kSceneBB06:
 		// Sebastian's room with doll
 		if (objectId == 3 && _objects[objectId].name == "BOX31") {
@@ -478,6 +484,12 @@ void Set::overrideSceneObjectInfo(int objectId) const {
 			// still it's best to fix its clickbox and remove clickable or restore functionality from
 			// the scene script
 			_objects[objectId].bbox.setXYZ(695.63f, 42.65f, -628.10f, 706.71f, 69.22f, -614.47f);
+		}
+		break;
+	case kScenePS07:
+		// Make the mid-wall thinner to enable access to clickable object (buzzer)
+		if (objectId == 1 && _objects[objectId].name == "BOX01") {
+			_objects[objectId].bbox.setXYZ(526.91f, 0.0f, -582.62f, 531.50f, 48.43f, -511.72f);
 		}
 		break;
 	case kSceneNR05:
@@ -571,6 +583,13 @@ void Set::patchInAdditionalObjectsInSet() {
 		// it causes McCoy to sometimes go behind the wall
 		bbox = BoundingBox(730.50f, -0.0f, -481.10f, 734.51f, 144.75f, -437.55f);
 		custObjName = "MAINFBLOCK";
+		setupNewObjectInSet(custObjName, bbox);
+		break;
+
+	case kScenePS07:
+		// add missing buzzer button to annoy Klein
+		bbox = BoundingBox(530.16f, 48.44f, -570.13f, 550.41f, 50.46f, -558.77f);
+		custObjName = "L.MOUSE";
 		setupNewObjectInSet(custObjName, bbox);
 		break;
 

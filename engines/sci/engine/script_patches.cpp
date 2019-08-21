@@ -104,7 +104,9 @@ static const char *const selectorNameTable[] = {
 	"cycleSpeed",   // system selector
 	"handsOff",     // system selector
 	"handsOn",      // system selector
+	"type",         // system selector
 	"localize",     // Freddy Pharkas
+	"roomFlags",    // Iceman
 	"put",          // Police Quest 1 VGA
 	"changeState",  // Quest For Glory 1 VGA, QFG4
 	"hide",         // Quest For Glory 1 VGA, QFG4
@@ -125,6 +127,7 @@ static const char *const selectorNameTable[] = {
 	"looper",       // Space Quest 4
 	"nMsgType",     // Space Quest 4
 	"doVerb",       // Space Quest 4
+	"setRegions",   // Space Quest 4
 	"loop",         // Laura Bow 1 Colonel's Bequest, QFG4
 	"setLoop",      // Laura Bow 1 Colonel's Bequest, QFG4
 	"ignoreActors", // Laura Bow 1 Colonel's Bequest
@@ -135,6 +138,7 @@ static const char *const selectorNameTable[] = {
 	"size",         // EcoQuest 1
 	"signal",       // EcoQuest 1, GK1
 	"obstacles",    // EcoQuest 1, QFG4
+	"handleEvent",  // EcoQuest 2, Shivers
 #ifdef ENABLE_SCI32
 	"newWith",      // SCI2 array script
 	"scrollSelections", // GK2
@@ -142,7 +146,6 @@ static const char *const selectorNameTable[] = {
 	"detailLevel",  // GK2 benchmarking
 	"view",         // RAMA benchmarking, GK1, QFG4
 	"fade",         // Shivers
-	"handleEvent",  // Shivers
 	"test",         // Torin
 	"get",          // Torin, GK1
 	"newRoom",      // GK1
@@ -180,6 +183,7 @@ static const char *const selectorNameTable[] = {
 	"getCursor",    // QFG4
 	"heading",      // QFG4
 	"moveSpeed",    // QFG4
+	"register",     // QFG4
 	"sayMessage",   // QFG4
 	"setCursor",    // QFG4
 	"setLooper",    // QFG4
@@ -213,7 +217,9 @@ enum ScriptPatcherSelectors {
 	SELECTOR_cycleSpeed,
 	SELECTOR_handsOff,
 	SELECTOR_handsOn,
+	SELECTOR_type,
 	SELECTOR_localize,
+	SELECTOR_roomFlags,
 	SELECTOR_put,
 	SELECTOR_changeState,
 	SELECTOR_hide,
@@ -234,6 +240,7 @@ enum ScriptPatcherSelectors {
 	SELECTOR_looper,
 	SELECTOR_nMsgType,
 	SELECTOR_doVerb,
+	SELECTOR_setRegions,
 	SELECTOR_loop,
 	SELECTOR_setLoop,
 	SELECTOR_ignoreActors,
@@ -243,7 +250,8 @@ enum ScriptPatcherSelectors {
 	SELECTOR_delete,
 	SELECTOR_size,
 	SELECTOR_signal,
-	SELECTOR_obstacles
+	SELECTOR_obstacles,
+	SELECTOR_handleEvent
 #ifdef ENABLE_SCI32
 	,
 	SELECTOR_newWith,
@@ -252,7 +260,6 @@ enum ScriptPatcherSelectors {
 	SELECTOR_detailLevel,
 	SELECTOR_view,
 	SELECTOR_fade,
-	SELECTOR_handleEvent,
 	SELECTOR_test,
 	SELECTOR_get,
 	SELECTOR_newRoom,
@@ -290,6 +297,7 @@ enum ScriptPatcherSelectors {
 	SELECTOR_getCursor,
 	SELECTOR_heading,
 	SELECTOR_moveSpeed,
+	SELECTOR_register,
 	SELECTOR_sayMessage,
 	SELECTOR_setCursor,
 	SELECTOR_setLooper,
@@ -519,9 +527,299 @@ static const uint16 camelotPatchPeepingTom[] = {
 	PATCH_END
 };
 
-//         script, description,                                       signature                   patch
+// If the butcher's daughter in room 62 closes her window while Arthur interacts
+//  with the relic merchant then the game locks up. The script daughterAppears
+//  attempts to dispose the script peepingTom, but it does so by clearing ego's
+//  script no matter what it is, which breaks the game if the script is buyRelic
+//  or one of the other handsOff merchant scripts.
+//
+// We fix this by calling peepingTom:dispose instead of clearing ego's script.
+//  As this is an earlier SCI game prior to Script:dispose clearing the client
+//  property, we need to do that ourselves in peepingTom:doit when Arthur turns
+//  away from the window, or else peepingTom:client will still point to ego
+//  after disposal, and the subsequent peepingTom:dispose will end ego's script.
+//
+// Applies to: All versions
+// Responsible methods: daughterAppears:changeState(6), peepingTom:doit
+// Fixes bug: #11025
+static const uint16 camelotSignatureRelicMerchantLockup1[] = {
+	0x39, SIG_SELECTOR8(setScript),     // pushi setScript
+	0x78,                               // push1
+	0x76,                               // push0
+	0x81, SIG_MAGICDWORD, 0x00,         // lag 00
+	0x4a, 0x06,                         // send 06 [ ego setScript: 0 ]
+	0x3a,                               // toss
+	SIG_END
+};
+
+static const uint16 camelotPatchRelicMerchantLockup1[] = {
+	0x39, PATCH_SELECTOR8(dispose),     // pushi dispose
+	0x76,                               // push0
+	0x72, PATCH_UINT16(0x01f3),         // lofsa peepingTom
+	0x4a, 0x04,                         // send 04 [ peepingTom dispose: ]
+	PATCH_END
+};
+
+static const uint16 camelotSignatureRelicMerchantLockup2[] = {
+	0x39, SIG_SELECTOR8(setScript),     // pushi setScript
+	0x78,                               // push1
+	0x76,                               // push0
+	0x81, SIG_MAGICDWORD, 0x00,         // lag 00
+	0x4a, 0x06,                         // send 06 [ ego setScript: 0 ]
+	0x48,                               // ret
+	SIG_END
+};
+
+static const uint16 camelotPatchRelicMerchantLockup2[] = {
+	0x39, PATCH_SELECTOR8(dispose),     // pushi dispose
+	0x76,                               // push0
+	0x54, 0x04,                         // self 04 [ self dispose: ]
+	0x76,                               // push0
+	0x69, 0x08,                         // sTop client [ client = 0 ]
+	PATCH_END
+};
+
+// The hunter in room 11 doesn't award soul points if you buy his furs with the
+//  "buy furs" command first and "pay" second. Two points are awarded if these
+//  commands are entered in the opposite order.
+//
+// We fix this by adding the missing function call to award the soul points as
+//  Sierra did in later versions. Fortunately, the GiveMoney script contains
+//  redundant code that can be replaced as it is occurs later in the method.
+//
+// Applies to: PC only
+// Responsible method: GiveMoney:changeState(3)
+// Fixes bug: #11027
+static const uint16 camelotSignatureHunterMissingPoints[] = {
+	SIG_MAGICDWORD,
+	0x30, SIG_UINT16(0x0020),           // bnt 0020 [ matches PC only ]
+	0x35, 0x00,                         // ldi 00
+	0xa3, 0x00,                         // sal 00 [ local0 = 0 ]
+	// unnecessary code which is repeated later in the method
+	0x89, 0xdd,                         // lsg dd
+	0x81, 0x84,                         // lag 84
+	0x02,                               // add
+	0xa1, 0xdd,                         // sag dd [ global221 += global132 ]
+	0x35, 0x00,                         // ldi 00
+	0xa1, 0x84,                         // sag 84 [ global132 = 0 ]
+	SIG_END
+};
+
+static const uint16 camelotPatchHunterMissingPoints[] = {
+	PATCH_ADDTOOFFSET(+7),
+	0x38, PATCH_UINT16(0x0003),         // pushi 0003
+	0x38, PATCH_UINT16(0x00f5),         // pushi 00f5 [ point flag 245 ]
+	0x7a,                               // push2 [ soul points ]
+	0x7a,                               // push2 [ +2 points ]
+	0x45, 0x0a, 0x06,                   // callb proc0_10 06 [ +2 soul points ]
+	PATCH_END
+};
+
+// When giving away the mule in room 56, the merchant's first long message is
+//  immediately replaced by the next. mo:handleEvent displays the first and
+//  starts the script getMule, which proceeds to display its own messages
+//  without waiting.
+//
+// We fix this by adding code to getMule to wait for the merchant's message to
+//  complete if you gave away the mule and a message is on screen.
+//
+// Applies to: All versions
+// Responsible method: getMule:changeState(4)
+// Fixes bug: #11026
+static const uint16 camelotSignatureGiveMuleMessage[] = {
+	0x30, SIG_UINT16(0x0023),           // bnt 0023 [ state 4 ]
+	SIG_ADDTOOFFSET(+0x20),
+	SIG_MAGICDWORD,
+	0x32, SIG_UINT16(0x0239),           // jmp 0239 [ end of method ]
+	0x3c,                               // dup
+	0x35, 0x04,                         // ldi 04
+	0x1a,                               // eq?
+	0x30, SIG_UINT16(0x0016),           // bnt 0016 [ state 5 ]
+	0x83, 0x02,                         // lal 02   [ gave away mule? ]
+	0x30, SIG_UINT16(0x000a),           // bnt 000a [ skip state 14 if mule was sold ]
+	0x39, SIG_SELECTOR8(changeState),   // pushi changeState
+	0x78,                               // push1
+	0x39, 0x0e,                         // pushi 0e
+	0x54, 0x06,                         // self 06 [ self changeState: 14 ]
+	0x32, SIG_UINT16(0x0223),           // jmp 0223 [ end of method ]
+	0x35, 0x01,                         // ldi 01
+	0x65, 0x10,                         // aTop cycles [ cycles = 1 ]
+	0x32, SIG_UINT16(0x021c),           // jmp 021c [ end of method ]
+	SIG_END
+};
+
+static const uint16 camelotPatchGiveMuleMessage[] = {
+	0x30, PATCH_UINT16(0x0020),         // bnt 0020 [ state 4 ]
+	PATCH_ADDTOOFFSET(+0x20),
+	0x3c,                               // dup
+	0x35, 0x04,                         // ldi 04
+	0x1a,                               // eq?
+	0x31, 0x1a,                         // bnt 1a [ state 5 ]
+	0x83, 0x02,                         // lal 02 [ gave away mule? ]
+	0x31, 0x13,                         // bnt 13 [ skip state 14 if mule was sold ]
+	0x35, 0x0d,                         // ldi 0d
+	0x65, 0x0a,                         // aTop state [ state = 13 ]
+	0x38, PATCH_UINT16(0x0121),         // pushi talkCue [ same value in all versions ]
+	0x78,                               // push1
+	0x7c,                               // pushSelf
+	0x38, PATCH_UINT16(0x0122),         // pushi tS1 [ same value in all versions ]
+	0x76,                               // push0
+	0x81, 0x6f,                         // lag 6f
+	0x4a, 0x0a,                         // send 0a [ tObj talkCue: self tS1? ]
+	0x2f, 0x03,                         // bt 03   [ don't set cycles if message on screen ]
+	0x78,                               // push1
+	0x69, 0x10,                         // sTop cycles [ cycles = 1 ]
+	PATCH_END
+};
+
+// In Fatima's house in room 64, "look room" and "look trap" respond with the
+//  wrong messages due to testing the wrong flag. Flag 162 is set when falling
+//  through the trap door and alters responses the next time in the room, but
+//  the script tests flag 137 instead, which is set when entering the room.
+//
+// Sierra fixed the first flag test in Amiga and Atari ST but not the second, so
+//  this patch is applied only once to those versions and twice to PC.
+//
+// Applies to: All versions
+// Responsible method: Rm64:handleEvent
+// Fixes bug: #11028
+static const uint16 camelotSignatureFatimaRoomMessages[] = {
+	0x78,                               // push1
+	0x38, SIG_MAGICDWORD,               // pushi 0089 [ flag 137, always true ]
+	      SIG_UINT16(0x0089),
+	0x45, 0x09, 0x02,                   // callb proc0_9 02 [ is flag 137 set? ]
+	SIG_END
+};
+
+static const uint16 camelotPatchFatimaRoomMessages[] = {
+	PATCH_ADDTOOFFSET(+1),
+	0x38, PATCH_UINT16(0x00a2),         // pushi 00a2 [ flag 162, set by trap ]
+	PATCH_END
+};
+
+// Sheathing the sword by pressing F8 while entering or exiting a room breaks
+//  the game by placing ego in an invalid state that allows walking through
+//  obstacles and prevents room changes. This affects rooms that subclass eRoom
+//  in areas that allow walking with sword drawn such as the monk's ruins and
+//  the desert. This is most likely to occur while battling the monk.
+//
+// eRoom walks ego in and out of rooms in handsOff mode. It sets ego:illegalBits
+//  to 0, enables ignoreActors, and sets a motion that cues when complete to
+//  restore ego's properties. Sheathing the sword interrupts the motion, which
+//  prevents eRoom:cue, and prematurely restores control to the user with ego in
+//  the temporary state. There are almost no restrictions on sheathing because
+//  it's used when input is disabled and during several handsOff scenes.
+//
+// We fix this by preventing sword scripts from starting when an eRoom is in the
+//  middle of controlling ego. eRoom tracks this with the comingIn and goingOut
+//  properties and we require that both be cleared to execute a sword command.
+//
+// Applies to: All versions
+// Responsible method: ARTHUR:doit
+// Fixes bug: #11042
+static const uint16 camelotSignatureSwordSheathing[] = {
+	SIG_MAGICDWORD,
+	0x89, 0x7d,                         // lsg 7d [ sword-command ]
+	0x3c,                               // dup
+	0x35, 0x01,                         // ldi 01
+	0x1a,                               // eq? [ sword-command == 1 (draw) ]
+	0x30, SIG_UINT16(0x0013),           // bnt 0013
+	0x39, SIG_SELECTOR8(setScript),     // pushi setScript
+	0x78,                               // push1
+	0x7a,                               // push2
+	0x38, SIG_UINT16(0x038e),           // pushi 910d
+	0x76,                               // push0
+	0x43, 0x02, 0x04,                   // callk ScriptID 04 [ ScriptID 910 0 (DrawSword) ]
+	0x36,                               // push
+	0x81, 0x00,                         // lag 00
+	0x4a, 0x06,                         // send 06 [ ego setScript: DrawSword ]
+	0x32, SIG_UINT16(0x0085),           // jmp 0085 [ end of switch ]
+	0x3c,                               // dup
+	0x35, 0x02,                         // ldi 02
+	0x1a,                               // eq? [ sword-command == 2 (sheath) ]
+	0x30, SIG_UINT16(0x0013),           // bnt 0013
+	0x39, SIG_SELECTOR8(setScript),     // pushi setScript
+	0x78,                               // push1
+	0x7a,                               // push2
+	0x38, SIG_UINT16(0x038e),           // pushi 910d
+	0x78,                               // push1
+	0x43, 0x02, 0x04,                   // callk ScriptID 04 [ ScriptID 910 1 (SheatheSword) ]
+	0x36,                               // push
+	0x81, 0x00,                         // lag 00
+	0x4a, 0x06,                         // send 06 [ ego setScript: SheatheSword ]
+	0x32, SIG_UINT16(0x006b),           // jmp 006b [ end of switch ]
+	0x3c,                               // dup
+	0x35, 0x03,                         // ldi 03
+	0x1a,                               // eq? [ sword-command == 3 (parry) ]
+	0x30, SIG_UINT16(0x0013),           // bnt 0013
+	0x39, SIG_SELECTOR8(setScript),     // pushi setScript
+	0x78,                               // push1
+	0x7a,                               // push2
+	0x38, SIG_UINT16(0x0390),           // pushi 912d
+	0x78,                               // push1
+	0x43, 0x02, 0x04,                   // callk ScriptID 04 [ ScriptID 912 1 (DoParry) ]
+	SIG_ADDTOOFFSET(+15),
+	0x81, 0x7c,                         // lag 7c [ start of sword-command == 0 handler ]
+	SIG_ADDTOOFFSET(+72),
+	0x3a,                               // toss [ end of switch ]
+	SIG_END
+};
+
+static const uint16 camelotPatchSwordSheathing[] = {
+	0x81, 0x7d,                         // lag 7d [ sword-command ]
+	0x31, 0x53,                         // bnt 53 [ sword-command == 0 handler ]
+	0x39, 0x03,                         // pushi 03
+	0x20,                               // ge? [ 3 >= sword-command ]
+	0x31, 0x3e,                         // bnt 3e [ exit if sword-command > 3 ]
+	0x7a,                               // push2
+	0x89, 0x02,                         // lsg 02
+	0x38, PATCH_UINT16(0x014b),         // pushi comingIn [ same value in all versions ]
+	0x43, 0x07, 0x04,                   // callk RespondsTo 04 [ RespondsTo currentRoom comingIn ]
+	0x31, 0x14,                         // bnt 14 [ skip eRoom checks if room isn't an eRoom ]
+	0x38, PATCH_UINT16(0x014b),         // pushi comingIn
+	0x76,                               // push0
+	0x81, 0x02,                         // lag 02
+	0x4a, 0x04,                         // send 04 [ currentRoom comingIn? ]
+	0x2f, 0x29,                         // bt 29   [ skip sword scripts if entering room ]
+	0x38, PATCH_UINT16(0x014c),         // pushi goingOut [ same value in all versions ]
+	0x76,                               // push0
+	0x81, 0x02,                         // lag 02
+	0x4a, 0x04,                         // send 04 [ currentRoom goingOut? ]
+	0x2f, 0x1f,                         // bt 1f   [ skip sword scripts if exiting room ]
+	0x39, PATCH_SELECTOR8(setScript),   // pushi setScript
+	0x78,                               // push1
+	0x7a,                               // push2
+	0x81, 0x7d,                         // lag 7d
+	0x7a,                               // push2
+	0x20,                               // ge? [ 2 >= sword-command ]
+	0x31, 0x05,                         // bnt 05
+	0x38, PATCH_UINT16(0x038e),         // pushi 910d
+	0x33, 0x03,                         // jmp 03
+	0x38, PATCH_UINT16(0x0390),         // pushi 912d
+	0x81, 0x7d,                         // lag 7d
+	0x78,                               // push1
+	0x1c,                               // ne? [ sword-command != 1 ]
+	0x36,                               // push
+	0x43, 0x02, 0x04,                   // callk ScriptID 04 [ ScriptID (sword-command <= 2) ? 910 : 912, (sword-command != 1) ]
+	0x36,                               // push
+	0x81, 0x00,                         // lag 00
+	0x4a, 0x06,                         // send 06 [ ego setScript: sword-script ]
+	0x48,                               // ret
+	PATCH_ADDTOOFFSET(+89),
+	0x48,                               // ret [ remove toss since dup instructions were removed ]
+	PATCH_END
+};
+
+
+//         script, description,                                       signature                             patch
 static const SciScriptPatcherEntry camelotSignatures[] = {
-	{ true,    62, "fix peepingTom Sierra bug",                    1, camelotSignaturePeepingTom, camelotPatchPeepingTom },
+	{ true,     0, "fix sword sheathing",                          1, camelotSignatureSwordSheathing,       camelotPatchSwordSheathing },
+	{ true,    11, "fix hunter missing points",                    1, camelotSignatureHunterMissingPoints,  camelotPatchHunterMissingPoints },
+	{ true,    62, "fix peepingTom Sierra bug",                    1, camelotSignaturePeepingTom,           camelotPatchPeepingTom },
+	{ true,    64, "fix Fatima room messages",                     2, camelotSignatureFatimaRoomMessages,   camelotPatchFatimaRoomMessages },
+	{ true,   158, "fix give mule message",                        1, camelotSignatureGiveMuleMessage,      camelotPatchGiveMuleMessage },
+	{ true,   169, "fix relic merchant lockup (1/2)",              1, camelotSignatureRelicMerchantLockup1, camelotPatchRelicMerchantLockup1 },
+	{ true,   169, "fix relic merchant lockup (2/2)",              1, camelotSignatureRelicMerchantLockup2, camelotPatchRelicMerchantLockup2 },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -1013,10 +1311,38 @@ static const uint16 ecoquest2PatchEcorderTutorial[] = {
 	PATCH_END
 };
 
-//          script, description,                                       signature                          patch
+// Clicking an icon during the icon bar tutorial in room 100 sends messages to
+//  an uninitialized temporary variable. This is supposed to be the dispatched
+//  Event object that's passed around earlier in the call stack. In Sierra's
+//  interpreter that's what happened to be at this location and it worked.
+//
+// We fix this by using the global variable that stores the current Event object
+//  instead of the uninitialized temp variable that accidentally points to it.
+//  User:handleEvent sets this global before dispatching an event.
+//
+// Applies to: All versions
+// Responsible methods: iconWalk:select, iconLook:select, ...
+// Fixes bug: #11081
+static const uint16 ecoquest2SignatureIconBarTutorial[] = {
+	0x7a,                               // push2
+	0x38, SIG_SELECTOR16(handleEvent),  // pushi handleEvent
+	SIG_MAGICDWORD,
+	0x8d, 0x01,                         // lst 01  [ uninitialized ]
+	0x4a, 0x08,                         // send 08 [ EventHandler firstTrue: handleEvent temp1 ]
+	SIG_END,
+};
+
+static const uint16 ecoquest2PatchIconBarTutorial[] = {
+	PATCH_ADDTOOFFSET(+4),
+	0x89, 0x18,                         // lsg 18 [ current event ]
+	PATCH_END
+};
+
+//          script, description,                                        signature                          patch
 static const SciScriptPatcherEntry ecoquest2Signatures[] = {
-	{  true,    50, "initial text not removed on ecorder",          1, ecoquest2SignatureEcorder,         ecoquest2PatchEcorder },
-	{  true,   333, "initial text not removed on ecorder tutorial", 1, ecoquest2SignatureEcorderTutorial, ecoquest2PatchEcorderTutorial },
+	{  true,     0, "icon bar tutorial",                            10, ecoquest2SignatureIconBarTutorial, ecoquest2PatchIconBarTutorial },
+	{  true,    50, "initial text not removed on ecorder",           1, ecoquest2SignatureEcorder,         ecoquest2PatchEcorder },
+	{  true,   333, "initial text not removed on ecorder tutorial",  1, ecoquest2SignatureEcorderTutorial, ecoquest2PatchEcorderTutorial },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -1301,6 +1627,114 @@ static const uint16 freddypharkasPatchMacHopSingh[] = {
 	PATCH_END
 };
 
+// At the start of act 4 the church key is removed from inventory but reappears
+//  in the church door. The door script attempts to prevent this by not drawing
+//  the key in act 4 but the verb handler is missing this check. Looking at the
+//  door in act 4 still brings up the inset with the key. Sierra fixed this in
+//  Mac but forgot to include the fix in the CD version a year later.
+//
+// We fix this by replacing a duplicate inventory check with an act 4 check so
+//  that the key no longer appears in the inset and can't be picked up again.
+//
+// Applies to: PC Floppy, PC CD
+// Responsible method: inDoorInset:init
+// Fixes bug #10975
+static const uint16 freddypharkasSignatureChurchKey[] = {
+	SIG_MAGICDWORD,
+	0x76,                           // push0
+	0x59, 0x01,                     // &rest 01
+	0x57, SIG_ADDTOOFFSET(+1), 0x04,// super Inset 04 [ super: init &rest ]
+	0x38, SIG_SELECTOR16(has),      // pushi has
+	0x78,                           // push1
+	0x39, 0x06,                     // pushi 06
+	0x81, 0x00,                     // lag 00
+	0x4a, 0x06,                     // send 06 [ ego has: 6 (church key) ]
+	SIG_END
+};
+
+static const uint16 freddypharkasPatchChurchKey[] = {
+	PATCH_ADDTOOFFSET(+6),
+	0x89, 0x78,                     // lsg 78 [ act number ]
+	0x35, 0x04,                     // ldi 04
+	0x20,                           // ge?
+	0x33, 0x03,                     // jmp 03
+	PATCH_END
+};
+
+// After leaving the desk letter in the grave, the letter reappears in the desk.
+//  The desk script only checks if the letter is in inventory. Sierra started to
+//  fix this in the CD version by setting a new flag but forgot to check it.
+//
+// We fix this by testing Letter's owner, if -1 then it is in the grave.
+//
+// Applies to: All versions
+// Responsible method: deskDrawer:doVerb(1)
+// Fixes bug #10975
+static const uint16 freddypharkasSignatureDeskLetter[] = {
+	SIG_MAGICDWORD,
+	0x30, SIG_UINT16(0x0055),       // bnt 0055
+	0x38, SIG_SELECTOR16(has),      // pushi has
+	0x78,                           // push1
+	0x39, 0x1f,                     // pushi 1f
+	0x81, 0x00,                     // lag 00
+	0x4a, 0x06,                     // send 06 [ ego has: 31 (Letter) ]
+	0x18,                           // not
+	0x31, 0x1f,                     // bnt 1f
+	0x78,                           // push1
+	0x39, 0x31,                     // pushi 31
+	0x45, 0x02, 0x02,               // callb proc0_2 02 [ is flag 49 set? ]
+	0x31, 0x17,                     // bnt 17
+	0x38, SIG_ADDTOOFFSET(+2),      // pushi stopUpd
+	0x76,                           // push0
+	0x81, 0x00,                     // lag 00
+	0x4a, 0x04,                     // send 04 [ ego stopUpd: (optimization) ]
+	0x38, SIG_ADDTOOFFSET(+2),      // pushi setInset
+	0x78,                           // push1
+	0x72, SIG_UINT16(0x0522),       // lofsa inLetterInset
+	0x36,                           // push
+	0x81, 0x02,                     // lag 02
+	0x4a, 0x06,                     // send 06  [ rm610 setInset: inLetterInset ]
+	0x32, SIG_UINT16(0x008f),       // jmp 008f [ end of method ]
+	0x78,                           // push1
+	0x39, 0x31,                     // pushi 31
+	0x45, 0x02, 0x02,               // callb proc0_2 02 [ is flag 49 set? ]
+	0x31, 0x11,                     // bnt 11 [ drawer is closed ]
+	SIG_END
+};
+
+static const uint16 freddypharkasPatchDeskLetter[] = {
+	0x31, 0x56,                     // bnt 56
+	0x78,                           // push1
+	0x39, 0x31,                     // pushi 31
+	0x45, 0x02, 0x02,               // callb proc0_2 02 [ is flag 49 set? ]
+	0x31, 0x3e,                     // bnt 3e  [ drawer is closed ]
+	0x38, PATCH_SELECTOR16(has),    // pushi has
+	0x78,                           // push1
+	0x39, 0x1f,                     // pushi 1f
+	0x81, 0x00,                     // lag 00
+	0x4a, 0x06,                     // send 06 [ ego has: 31 (Letter) ]
+	0x2f, 0x21,                     // bt 21   [ drawer is open and empty ]
+	0x39, PATCH_SELECTOR8(at),      // pushi at
+	0x78,                           // push1
+	0x39, 0x1f,                     // pushi 1f
+	0x81, 0x09,                     // lag 09
+	0x4a, 0x06,                     // send 06 [ fpInv at: 31 (Letter) ]
+	0x38, PATCH_SELECTOR16(owner),  // pushi owner
+	0x76,                           // push0
+	0x4a, 0x04,                     // send 04 [ Letter owner? ]
+	0x39, 0xff,                     // pushi ff
+	0x1a,                           // eq?
+	0x2f, 0x0d,                     // bt 0d   [ drawer is open and empty ]
+	0x38, PATCH_GETORIGINALUINT16(+33), // pushi setInset
+	0x78,                           // push1
+	0x74, PATCH_UINT16(0x0522),     // lofss inLetterInset
+	0x81, 0x02,                     // lag 02
+	0x4a, 0x06,                     // send 06 [ rm610 setInset: inLetterInset ]
+	0x3a,                           // toss
+	0x48,                           // ret
+	PATCH_END
+};
+
 //          script, description,                                      signature                            patch
 static const SciScriptPatcherEntry freddypharkasSignatures[] = {
 	{  true,     0, "CD: score early disposal",                    1, freddypharkasSignatureScoreDisposal, freddypharkasPatchScoreDisposal },
@@ -1309,7 +1743,9 @@ static const SciScriptPatcherEntry freddypharkasSignatures[] = {
 	{  false,  200, "Mac: skip broken hop singh scene",            1, freddypharkasSignatureMacHopSingh,   freddypharkasPatchMacHopSingh },
 	{  true,   235, "CD: canister pickup hang",                    3, freddypharkasSignatureCanisterHang,  freddypharkasPatchCanisterHang },
 	{  true,   270, "Mac: easter egg hang",                        1, freddypharkasSignatureMacEasterEgg,  freddypharkasPatchMacEasterEgg },
+	{  true,   310, "church key reappears",                        1, freddypharkasSignatureChurchKey,     freddypharkasPatchChurchKey },
 	{  true,   320, "ladder event issue",                          2, freddypharkasSignatureLadderEvent,   freddypharkasPatchLadderEvent },
+	{  true,   610, "desk letter reappears",                       1, freddypharkasSignatureDeskLetter,    freddypharkasPatchDeskLetter },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -2581,6 +3017,164 @@ static const SciScriptPatcherEntry gk2Signatures[] = {
 };
 
 #endif
+
+// When spotting the destroyer, timing problems prevent completing the bridge
+//  scene at fast game speeds.
+//
+// In the control room, room 25, ego and the captain go to the bridge, room 28,
+//  where they spot ships in an effectively automatic scene. When this completes
+//  they return to the control room, the captain falls, and the player regains
+//  control of ego and has to walk to the control panel. This entire sequence
+//  has to be completed within 400 game cycles or the destroyer kills the sub,
+//  but the bridge timing is in wall time and has at least 25 seconds of delays,
+//  which at faster speeds is longer than 400 cycles. The bridge also animates
+//  during messages, causing the timer to run while reading, so even at slower
+//  speeds the game can illogically end before the ships are revealed.
+//
+// There are several problems here but the real bug is that the timer starts
+//  before the player has control. We fix this by disabling the timer during the
+//  bridge and resetting it to 120 game cycles when the player regains control.
+//  This preserves the original timer duration in the control room, where the
+//  real timed action is, and is compatible with existing saved games. When the
+//  timer expires, subMarineScript:changeState(9) no longer ends the game if
+//  subMarine:roomFlags flag 2 isn't set, which captainfallsScript sets at the
+//  same time that it now calls subMarineScript:changeState(8).
+//
+// Applies to: All versions
+// Responsible methods: subMarineScript:changeState, captainfallsScript:changeState
+// Fixes bug #11017
+static const uint16 icemanDestroyerTimer1Signature[] = {
+	0x30, SIG_UINT16(0x0022),           // bnt 0022 [ state 8 ]
+	SIG_ADDTOOFFSET(+0x1f),
+	SIG_MAGICDWORD,
+	0x32, SIG_UINT16(0x0074),           // jmp 0074 [ end of method ]
+	0x3c,                               // dup
+	0x35, 0x08,                         // ldi 08
+	0x1a,                               // eq?
+	0x30, SIG_UINT16(0x0008),           // bnt 0008 [ state 9 ]
+	0x34, SIG_UINT16(0x0190),           // ldi 0190
+	0x65, 0x10,                         // aTop cycles [ cycles = 400 ]
+	0x32, SIG_UINT16(0x0065),           // jmp 0065 [ end of method ]
+	0x3c,                               // dup
+	0x35, 0x09,                         // ldi 09
+	0x1a,                               // eq?
+	0x30, SIG_UINT16(0x0023),           // bnt 0023 [ state 15 ]
+	0x8f, 0x00,                         // lsp 00
+	0x35, 0x02,                         // ldi 02
+	0x22,                               // lt?      [ didn't reach control panel? ]
+	0x30, SIG_UINT16(0x0014),           // bnt 0014 [ skip death if reached control panel ]
+	SIG_END
+};
+
+static const uint16 icemanDestroyerTimer1Patch[] = {
+	0x30, PATCH_UINT16(0x001f),         // bnt 001f [ state 8 ]
+	PATCH_ADDTOOFFSET(+0x1f),
+	0x3c,                               // dup
+	0x35, 0x08,                         // ldi 08
+	0x1a,                               // eq?
+	0x31, 0x04,                         // bnt 04 [ state 9 ]
+	0x35, 0x78,                         // ldi 78
+	0x65, 0x10,                         // aTop cycles [ cycles = 120 ]
+	0x3c,                               // dup
+	0x35, 0x09,                         // ldi 09
+	0x1a,                               // eq?
+	0x31, 0x2c,                         // bnt 2c [ state 15 ]
+	0x38, PATCH_SELECTOR16(roomFlags),  // pushi roomFlags
+	0x76,                               // push0
+	0x63, 0x08,                         // pToa client
+	0x4a, 0x04,                         // send 04 [ subMarine roomFlags? ]
+	0x7a,                               // push2  [ flag 2 set when captain falls ]
+	0x12,                               // and    [ has captain fallen? ]
+	0x31, 0x19,                         // bnt 19 [ skip death if captain hasn't fallen ]
+	0x8f, 0x00,                         // lsp 00
+	0x22,                               // lt?    [ didn't reach control panel? ]
+	0x31, 0x14,                         // bnt 14 [ skip death if reached control panel ]
+	PATCH_END
+};
+
+static const uint16 icemanDestroyerTimer2Signature[] = {
+	// print four messages
+	0x7a,                               // push2
+	0x38, SIG_UINT16(0x0187),           // pushi 0187
+	SIG_MAGICDWORD,
+	0x7a,                               // push2
+	0x47, 0xff, 0x00, 0x04,             // calle proc255_0 [ print 391 2 ]
+	SIG_ADDTOOFFSET(+20),               // [ print 391 3, print 391 4 ]
+	0x7a,                               // push2
+	0x38, SIG_UINT16(0x0187),           // pushi 0187
+	0x39, 0x05,                         // pushi 05
+	0x47, 0xff, 0x00, 0x04,             // calle proc255_0 [ print 391 5 ]
+	SIG_END,
+};
+
+static const uint16 icemanDestroyerTimer2Patch[] = {
+	// print four messages using a loop
+	0x35, 0x02,                         // ldi 02
+	0xa7, 0x01,                         // sap 01
+	0x8f, 0x01,                         // lsp 01
+	0x35, 0x05,                         // ldi 05
+	0x24,                               // le?    [ loop while 2 <= param1 <= 5 ]
+	0x31, 0x0e,                         // bnt 0e [ exit loop ]
+	0x7a,                               // push2
+	0x38, PATCH_UINT16(0x0187),         // pushi 0187
+	0x8f, 0x01,                         // lsp 01
+	0x47, 0xff, 0x00, 0x04,             // calle proc255_0 [ print 391 param1 ]
+	0xcf, 0x01,                         // +sp 01 [ increment and push param1 ]
+	0x33, 0xed,                         // jmp ed [ continue loop ]
+	// reset subMarineScript timer
+	0x39, PATCH_SELECTOR8(script),      // pushi script
+	0x76,                               // push0
+	0x51, 0x5c,                         // class subMarine
+	0x4a, 0x04,                         // send 04 [ subMarine script? ]
+	0x39, PATCH_SELECTOR8(changeState), // pushi changeState
+	0x78,                               // push1
+	0x39, 0x08,                         // pushi 08
+	0x4a, 0x06,                         // send 06 [ subMarineScript changeState: 8 ]
+	PATCH_END
+};
+
+// At the pier in Honolulu, room 23, "climb down" causes ego to bypass boarding
+//  procedure, walk through the air, climb down the hatch, and get stuck in the
+//  submarine without triggering a room change. There is no "climb up" command.
+//
+// Boarding requires asking the officer permission. comeAboardScript gives him
+//  the orders, runs downTheHatchScript, and changes to room 31 when finished.
+//  downTheHatchScript only walks ego to the hatch and runs the climb animation.
+//  "climb down" simply runs downTheHatchScript and nothing else, leaving the
+//  room in a broken state by running this intermediate script out of context.
+//
+// We patch "climb down" to respond with the message for other hatch commands.
+//
+// Applies to: All versions
+// Responsible method: hatch:handleEvent
+// Fixes bug #11039
+static const uint16 icemanClimbDownHatchSignature[] = {
+	0x7a,                               // push2
+	SIG_MAGICDWORD,
+	0x39, 0x17,                         // pushi 17
+	0x39, 0x18,                         // pushi 18
+	0x47, 0xff, 0x00, 0x04,             // calle proc255_0 04 [ "You must follow proper boarding procedure." ]
+	0x32, SIG_UINT16(0x0021),           // jmp 0021 [ end of method ]
+	SIG_ADDTOOFFSET(+22),
+	0x39, SIG_SELECTOR8(setScript),     // pushi setScript
+	0x78,                               // push1
+	0x72, SIG_UINT16(0xfc24),           // lofsa downTheHatchScript
+	SIG_END,
+};
+
+static const uint16 icemanClimbDownHatchPatch[] = {
+	PATCH_ADDTOOFFSET(+34),
+	0x33, 0xdc,                         // jmp dc [ "You must follow proper boarding procedure." ]
+	PATCH_END
+};
+
+//         script, description,                                       signature                                      patch
+static const SciScriptPatcherEntry icemanSignatures[] = {
+	{ true,    23, "climb down hatch",                             1, icemanClimbDownHatchSignature,                 icemanClimbDownHatchPatch },
+	{ true,   314, "destroyer timer (1/2)",                        1, icemanDestroyerTimer1Signature,                icemanDestroyerTimer1Patch },
+	{ true,   391, "destroyer timer (2/2)",                        1, icemanDestroyerTimer2Signature,                icemanDestroyerTimer2Patch },
+	SCI_SIGNATUREENTRY_TERMINATOR
+};
 
 // ===========================================================================
 // At least during the harpy scene, export 29 of script 0 is called and has an
@@ -5143,6 +5737,34 @@ static const uint16 laurabow1PatchLeftStairsLockupFix[] = {
 	PATCH_END
 };
 
+// LB1's fingerprint copy protection randomly rejects the correct answer and may
+//  even fail to draw a fingerprint. myCopy:init selects the fingerprint by
+//  generating random loop and cel numbers for view 553, but it passes incorrect
+//  ranges to kRandom. If kRandom returns the maximum value then the loop or cel
+//  overflow and a different image is displayed than what was intended.
+//
+// We correct the ranges from 0-600 and 1-1000 to 0-599 and 0-999 so that
+//  invalid cel 6 and loop 10 are never used after the script divides by 10.
+//
+// Applies to: DOS, Amiga, Atari ST
+// Responsible method: myCopy:init
+static const uint16 laurabow1SignatureCopyProtectionRandomFix[] = {
+	0x38, SIG_UINT16(0x0258),           // pushi 600d
+	SIG_ADDTOOFFSET(+10),
+	SIG_MAGICDWORD,
+	0x78,                               // push1
+	0x38, SIG_UINT16(0x03e8),           // pushi 1000d
+	SIG_END
+};
+
+static const uint16 laurabow1PatchCopyProtectionRandomFix[] = {
+	0x38, PATCH_UINT16(0x0257),         // pushi 599d
+	PATCH_ADDTOOFFSET(+10),
+	0x76,                               // push0
+	0x38, PATCH_UINT16(0x03e7),         // pushi 999d
+	PATCH_END
+};
+
 //          script, description,                                signature                                             patch
 static const SciScriptPatcherEntry laurabow1Signatures[] = {
 	{  true,     4, "easter egg view fix",                      1, laurabow1SignatureEasterEggViewFix,                laurabow1PatchEasterEggViewFix },
@@ -5155,6 +5777,7 @@ static const SciScriptPatcherEntry laurabow1Signatures[] = {
 	{  true,    58, "chapel candles persistence",               1, laurabow1SignatureChapelCandlesPersistence,        laurabow1PatchChapelCandlesPersistence },
 	{  true,   236, "tell Lilly about Gertie blocking fix 1/2", 1, laurabow1SignatureTellLillyAboutGerieBlockingFix1, laurabow1PatchTellLillyAboutGertieBlockingFix1 },
 	{  true,   236, "tell Lilly about Gertie blocking fix 2/2", 1, laurabow1SignatureTellLillyAboutGerieBlockingFix2, laurabow1PatchTellLillyAboutGertieBlockingFix2 },
+	{  true,   414, "copy protection random fix",               1, laurabow1SignatureCopyProtectionRandomFix,         laurabow1PatchCopyProtectionRandomFix },
 	{  true,   998, "obstacle collision lockups fix",           1, laurabow1SignatureObstacleCollisionLockupsFix,     laurabow1PatchObstacleCollisionLockupsFix },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
@@ -6211,11 +6834,103 @@ static const uint16 mothergoose256PatchSaveLimit[] = {
 	PATCH_END
 };
 
-//          script, description,                                      signature                         patch
+// Clicking a button on the main menu as the screen fades in causes a message to
+//  be sent to a non-object when coming from the Sierra logo. This also crashes
+//  the original. If returning from a menu then the previous button is clicked.
+//
+// After the main menu screen fades in, IconBar:doit polls for events in a loop
+//  until a mouse click or key press occurs over a button. choices:show then
+//  calls highlightedIcon:message to run the correct action. IconBar:doit
+//  updates this property on each iteration unless the event is a mouse click.
+//  If a button is clicked before polling begins then IconBar:doit exits on its
+//  first iteration without setting highlightedIcon. This property is never
+//  reset and its stale value can get reused when returning from a menu.
+//
+// These problems would be simple to fix in the event polling loop, but that
+//  code is in the IconBar and GameControls classes that affect each screen.
+//  Instead we surround the loop with fixes. The event queue is now drained of
+//  mouse clicks and highlightedIcon is cleared before polling. Afterwards,
+//  highlightedIcon is verified and the loop is repeated if it's not set. This
+//  discards clicks during fade-in, resets state when canceling a subsequent
+//  menu, and prevents timing edge cases from crashing should a click ever
+//  register on the loop's first iteration. We make room for this by overwriting
+//  the code that initializes the cursor when kHaveMouse reports no mouse, as
+//  that doesn't apply to ScummVM. The CD version's menu was rewritten and
+//  doesn't have these problems.
+//
+// Applies to: English PC Floppy
+// Responsible method: choices:show
+// Fixes bug #9681
+static const uint16 mothergoose256SignatureMainMenuCrash[] = {
+	0x43, SIG_MAGICDWORD, 0x27, 0x00,   // callk HaveMouse
+	0x31, 0x0e,                         // bnt 0e [ no mouse ]
+	SIG_ADDTOOFFSET(+0x0b),
+	0x32, SIG_UINT16(0x0036),           // jmp 0036 [ skip no-mouse code ]
+	SIG_ADDTOOFFSET(+0x1a),
+	// no mouse
+	0x76,                               // push0
+	0x63, 0x1e,                         // pToa curIcon
+	0x4a, 0x04,                         // send 04
+	0x04,                               // sub
+	0x36,                               // push
+	0x35, 0x02,                         // ldi 02
+	0x08,                               // div
+	0x02,                               // add
+	0x36,                               // push
+	0x39, 0x08,                         // pushi 08
+	0x76,                               // push0
+	0x63, 0x1e,                         // pToa curIcon
+	0x4a, 0x04,                         // send 04
+	0x36,                               // push
+	0x35, 0x03,                         // ldi 03
+	0x04,                               // sub
+	// event polling loop
+	0x36,                               // push
+	0x81, 0x01,                         // lag 01
+	0x4a, 0x0c,                         // send 0c
+	0x39, SIG_SELECTOR8(doit),          // pushi doit
+	0x76,                               // push0
+	0x39, SIG_SELECTOR8(hide),          // pushi hide
+	0x76,                               // push0
+	0x54, 0x08,                         // self 08 [ self doit: hide: ]
+	SIG_END
+};
+
+static const uint16 mothergoose256PatchMainMenuCrash[] = {
+	PATCH_ADDTOOFFSET(+3),
+	0x33, 0x00,                         // jmp 00 [ always run mouse code ]
+	PATCH_ADDTOOFFSET(+0x0b),
+	0x32, PATCH_UINT16(0x001a),         // jmp 001a [ skip no-mouse code ]
+	PATCH_ADDTOOFFSET(+0x1a),
+	0x76,                               // push0
+	0x69, 0x20,                         // sTop highlightedIcon [ highlightedIcon = 0 ]
+	0x39, PATCH_SELECTOR8(new),         // pushi new
+	0x78,                               // push1
+	0x39, 0x03,                         // pushi 03 [ mouse down/up ]
+	0x51, 0x07,                         // class Event
+	0x4a, 0x06,                         // send 06 [ Event new: 3 ]
+	0x39, PATCH_SELECTOR8(dispose),     // pushi dispose
+	0x76,                               // push0
+	0x39, PATCH_SELECTOR8(type),        // pushi type
+	0x76,                               // push0
+	0x4a, 0x08,                         // send 08 [ event dispose: type? ]
+	0x2f, 0xed,                         // bt ed [ loop until no more mouse down/up events ]
+	0x39, PATCH_SELECTOR8(doit),        // pushi doit
+	0x76,                               // push0
+	0x54, 0x04,                         // self 04 [ self doit: ]
+	0x63, 0x20,                         // pToa highlightedIcon
+	0x31, 0xf7,                         // bnt f7 [ repeat event loop until highlightedIcon is set ]
+	PATCH_ADDTOOFFSET(+3),
+	0x54, 0x04,                         // self 04 [ self hide: ]
+	PATCH_END
+};
+
+//          script, description,                                      signature                             patch
 static const SciScriptPatcherEntry mothergoose256Signatures[] = {
-	{  true,     0, "replay save issue",                           1, mothergoose256SignatureReplay,    mothergoose256PatchReplay },
-	{  true,     0, "save limit dialog (SCI1.1)",                  1, mothergoose256SignatureSaveLimit, mothergoose256PatchSaveLimit },
-	{  true,   994, "save limit dialog (SCI1)",                    1, mothergoose256SignatureSaveLimit, mothergoose256PatchSaveLimit },
+	{  true,     0, "replay save issue",                           1, mothergoose256SignatureReplay,        mothergoose256PatchReplay },
+	{  true,     0, "save limit dialog (SCI1.1)",                  1, mothergoose256SignatureSaveLimit,     mothergoose256PatchSaveLimit },
+	{  true,   994, "save limit dialog (SCI1)",                    1, mothergoose256SignatureSaveLimit,     mothergoose256PatchSaveLimit },
+	{  true,    90, "main menu button crash",                      1, mothergoose256SignatureMainMenuCrash, mothergoose256PatchMainMenuCrash },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -7024,9 +7739,35 @@ static const uint16 pq3PatchGiveLocketPoints[] = {
 	PATCH_END
 };
 
+// The doctor's mouth moves too fast in room 36. doctorMouth:cyleSpeed is set to
+//  one, the maximum speed, unlike any other inset in the game. Most insets use
+//  the default speed of six and almost all the rest use an even slower speed.
+//  We set the doctor's mouth to the default speed.
+//
+// Applies to: All versions
+// Responsible method: insetDoctor:init
+// Fixes bug: #10255
+static const uint16 pq3SignatureDoctorMouthSpeed[] = {
+	0x38, SIG_MAGICDWORD,                // pushi cyleSpeed
+	      SIG_SELECTOR16(cycleSpeed),
+	0x78,                                // push1
+	0x78,                                // push1
+	SIG_ADDTOOFFSET(+13),
+	0x4a, 0x1c,                          // send 1c [ doctorMouth ... cycleSpeed: 1 ... ]
+	SIG_END,
+};
+
+static const uint16 pq3PatchDoctorMouthSpeed[] = {
+	0x32, PATCH_UINT16(0x0002),          // jmp 0002
+	PATCH_ADDTOOFFSET(+15),
+	0x4a, 0x16,                          // send 16 [ don't set cycleSpeed, use default (6) ]
+	PATCH_END,
+};
+
 //          script, description,                                 signature                     patch
 static const SciScriptPatcherEntry pq3Signatures[] = {
 	{  true, 36, "give locket missing points",                1, pq3SignatureGiveLocketPoints, pq3PatchGiveLocketPoints },
+	{  true, 36, "doctor mouth speed",                        1, pq3SignatureDoctorMouthSpeed, pq3PatchDoctorMouthSpeed },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -8194,6 +8935,63 @@ static const uint16 qfg1vgaPatchMacDagnabitIconBar[] = {
 	PATCH_END
 };
 
+// Drinking water in room 87 after talking to the healer about falling water
+//  shows two messages at once. The second message overwrites the first before
+//  it is shown. We add a state for the second message as in the Mac version.
+//
+// Applies to: PC Floppy
+// Responsible method: drinkWater:changeState
+// Fixes bug: #11086
+static const uint16 qfg1vgaSignatureDrinkWaterMessage[] = {
+	0x31, SIG_MAGICDWORD, 0x29,             // bnt 29 [ state 3 handler ]
+	0x38, SIG_SELECTOR16(say),              // pushi say
+	0x39, 0x05,                             // pushi 05
+	0x39, 0x07,                             // pushi 07
+	0x76,                                   // push0
+	0x76,                                   // push0
+	0x78,                                   // push1
+	0x7c,                                   // pushSelf
+	0x81, 0x5b,                             // lag 5b
+	0x4a, 0x0e,                             // send 0e [ qg1Messager say: 7 0 0 1 self ]
+	0x78,                                   // push1
+	0x38, SIG_UINT16(0x00c9),               // pushi 00c9 [ flag 201 ]
+	0x45, 0x07, 0x02,                       // callb proc0_7 [ talked to healer about water? ]
+	0x31, 0x42,                             // bnt 42 [ skip second message ]
+	SIG_ADDTOOFFSET(+9),
+	0x7a,                                   // push2 [ message seq: 2 ]
+	SIG_ADDTOOFFSET(+8),
+	0x35, 0x03,                             // ldi 03 [ state 3 ]
+	SIG_ADDTOOFFSET(+18),
+	0x35, 0x04,                             // ldi 04 [ state 4 ]
+	SIG_END
+};
+
+static const uint16 qfg1vgaPatchDrinkWaterMessage[] = {
+	0x2f, 0x14,                             // bt 14  [ show first message in state 2 ]
+	0x3c,                                   // dup
+	0x35, 0x03,                             // ldi 03 [ state 3 ]
+	0x1a,                                   // eq?
+	0x31, 0x23,                             // bnt 23 [ state 4 handler ]
+	0x78,                                   // push1
+	0x38, PATCH_UINT16(0x00c9),             // pushi 00c9 [ flag 201 ]
+	0x45, 0x07, 0x02,                       // callb proc0_7 [ talked to healer about water? ]
+	0x2f, 0x05,                             // bt 05 [ show second message in state 3 ]
+	0x78,                                   // push1
+	0x69, 0x1a,                             // sTop cycles [ cycles = 1 ]
+	0x3a,                                   // toss
+	0x48,                                   // ret
+	0x3c,                                   // dup
+	0x35, 0x01,                             // ldi 01
+	0x04,                                   // sub
+	PATCH_ADDTOOFFSET(+9),
+	0x36,                                   // push [ message seq: state - 1 ]
+	PATCH_ADDTOOFFSET(+8),
+	0x35, 0x04,                             // ldi 04 [ state 4 ]
+	PATCH_ADDTOOFFSET(+18),
+	0x35, 0x05,                             // ldi 05 [ state 5 ]
+	PATCH_END
+};
+
 //          script, description,                                      signature                            patch
 static const SciScriptPatcherEntry qfg1vgaSignatures[] = {
 	{  true,     0, "inventory weight warning",                    1, qfg1vgaSignatureInventoryWeightWarn, qfg1vgaPatchInventoryWeightWarn },
@@ -8203,6 +9001,7 @@ static const SciScriptPatcherEntry qfg1vgaSignatures[] = {
 	{  true,    73, "brutus script freeze glitch",                 1, qfg1vgaSignatureBrutusScriptFreeze,  qfg1vgaPatchBrutusScriptFreeze },
 	{  true,    77, "white stag dagger throw animation glitch",    1, qfg1vgaSignatureWhiteStagDagger,     qfg1vgaPatchWhiteStagDagger },
 	{  true,    78, "mac: enable antwerp controls",                1, qfg1vgaSignatureMacAntwerpControls,  qfg1vgaPatchMacAntwerpControls },
+	{  true,    87, "drink water message",                         1, qfg1vgaSignatureDrinkWaterMessage,   qfg1vgaPatchDrinkWaterMessage },
 	{  true,    96, "funny room script bug fixed",                 1, qfg1vgaSignatureFunnyRoomFix,        qfg1vgaPatchFunnyRoomFix },
 	{  true,    96, "yorick door #2 lockup fixed",                 1, qfg1vgaSignatureYorickDoorTwoRect,   qfg1vgaPatchYorickDoorTwoRect },
 	{  true,   141, "mac: enter great hall",                       1, qfg1vgaSignatureMacEnterGreatHall,   qfg1vgaPatchMacEnterGreatHall },
@@ -9943,6 +10742,36 @@ static const uint16 qfg4DreamGatePatch[] = {
 	PATCH_END
 };
 
+// When approaching the town gate at night in room 270, dismissing the menu
+//  often doesn't work and instead repeats the gate message and menu. Upon
+//  entering the gate's doormat, sTo290Night moves hero up by 6 pixels, assuming
+//  that this places him outside the doormat. That assumption is usually wrong
+//  since it depends on hero's start position, walk/run mode, and game speed.
+//
+// We fix this by moving hero one pixel above the doormat instead.
+//
+// Applies to: All versions
+// Responsible method: sTo290Night:changeState(1)
+// Fixes bug: #10995
+static const uint16 qfg4TownGateDoormatSignature[] = {
+	0x7a,                               // push2 [ y ]
+	0x76,                               // push0
+	0x81, 0x00,                         // lag 00
+	0x4a, SIG_UINT16(0x0004),           // send 04 [ hero:y? ]
+	SIG_MAGICDWORD,
+	0x36,                               // push
+	0x35, 0x06,                         // ldi 06
+	0x04,                               // sub
+	0x36,                               // push [ hero:y - 6 ]
+	SIG_END
+};
+
+static const uint16 qfg4TownGateDoormatPatch[] = {
+	0x38, PATCH_UINT16(0x00b4),         // pushi 180d [ 1 pixel above doormat ]
+	0x33, 0x07,                         // jmp 07
+	PATCH_END
+};
+
 // Some inventory item properties leak across restarts. Most conspicuously, the
 // torch icon appears pre-lit after a restart, if it had been lit before.
 //
@@ -10401,6 +11230,9 @@ static const uint16 qfg4TentacleWrigglePatch[] = {
 //
 // Crossing from the left (crossByHandLeft) doesn't require fixing.
 //
+// This patch doesn't apply to the NRS version which ships with the GOG release
+//  as it throttles the frequency of crossByHand:doit which fixes the bug.
+//
 // Applies to at least: English CD, English floppy, German floppy
 // Responsible method: crossByHand::changeState(3) in script 710
 // Fixes bug: #10615
@@ -10474,6 +11306,9 @@ static const uint16 qfg4PitRopeFighterPatch[] = {
 // state 5 code thought 0/1 meant move right/left. Whereas state 4 decides 0/1
 // means abort/cross, only ever moving left. The rightward MoveTo never runs.
 //
+// We also include a version of this for the instruction sizes in the NRS patch,
+//  which is important as that ships with the GOG version.
+//
 // Applies to at least: English CD, English floppy, German floppy
 // Responsible method: sLevitateOverPit::changeState(5) in script 710
 // Fixes bug: #10615
@@ -10505,13 +11340,50 @@ static const uint16 qfg4PitRopeMagePatch1[] = {
 	0x81, 0x00,                         // lag global[0] (hero)
 	0x4a, PATCH_UINT16(0x0004),         // send 4d
 	0xa3, 0x02,                         // sal local[2] (cache again)
-                                        //
+	                                    //
 	0x38, PATCH_SELECTOR16(setSpeed),   // pushi setSpeed
 	0x78,                               // push1
 	0x39, 0x08,                         // pushi 8d (set our fixed speed)
 	0x81, 0x00,                         // lag global[0] (hero)
 	0x4a, PATCH_UINT16(0x0006),         // send 6d
 	0x5c,                               // selfID (erase 1 byte to keep disasm aligned)
+	PATCH_END
+};
+
+static const uint16 qfg4PitRopeMageNrsSignature1[] = {
+	0x30, SIG_UINT16(0x0016),           // bnt 22d [if register == 0 (never), move right]
+	SIG_ADDTOOFFSET(+19),               // ... (move left)
+	0x32, SIG_ADDTOOFFSET(+2),          // jmp ?? [end the switch]
+
+	0x38, SIG_SELECTOR16(setMotion),    // pushi setMotion (move right)
+	0x39, 0x04,                         // pushi 4d
+	0x51, SIG_ADDTOOFFSET(+1),          // class MoveTo
+	0x36,                               // push
+	SIG_MAGICDWORD,
+	0x38, SIG_UINT16(0x00da),           // pushi 218d
+	0x39, 0x30,                         // pushi 48d
+	0x7c,                               // pushSelf
+	0x81, 0x00,                         // lag global[0] (hero)
+	0x4a, SIG_UINT16(0x000c),           // send 12d
+	0x32, SIG_ADDTOOFFSET(+2),          // jmp ?? [end the switch]
+	SIG_END
+};
+
+static const uint16 qfg4PitRopeMageNrsPatch1[] = {
+	0x34, PATCH_UINT16(0x0000),         // ldi 0 (erase the branch)
+	PATCH_ADDTOOFFSET(+19),             // ...
+
+	0x38, PATCH_SELECTOR16(cycleSpeed), // pushi cycleSpeed
+	0x76,                               // push0
+	0x81, 0x00,                         // lag global[0] (hero)
+	0x4a, PATCH_UINT16(0x0004),         // send 4d
+	0xa3, 0x02,                         // sal local[2] (cache again)
+	                                    //
+	0x38, PATCH_SELECTOR16(setSpeed),   // pushi setSpeed
+	0x78,                               // push1
+	0x39, 0x08,                         // pushi 8d (set our fixed speed)
+	0x81, 0x00,                         // lag global[0] (hero)
+	0x4a, PATCH_UINT16(0x0006),         // send 6d
 	PATCH_END
 };
 
@@ -11267,6 +12139,459 @@ static const uint16 qfg4RunesPuzzlePatch2[] = {
 	PATCH_END
 };
 
+// The Domovoi in room 320 has a complex bug in the CD version. If you don't
+//  talk to him before Bella wakes you up then you can't get the doll and the
+//  game can't be completed. The event logic was changed in the floppy patch and
+//  again in the CD version, which introduced the bug. Working backwards...
+//
+// To get the doll from the inn's cabinet:
+// - It must be late at night
+// - Inn event 15 has occurred or is occurring
+//
+// To trigger inn event 15 ("You see that the Domovoi is here again"):
+// - It must be late at night
+// - You saved the monastery's Domovoi
+// - You clicked Talk on the Domovoi during inn event 3 (new requirement in CD)
+// - You didn't just enter from your room and hear crying
+//
+// To trigger inn event 3 ("You have the feeling you are being watched"):
+// - It must be late at night
+// - You haven't already clicked Talk on the Domovoi during inn event 3
+// - You haven't been woken by Bella (new requirement in CD)
+// - You didn't just enter from your room and hear crying
+//
+// The two new requirements create an unwinnable state. Once Bella wakes you,
+//  event 3 is no longer possible, cascading to event 15 and the doll. This also
+//  prevents the Domovoi from appearing in your room as that requires talking
+//  to him during event 3. Putting it all together, the new Bella requirement's
+//  only effect is to suppress a mandatory event, and so it is safe to remove.
+//
+// Applies to: English CD
+// Responsible methods: rm320:init, heroTeller:respond
+// Fixes bug: #10978
+static const uint16 qfg4DomovoiInnSignature[] = {
+	SIG_MAGICDWORD,
+	0x78,                               // push1
+	0x38, SIG_UINT16(0x0088),           // pushi 0088
+	0x45, 0x04, SIG_UINT16(0x0002),     // callb proc0_4 [ is flag 136 set? (has Bella woken you up?) ]
+	0x18,                               // not
+	0x31,                               // bnt [ skip inn event 3 ]
+	SIG_END
+};
+
+static const uint16 qfg4DomovoiInnPatch[] = {
+	0x32, PATCH_UINT16(0x0008),         // jmp 0008 [ skip flag 136 check ]
+	PATCH_END
+};
+
+// During the final battle with Ad Avis his initial timer is never stopped,
+//  reducing the intended time the player has to complete the sequence by more
+//  than half, and bringing Ad Avis back to life after he's killed.
+//
+// sTimeItOut state 0 sets a timeout when the battle starts. Its length depends
+//  on the detected cpu speed and game version. In the floppy versions this was
+//  a minimum of 400 seconds, which is so long that it masked the bug, but in CD
+//  it was reduced to 20 seconds. This is supposed to be how long the player has
+//  to tell the joke, after which sUltimakeJoke sets a second timeout in which
+//  the character-specific actions are to be done, but sTimeItOut finishes first
+//  and forces the player to complete both phases during the first shorter one.
+//  When Ad Avis is killed his death scripts only stop sUltimakeJoke, as they
+//  don't expect sTimeItOut to be running, and so when sTimeItOut times out it
+//  kills the player unless the death script has already called avis:dispose.
+//
+// We fix this by patching sTimeItOut state 1 to abort the script if the joke
+//  has been told. This is equivalent to the NRS patch that ships with the GOG
+//  version, which disposes sTimeItOut when telling the joke, and so this patch
+//  is applied to all versions except that one.
+//
+// Applies to: All versions
+// Responsible method: sTimeItOut:changeState(1)
+// Fixes bug: #10844
+static const uint16 qfg4AdAvisTimeoutSignature[] = {
+	0x30, SIG_UINT16(0x002c),           // bnt 002c [ state 1 ]
+	SIG_ADDTOOFFSET(+0x29),
+	SIG_MAGICDWORD,
+	0x32, SIG_UINT16(0x00ae),           // jmp 00ae [ end of method ]
+	0x3c,                               // dup
+	0x35, 0x01,                         // ldi 01
+	0x1a,                               // eq?
+	0x30, SIG_UINT16(0x0027),           // bnt 0027 [ state 2 ]
+	SIG_END
+};
+
+static const uint16 qfg4AdAvisTimeoutPatch[] = {
+	0x30, PATCH_UINT16(0x0029),         // bnt 0029 [ state 1 ]
+	PATCH_ADDTOOFFSET(+0x29),
+	0x3c,                               // dup
+	0x35, 0x01,                         // ldi 01
+	0x1a,                               // eq?
+	0x31, 0x2b,                         // bnt 2b [ state 2 ]
+	0x83, 0x04,                         // lal 04 [ has joke been told? ]
+	0x2f, 0x27,                         // bt 27  [ abort script if joke has been told ]
+	PATCH_END
+};
+
+// During the final battle with Ad Avis if the player casts a non-fatal spell at
+//  him then they can't cast any more spells. Instead they receive a message
+//  about being too busy or it not being a good place and must wait to die.
+//  Another symptom of this bug is that fighters and thieves don't get to see
+//  the staff transform if they've previously thrown a weapon.
+//
+// SpellItem:doVerb(4) determines if a spell is allowed. If hero:view is the
+//  wrong value then it says "This isn't a good place..." and if the room has
+//  a script it says "You're too busy...". avis:getHurt breaks one or both of
+//  these conditions by setting the room script to sMessages. If the game speed
+//  is set to less than high then avis:getHurt runs while the "project" room
+//  script is animating hero. Setting the room script to sMessages interrupts
+//  this and hero is left on view 14, breaking the first spell condition. Even
+//  if the game speed is set to high and hero's animation completes, sMessages
+//  fails to dispose itself, leaving it as the room script when it's complete
+//  and breaking the second spell condition.
+//
+// We fix this by reassigning sMessages from the room's script to midBlast, an
+//  arbitrary Prop that no scripts depend on. project is no longer interrupted,
+//  hero's animation completes at all speeds, and it no longer matters that
+//  sMessage fails to dispose itself. Due to script changes, this patch is only
+//  applied once to floppy and twice to CD.
+//
+// We also include a version of this for the offsets in the NRS patch, which is
+//  important as that ships with the GOG version.
+//
+// Applies to: All versions
+// Responsible method: avis:getHurt
+// Fixes bug: #10835
+static const uint16 qfg4AdAvisSpellsFloppySignature[] = {
+	SIG_MAGICDWORD,
+	0x72, SIG_UINT16(0x0096),           // lofsa sMessages
+	0x36,                               // push
+	0x81, 0x02,                         // lag 02
+	0x4a, SIG_UINT16(0x0006),           // send 06 [ rm730 setScript: sMessages ]
+	SIG_END
+};
+
+static const uint16 qfg4AdAvisSpellsFloppyPatch[] = {
+	0x74, PATCH_ADDTOOFFSET(+2),        // lofss sMessages
+	0x72, PATCH_UINT16(0x0668),         // lofsa midBlast
+	SIG_END
+};
+
+static const uint16 qfg4AdAvisSpellsCDSignature[] = {
+	SIG_MAGICDWORD,
+	0x72, SIG_UINT16(0x00a6),           // lofsa sMessages
+	0x36,                               // push
+	0x81, 0x02,                         // lag 02
+	0x4a, SIG_UINT16(0x0006),           // send 06 [ rm730 setScript: sMessages ]
+	SIG_END
+};
+
+static const uint16 qfg4AdAvisSpellsCDPatch[] = {
+	0x74, PATCH_ADDTOOFFSET(+2),        // lofss sMessages
+	0x72, PATCH_UINT16(0x06b6),         // lofsa midBlast
+	SIG_END
+};
+
+static const uint16 qfg4AdAvisSpellsNrsSignature[] = {
+	SIG_MAGICDWORD,
+	0x72, SIG_UINT16(0x00a8),           // lofsa sMessages
+	0x36,                               // push
+	0x81, 0x02,                         // lag 02
+	0x4a, SIG_UINT16(0x0006),           // send 06 [ rm730 setScript: sMessages ]
+	SIG_END
+};
+
+static const uint16 qfg4AdAvisSpellsNrsPatch[] = {
+	0x74, PATCH_ADDTOOFFSET(+2),        // lofss sMessages
+	0x72, PATCH_UINT16(0x06b8),         // lofsa midBlast
+	SIG_END
+};
+
+// If the magic user defeats Ad Avis with the game speed set to less than high
+//  then they aren't allowed to cast the final summon staff spell and complete
+//  the game. Instead they receive "You're too busy to cast a spell right now."
+//
+// Spells can't be cast if a room script is set, as described in the above patch
+//  notes. When Ad Avis is killed, avis:getHurt sets hero's view and loop before
+//  running sAdavisDies. If the game speed isn't set to high then the "project"
+//  script that deployed the final projectile spell is still running and waiting
+//  on hero's animation to complete. By changing the view and loop, avis:getHurt
+//  prevents project from advancing to its next state and completing, leaving it
+//  stuck as the room script and blocking the final spell.
+//
+// We can't prevent project from being the room script as that's game-wide
+//  behavior, and we can't prevent it from being interrupted since avis:getHurt
+//  needs to set hero's final view/loop, but we can still fix the bug by setting
+//  sAdavisDies as the room's script instead of hero's. This disposes project if
+//  it's still running and guarantees that the room script is cleared since
+//  sAdavisDies always disposes of itself.
+//
+// Applies to: All versions
+// Responsible method: avis:getHurt
+// Fixes bug: #10835
+static const uint16 qfg4AdAdvisLastSpellSignature[] = {
+	0x38, SIG_SELECTOR16(setScript),    // pushi setScript
+	0x78,                               // push1
+	0x72, SIG_ADDTOOFFSET(+2),          // lofsa sAdavisDies
+	SIG_MAGICDWORD,
+	0x36,                               // push
+	0x81, 0x00,                         // lag 00
+	0x4a, SIG_UINT16(0x0006),           // send 06 [ hero setScript: sAdavisDies ]
+	SIG_END
+};
+
+static const uint16 qfg4AdAdvisLastSpellPatch[] = {
+	PATCH_ADDTOOFFSET(+8),
+	0x81, 0x02,                         // lag 02 [ rm730 ]
+	SIG_END
+};
+
+// When throwing a weapon or casting a spell at Ad Avis in room 730, sMessages
+//  tests the projectile type incorrectly and transposes the message responses.
+//
+// Applies to: All versions
+// Responsible method: sMessages:changeState(2)
+// Fixes bug: #10989
+static const uint16 qfg4AdAvisMessageSignature[] = {
+	0x8b, SIG_MAGICDWORD, 0x01,         // lsl 01 [ 0 if weapon thrown, else a spell ]
+	0x35, 0x00,                         // ldi 00
+	0x1a,                               // eq?
+	SIG_END
+};
+
+static const uint16 qfg4AdAvisMessagePatch[] = {
+	PATCH_ADDTOOFFSET(+4),
+	0x1c,                               // ne?
+	PATCH_END
+};
+
+// Throwing a rock or dagger at Ad Avis after telling the joke kills him.
+//  avis:getHurt fails to test the projectile type correctly in CD, or at all in
+//  floppy, and so all versions mistake this for casting a spell with the staff.
+//
+// We fix this by testing the projectile type and not allowing a thrown weapon
+//  to kill Ad Avis. This replaces an unnecessary hero:script test.
+//
+// Applies to: All versions
+// Responsible method: avis:getHurt
+// Fixes bug: #10989
+static const uint16 qfg4AdAvisThrowWeaponSignature[] = {
+	SIG_MAGICDWORD,
+	0x38, SIG_SELECTOR16(script),       // pushi script
+	0x76,                               // push0
+	0x81, 0x00,                         // lag 00
+	0x4a, SIG_UINT16(0x0004),           // send 04 [ hero script? ]
+	0x18,                               // not
+	0x30, SIG_ADDTOOFFSET(+2),          // bnt [ projectile doesn't kill ad avis ]
+	0x39, SIG_SELECTOR8(view),          // pushi view
+	SIG_END
+};
+
+static const uint16 qfg4AdAvisThrowWeaponPatch[] = {
+	0x83, 0x01,                        // lal 01 [ 0 if weapon thrown, else a spell ]
+	0x33, 0x06,                        // jmp 06 [ throwing a weapon doesn't kill ad avis ]
+	PATCH_END
+};
+
+// When a fighter or paladin selects the staff in the final battle with Ad Avis
+//  after throwing a rock or dagger they enter an infinite animation loop due to
+//  not clearing hero:cycler. Multiple bugs in this room prevented getting this
+//  far, but we fixed those, so we also fix this by clearing the cycler.
+//
+// Applies to: All versions
+// Responsible method: sDoTheStaff:changeState(3)
+// Fixes bug: #10835
+static const uint16 qfg4FighterSpearSignature[] = {
+	0x39, SIG_SELECTOR8(view),          // pushi view [ start of fighter code, same as paladin ]
+	SIG_ADDTOOFFSET(0x3e),
+	0x3c,                               // dup
+	0x35, SIG_MAGICDWORD, 0x03,         // ldi 03
+	0x1a,                               // eq? [ is paladin? (last condition so always true) ]
+	0x30, SIG_UINT16(0x0022),           // bnt 0022
+	0x39, SIG_SELECTOR8(view),          // pushi view
+	0x78,                               // push1
+	0x39, 0x0a,                         // pushi 0a
+	0x38, SIG_SELECTOR16(setLoop),      // pushi setLoop
+	0x7a,                               // push2
+	0x76,                               // push0
+	0x78,                               // push1
+	0x38, SIG_SELECTOR16(setCel),       // pushi setCel
+	SIG_ADDTOOFFSET(+13),
+	0x4a, SIG_UINT16(0x001c),           // send 1c [ hero view: 10 setLoop 0 1 setCel: 0 ... ]
+	SIG_END
+};
+
+static const uint16 qfg4FighterSpearPatch[] = {
+	0x33, 0x3e,                         // jmp 3e [ use patched paladin code for fighter ]
+	PATCH_ADDTOOFFSET(0x3e),
+	0x39, PATCH_SELECTOR8(view),        // pushi view
+	0x78,                               // push1
+	0x39, 0x0a,                         // pushi 0a
+	0x38, PATCH_SELECTOR16(setLoop),    // pushi setLoop
+	0x7a,                               // push2
+	0x76,                               // push0
+	0x78,                               // push1
+	0x38, PATCH_SELECTOR16(setCel),     // pushi setCel
+	0x39, 0x01,                         // pushi 01
+	0x39, 0x00,                         // pushi 00
+	0x38, PATCH_SELECTOR16(setCycle),   // pushi setCycle
+	PATCH_ADDTOOFFSET(+13),
+	0x4a, PATCH_UINT16(0x0022),         // send 22 [ hero view: 10 setLoop 0 1 setCel: 0 setCycle: 0 ... ]
+	PATCH_END
+};
+
+// Clicking Do on the inn door in room 260 from certain coordinates crashes the
+//  CD version. This is one of several related crashes where the Grooper or
+//  Grycler classes send a selector to a non-object in only the CD version.
+//
+// The inn door script isn't buggy, and neither are Grooper or Grycler. Instead,
+//  Sierra "upgraded" the core Cycle classes in the CD version with drastically
+//  different behavior after the game was already written for the first ones.
+//  It's unclear what they were attempting to accomplish, but the conspicuous
+//  regressions include hero stuttering when walking on every screen, the runes
+//  dial refusing to spin a full rotation, random crashes at the inn door and
+//  on the slippery path in room 800, and probably other problems. Meanwhile
+//  GK1, a relatively stable SCI32 game released at the same time, used the same
+//  Cycle classes in all its versions as QFG4 floppy without motion problems.
+//
+// The crashes result from complex motion edge cases but involve hero ending up
+//  without a cycler at the wrong moment. These can be avoided by adding a call
+//  to hero:normalize to reset a lot of state and set hero:cycler to StopWalk
+//  and hero:looper to stopGroop. This is a bit of a kitchen-sink solution but
+//  it does the job without side effects and only requires 4 bytes.
+//
+// We prevent the inn door crash by calling hero:normalize in sInInnDoor.
+//
+// Applies to: English CD
+// Responsible method: sInInnDoor:changeState(1)
+// Fixes bug: #10760
+static const uint16 qfg4InnDoorCDSignature[] = {
+	0x30, SIG_MAGICDWORD,               // bnt 000e [ state 2 ]
+	      SIG_UINT16(0x000e),
+	0x38, SIG_UINT16(0x0111),           // pushi setHeading [ hard-coded for CD ]
+	0x7a,                               // push2
+	0x76,                               // push0
+	0x7c,                               // pushSelf
+	0x81, 0x00,                         // lag 00
+	0x4a, SIG_UINT16(0x0008),           // send 08  [ hero setHeading: 0 self ]
+	0x32, SIG_UINT16(0x00c3),           // jmp 00c3 [ end of method ]
+	SIG_END,
+};
+
+static const uint16 qfg4InnDoorCDPatch[] = {
+	0x31, 0x0f,                         // bnt 0f [ state 2 ]
+	0x38, PATCH_SELECTOR16(normalize),  // pushi normalize
+	0x76,                               // push0
+	0x38, PATCH_UINT16(0x0111),         // pushi setHeading [ hard-coded for CD ]
+	0x7a,                               // push2
+	0x76,                               // push0
+	0x7c,                               // pushSelf
+	0x81, 0x00,                         // lag 00
+	0x4a, PATCH_UINT16(0x000c),         // send 0c [ hero normalize: setHeading: 0 self ]
+	PATCH_END
+};
+
+// Walking around the base of the slippery slope in room 800 can crash the CD
+//  version in either the Grooper or Grycler classes. See the inn door patch
+//  above for details on these regressions and their solution.
+//
+// The script sSlippery runs when walking up the slope and sWalksDown runs when
+//  walking down. Both are vulnerable to Grooper/Grycler crashes and both can be
+//  fixed by adding hero:normalize calls.
+//
+// We also include a version of the sWalksDown patch for the instruction sizes
+//  in the NRS patch, which is important as that ships with the GOG version.
+//
+// Applies to: English CD
+// Responsible methods: sSlippery:changeState(0), sWalksDown:changeState(0)
+// Fixes bug: #10747
+static const uint16 qfg4WalkUpSlopeCDSignature[] = {
+	SIG_MAGICDWORD,
+	0x38, SIG_UINT16(0x0142),           // pushi setMotion [ hard-coded for CD ]
+	0x78,                               // push1
+	0x76,                               // push0
+	SIG_ADDTOOFFSET(+8),
+	0x4a, SIG_UINT16(0x000e),           // send 0e [ hero setMotion: 0 ... ]
+	SIG_END,
+};
+
+static const uint16 qfg4WalkUpSlopeCDPatch[] = {
+	0x38, PATCH_SELECTOR16(normalize),  // pushi normalize
+	0x39, 0x00,                         // pushi 00
+	PATCH_ADDTOOFFSET(+8),
+	0x4a, PATCH_UINT16(0x000c),         // send 0c [ hero normalize: ... ]
+	PATCH_END
+};
+
+static const uint16 qfg4WalkDownSlopeCDSignature[] = {
+	0x3c,                               // dup
+	0x35, SIG_MAGICDWORD, 0x00,         // ldi 00
+	0x1a,                               // eq?
+	0x31, 0x1e,                         // bnt 1e [ state 1 ]
+	0x38, SIG_UINT16(0x0218),           // pushi handsOff [ hard-coded for CD ]
+	SIG_ADDTOOFFSET(+15),
+	0x4a, SIG_UINT16(0x0008),           // send 08 [ hero setStep: ... ]
+	SIG_END,
+};
+
+static const uint16 qfg4WalkDownSlopeCDPatch[] = {
+	0x2f, 0x22,                         // bt 22 [ state 1 ]
+	0x38, PATCH_SELECTOR16(normalize),  // pushi normalize
+	0x76,                               // push0
+	PATCH_ADDTOOFFSET(+18),
+	0x4a, PATCH_UINT16(0x000c),         // send 0c [ hero normalize: setStep: ... ]
+	PATCH_END
+};
+
+static const uint16 qfg4WalkDownSlopeNrsSignature[] = {
+	0x3c,                               // dup
+	0x35, SIG_MAGICDWORD, 0x00,         // ldi 00
+	0x1a,                               // eq?
+	0x30, SIG_UINT16(0x001f),           // bnt 001f [ state 1 ]
+	0x38, SIG_UINT16(0x0218),           // pushi handsOff [ hard-coded for CD ]
+	SIG_ADDTOOFFSET(+15),
+	0x4a, SIG_UINT16(0x0008),           // send 08 [ hero setStep: ... ]
+	SIG_END,
+};
+
+static const uint16 qfg4WalkDownSlopeNrsPatch[] = {
+	0x2e, PATCH_UINT16(0x0023),         // bt 0023 [ state 1 ]
+	0x38, PATCH_SELECTOR16(normalize),  // pushi normalize
+	0x76,                               // push0
+	PATCH_ADDTOOFFSET(+18),
+	0x4a, PATCH_UINT16(0x000c),         // send 0c [ hero normalize: setStep: ... ]
+	PATCH_END
+};
+
+// The NRS fan-patch for wraiths has a bug which locks up the game. This occurs
+//  when a wraith initializes while game time is greater than $7fff. The patch
+//  throttles wraith:doit to execute no more than once per game tick, which it
+//  does by storing the previous game time in a new local variable whose initial
+//  value is zero. This technique is used in several patches but this one is
+//  missing a call to Abs that the others have. Once game time reaches $8000 or
+//  greater, the signed less-than test will always pass when the local variable
+//  is zero, and wraith:doit won't execute.
+//
+// We fix this by changing the signed less-than comparison to unsigned.
+//
+// Applies to: English CD with NRS patches 53.HEP/SCR
+// Responsible method: wraith:doit
+// Fixes bug: #10711
+static const uint16 qfg4WraithLockupNrsSignature[] = {
+	SIG_MAGICDWORD,
+	0x89, 0x58,                         // lsg 58
+	0x83, 0x04,                         // lal 04
+	0x04,                               // sub
+	0x36,                               // push
+	0x35, 0x01,                         // ldi 01
+	0x22,                               // lt? [ (gameTime - prevGameTime) < 1 ]
+	SIG_END
+};
+
+static const uint16 qfg4WraithLockupNrsPatch[] = {
+	PATCH_ADDTOOFFSET(+8),
+	0x2a,                               // ult?
+	PATCH_END
+};
+
 // The script that determines how much money a revenant has is missing the first
 //  parameter to kRandom, which should be zero as it is with other monsters.
 //  Instead of awarding the intended 15 to 40 kopeks, it always awards 15 and
@@ -11292,6 +12617,560 @@ static const uint16 qfg4SearchRevenantPatch[] = {
 	PATCH_END
 };
 
+// During combat, if a rabbit is all the way to the right and attacks then it
+//  won't make any more moves, forcing the player to run away to end the fight.
+//  This is due to rabbitCombat failing to pass a caller to the rabbitAttack
+//  script and so it gets stuck. We pass the missing "self" parameter.
+//
+// Applies to: All versions
+// Responsible method: rabbitCombat:changeState(1)
+// Fixes bug: #11000
+static const uint16 qfg4RabbitCombatSignature[] = {
+	0x38, SIG_SELECTOR16(setScript),    // pushi setScript
+	0x78,                               // push1
+	0x72, SIG_ADDTOOFFSET(+2),          // lofsa rabbitAttack
+	0X36,                               // push
+	SIG_MAGICDWORD,
+	0x54, SIG_UINT16(0x0006),           // self 06 [ self setScript: rabbitAttack ]
+	0x32, SIG_UINT16(0x014b),           // jmp 014b
+	SIG_END
+};
+
+static const uint16 qfg4RabbitCombatPatch[] = {
+	PATCH_ADDTOOFFSET(+3),
+	0x7a,                               // push2
+	0x74, PATCH_ADDTOOFFSET(+2),        // lofss rabbitAttack
+	0x7c,                               // pushSelf
+	0x54, PATCH_UINT16(0x0008),         // self 08 [ self setScript: rabbitAttack self ]
+	PATCH_END
+};
+
+// Attempting to open the monastery door in room 250 while Igor is present
+//  randomly locks up the game. sHectapusDeath stands Igor up, but this can be
+//  interrupted by sIgorCarves animating him at random intervals, leaving
+//  sHectapusDeath stuck in handsOff mode.
+//
+// We fix this by first stopping sIgorCarves as other scripts in this room do.
+//
+// Applies to: All versions
+// Responsible method: sHectapusDeath:changeState(4)
+// Fixes bug: #10994
+static const uint16 qfg4HectapusDeathSignature[] = {
+	0x30, SIG_UINT16(0x0027),           // bnt 0027
+	SIG_ADDTOOFFSET(+13),
+	0x30, SIG_UINT16(0x0017),           // bnt 0017
+	0x38, SIG_MAGICDWORD,               // pushi setLoop
+	      SIG_SELECTOR16(setLoop),
+	0x7a,                               // push2
+	0x7a,                               // push2
+	0x78,                               // push1
+	0x38, SIG_SELECTOR16(setCycle),     // pushi setCycle
+	0x7a,                               // push2
+	0x51, SIG_ADDTOOFFSET(+1),          // class End
+	0x36,                               // push
+	0x7c,                               // pushSelf
+	0x72, SIG_ADDTOOFFSET(+2),          // lofsa igor
+	0x4a, SIG_UINT16(0x0010),           // send 10 [ igor setLoop: 2 1 setCycle: End self ]
+	0x32, SIG_ADDTOOFFSET(+2),          // jmp [ end of method ]
+	0x35, 0x01,                         // ldi 01
+	0x65, SIG_ADDTOOFFSET(+1),          // aTop cycles
+	0x32, SIG_ADDTOOFFSET(+2),          // jmp [ end of method ]
+	SIG_END
+};
+
+static const uint16 qfg4HectapusDeathPatch[] = {
+	0x30, PATCH_UINT16(0x002b),         // bnt 002b
+	PATCH_ADDTOOFFSET(+13),
+	0x30, PATCH_UINT16(0x001b),         // bnt 001b
+	PATCH_ADDTOOFFSET(+17),
+	0x38, PATCH_SELECTOR16(setScript),  // pushi setScript
+	0x78,                               // push1
+	0x76,                               // push0
+	0x4a, PATCH_UINT16(0x0016),         // send 16 [ igor setLoop: 2 1 setCycle: End self setScript: 0 ]
+	0x3a,                               // toss
+	0x48,                               // ret
+	0x78,                               // push1
+	0x69, PATCH_GETORIGINALBYTE(+45),   // sTop cycles
+	PATCH_END
+};
+
+// Floppy 1.0 locks up when Ad Avis captures you with a Necrotaur in room 552,
+//  and possibly other rooms. sBlackOut:changeState has one too many states
+//  and doesn't increment the state number and cue enough in all scenarios.
+//
+// We fix this by removing the empty state 3 as later floppy versions do.
+//
+// Applies to: English Floppy 1.0
+// Responsible method: sBlackOut:changeState
+// Fixes bug: #11001
+static const uint16 qfg4AdAvisCaptureSignature[] = {
+	0x31, 0x05,                         // bnt 05 [ state 3 ]
+	SIG_ADDTOOFFSET(+6),
+	0x35, SIG_MAGICDWORD, 0x03,         // ldi 03
+	0x1a,                               // eq?
+	0x31, 0x05,                         // bnt 05 [ state 4 ]
+	SIG_ADDTOOFFSET(+6),
+	0x35, 0x04,                         // ldi 04
+	SIG_ADDTOOFFSET(+83),
+	0x35, 0x05,                         // ldi 05
+	SIG_END
+};
+
+static const uint16 qfg4AdAvisCapturePatch[] = {
+	0x31, 0x10,                         // bnt 10 [ new state 3 ]
+	PATCH_ADDTOOFFSET(+17),
+	0x35, 0x03,                         // ldi 03 [ state 4 is now state 3 ]
+	PATCH_ADDTOOFFSET(+83),
+	0x35, 0x04,                         // ldi 04 [ state 5 is now state 4 ]
+	PATCH_END
+};
+
+// The character selection screen in room 140 can select the wrong character.
+//  The showOff script brings each through their door and sets showOff:register
+//  as they animate so that myChar:doVerb knows which animating character was
+//  clicked. showOff:register is supposed to be 1 - 3 but showOff sets the wrong
+//  fighter value and sets the rest at the wrong times.
+//
+// showOff state 0 sets register to 30 instead of 1 and so clicking the fighter
+//  door during the first four seconds doesn't select any character. Instead it
+//  proceeds to the skill screen without updating the character type global.
+//  This global's initial value is zero, which happens to be the fighter value,
+//  and so this appears to work unless a different character was first selected
+//  and cancel was clicked. The magic user and thief register values are correct
+//  but they're set one state too late, creating 2 - 4 second windows where
+//  clicking their doors selects the previously animated character.
+//
+// We fix this by setting showOff:register to the correct fighter value and
+//  setting the magic user and thief values one state earlier.
+//
+// Applies to: All versions
+// Responsible method: showOff:changeState
+// Fixes bug: #11002
+static const uint16 qfg4CharacterSelectSignature[] = {
+	// state 0
+	0x35, 0x1e,                         // ldi 1e
+	0x65, SIG_ADDTOOFFSET(+1),          // aTop register
+	SIG_ADDTOOFFSET(+461),
+	// state 5
+	SIG_MAGICDWORD,
+	0x32, SIG_UINT16(0x031e),           // jmp 031e [ end of method ]
+	0x3c,                               // dup
+	SIG_ADDTOOFFSET(+219),
+	// state 9
+	0x35, 0x02,                         // ldi 02
+	0x65, SIG_ADDTOOFFSET(+1),          // aTop seconds
+	0x32, SIG_UINT16(0x023b),           // jmp 023b [ end of method ]
+	SIG_END
+};
+
+static const uint16 qfg4CharacterSelectPatch[] = {
+	// state 0
+	0x35, 0x01,                         // ldi 01
+	PATCH_ADDTOOFFSET(+463),
+	// state 5
+	0x7a,                               // push2
+	0x69, PATCH_GETORIGINALBYTE(+3),    // sTop register
+	PATCH_ADDTOOFFSET(+220),
+	// state 9
+	0x7a,                               // push2
+	0x69, PATCH_GETORIGINALBYTE(+691),  // sTop seconds
+	0x39, 0x03,                         // pushi 03
+	0x69, PATCH_GETORIGINALBYTE(+3),    // sTop register
+	PATCH_END
+};
+
+// Clicking Look in the dungeon (room 670) responds with the dungeon description
+//  followed by the generic message for not seeing anything. rm670:doVerb is
+//  missing a return statement and so it proceeds with generic verb handling.
+//
+// Applies to: All versions
+// Responsible method: rm670:doVerb
+static const uint16 qfg4LookDungeonSignature[] = {
+	0x38, SIG_SELECTOR16(say),          // pushi say
+	0x38, SIG_UINT16(0x0006),           // pushi 0006
+	SIG_MAGICDWORD,
+	0x76,                               // push0
+	0x78,                               // push1
+	0x76,                               // push0
+	0x76,                               // push0
+	0x76,                               // push0
+	0x38, SIG_UINT16(0x029e),           // pushi 029e
+	0x81, 0x5b,                         // lag 5b
+	0x4a, SIG_UINT16(0x0010),           // send 10 [ gloryMessager say: 0 1 0 0 0 670 ]
+	SIG_END
+};
+
+static const uint16 qfg4LookDungeonPatch[] = {
+	PATCH_ADDTOOFFSET(+11),
+	0x89, 0x0b,                         // lsg 0b [ room number, saves a byte ]
+	0x81, 0x5b,                         // lag 5b
+	0x4a, PATCH_UINT16(0x0010),         // send 10 [ gloryMessager say: 0 1 0 0 0 670 ]
+	0x48,                               // ret
+	PATCH_END
+};
+
+// When approaching the door to the great hall in staircase room 627 at night,
+//  the message "You hear voices..." continues to occur even after witnessing
+//  the argument between Katrina and Ad Avis in the floppy version. This is due
+//  to not testing flag 112, which is set by the argument scene, and was fixed
+//  in the CD version. We add the missing flag test.
+//
+// This incomplete logic to determine if Katrina and Ad Avis are in the great
+//  hall is duplicated throughout this script. Although Sierra fixed this
+//  instance in the CD version, it's the only one they fixed, while adding more
+//  that lack the flag test. We fix those bugs in subsequent patches.
+//
+// Applies to: English Floppy, German Floppy
+// Responsible method: sDisplay:changeState(0)
+// Fixes bug: #10799
+static const uint16 qfg4ArgumentMessageFloppySignature[] = {
+	SIG_MAGICDWORD,
+	0x83, 0x02,                         // lal 02   [ message already said? ]
+	0x30, SIG_UINT16(0x0013),           // bnt 0013 [ say message ]
+	0x38, SIG_SELECTOR16(handsOn),      // pushi handsOn
+	0x76,                               // push0
+	0x81, 0x01,                         // lag 01
+	0x4a, SIG_UINT16(0x0004),           // send 04 [ Glory handsOn: ]
+	0x38, SIG_SELECTOR16(dispose),      // pushi dispose
+	0x76,                               // push0
+	0x54, SIG_UINT16(0x0004),           // self 04
+	0x32, SIG_UINT16(0x0079),           // jmp 0079 [ end of method ]
+	SIG_ADDTOOFFSET(+38),
+	0x38, SIG_SELECTOR16(dispose),      // pushi dispose
+	0x76,                               // push0
+	0x54, SIG_UINT16(0x0004),           // self 04  [ self dispose: ]
+	0x32, SIG_UINT16(0x0049),           // jmp 0049 [ end of method ]
+	SIG_END,
+};
+
+static const uint16 qfg4ArgumentMessageFloppyPatch[] = {
+	PATCH_ADDTOOFFSET(+2),
+	0x2f, 0x09,                         // bt 09 [ skip message if already said ]
+	0x78,                               // push1
+	0x39, 0x70,                         // pushi 70 [ flag 112 ]
+	0x45, 0x04, PATCH_UINT16(0x0002),   // callb proc0_4 02 [ has argument occurred? ]
+	0x31, 0x0b,                         // bnt 0b [ say message ]
+	0x38, PATCH_SELECTOR16(handsOn),    // pushi handsOn
+	0x76,                               // push0
+	0x81, 0x01,                         // lag 01
+	0x4a, PATCH_UINT16(0x0004),         // send 04 [ Glory handsOn: ]
+	0x33, 0x26,                         // jmp 26 [ self dispose:, end of method ]
+	PATCH_END,
+};
+
+// The great hall door options in room 627 are incorrect at night after Katrina
+//  and Ad Avis argue. rm620Code:init is missing a flag test to prevent the
+//  argument options from reoccurring. We add the missing flag test.
+//
+// Applies to: All versions
+// Responsible methods: rm620Code:init
+// Fixes bug: #10799
+static const uint16 qfg4Room627DoorOptionsSignature[] = {
+	0x89, 0x0b,                         // lsg 0b [ room number ]
+	SIG_ADDTOOFFSET(+28),
+	0x39, 0x05,                         // pushi 05 [ argument door options ]
+	0x72, SIG_ADDTOOFFSET(+2),          // lofsa doorTopTeller
+	0x4a, SIG_UINT16(0x000e),           // send 0e [ doorTopTeller init: pUpperDoor 620 8 155 5 ]
+	SIG_MAGICDWORD,
+	0x33, 0x19,                         // jmp 19
+	0x38, SIG_SELECTOR16(init),         // pushi init
+	0x38, SIG_UINT16(0x0005),           // pushi 0005
+	0x72, SIG_ADDTOOFFSET(+2),          // lofsa pUpperDoor
+	0x36,                               // push
+	0x38, SIG_UINT16(0x026c),           // pushi 026c
+	0x39, 0x08,                         // pushi 08
+	0x38, SIG_UINT16(0x009b),           // pushi 009b
+	0x78,                               // push1 [ normal door options ]
+	0x72, SIG_ADDTOOFFSET(+2),          // lofsa doorTopTeller
+	0x4a, SIG_UINT16(0x000e),           // send 0e [ doorTopTeller init: pUpperDoor 620 8 155 1 ]
+	SIG_END
+};
+
+static const uint16 qfg4Room627DoorOptionsPatch[] = {
+	0x33, 0x0a,                         // jmp 0a
+	PATCH_ADDTOOFFSET(+28),
+	0x89, 0x0b,                         // lsg 0b [ room number ]
+	0x34, PATCH_UINT16(0x0273),         // ldi 627d
+	0x1a,                               // eq?
+	0x31, 0x14,                         // bnt 14 [ normal door options ]
+	0x81, 0x79,                         // lag 79 [ night ]
+	0x31, 0x10,                         // bnt 10 [ normal door options ]
+	0x78,                               // push1
+	0x39, 0x70,                         // pushi 70 [ flag 112 ]
+	0x45, 0x04, PATCH_UINT16(0x0002),   // callb proc0_4 02 [ has argument occurred? ]
+	0x2f, 0x07,                         // bt 07 [ normal door options ]
+	0x39, 0x05,                         // pushi 05
+	0x33, 0x04,                         // jmp 04 [ argument door options ]
+	PATCH_END
+};
+
+// The responses to the great hall door options in room 627 have problems. The
+//  floppy version is missing message handlers for Open Door and Knock on Door
+//  during the argument and so the door doesn't open. The CD version displays
+//  the wrong Knock on Door message. All versions fail to test flag 112 to see
+//  if the argument has already occurred.
+//
+// We fix all of this with a two part patch. First, sListened:register now
+//  controls which message is displayed before the door opens. This allows
+//  doorTopTeller:sayMessage to specify the correct message before running it.
+//  To add flag tests, new message handlers, and set sListened:register, we take
+//  advantage of identical message handlers in doorTopTeller:sayMessage. These
+//  provide plenty of room for new code that then jumps into another handler to
+//  continue and complete the work.
+//
+// Applies to: All versions
+// Responsible methods: sListened:changeState(0), doorTopTeller:sayMessage
+// Fixes bug: #10799
+static const uint16 qfg4Room627DoorResponsesSignature1[] = {
+	0x65, SIG_ADDTOOFFSET(+17),         // aTop state
+	0x38, SIG_SELECTOR16(say),          // pushi say
+	0x38, SIG_UINT16(0x0006),           // pushi 0006
+	0x39, 0x08,                         // pushi 08
+	0x38, SIG_UINT16(0x009b),           // pushi 009b
+	0x39, SIG_MAGICDWORD, 0x09,         // pushi 09
+	0x78,                               // push1
+	0x7c,                               // pushSelf
+	0x38, SIG_UINT16(0x026c),           // pushi 026c
+	0x81, 0x5b,                         // lag 5b
+	0x4a, SIG_UINT16(0x0010),           // send 10 [ gloryMessager say: 8 155 9 1 self 620 ]
+	0x32,                               // jmp ... [ end of method ]
+	SIG_END
+};
+
+static const uint16 qfg4Room627DoorResponsesPatch1[] = {
+	PATCH_ADDTOOFFSET(+21),
+	0x39, 0x06,                         // pushi 06
+	0x39, 0x08,                         // pushi 08
+	0x38, PATCH_UINT16(0x009b),         // pushi 009b
+	0x39, 0x09,                         // pushi 09
+	0x63, PATCH_GETORIGINALBYTEADJUST(+1, 0x10), // pToa register
+	0x02,                               // add
+	0x36,                               // push
+	0x78,                               // push1
+	0x7c,                               // pushSelf
+	0x38, PATCH_UINT16(0x026c),         // pushi 026c
+	0x81, 0x5b,                         // lag 5b
+	0x4a, PATCH_UINT16(0x0010),         // send 10 [ gloryMessager say: 8 155 (9 + register) 1 self 620 ]
+	PATCH_END
+};
+
+static const uint16 qfg4Room627DoorResponsesFloppySignature2[] = {
+	// Pick Lock (no argument) - missing flag check
+	SIG_MAGICDWORD,
+	0x30, SIG_UINT16(0x0072),           // bnt 0072 [ next message handler ]
+	0x81, 0x79,                         // lag 79 [ night ]
+	0x30, SIG_UINT16(0x0028),           // bnt 0028
+	0x89, 0x0b,                         // lsg 0b [ room number ]
+	0x34, SIG_UINT16(0x0273),           // ldi 627d
+	0x1a,                               // eq?
+	0x30, SIG_UINT16(0x001f),           // bnt 001f
+	0x38, SIG_UINT16(0x00fe),           // pushi clean [ hard-coded for floppy ]
+	0x76,                               // push0
+	0x54, SIG_UINT16(0x0004),           // self 04
+	0x78,                               // push1
+	0x39, 0x71,                         // pushi 71
+	0x45, 0x02, SIG_UINT16(0x0002),     // callb proc0_2 02
+	0x38, SIG_SELECTOR16(setScript),    // pushi setScript
+	0x78,                               // push1
+	0x72, SIG_UINT16(0x0082),           // lofsa sListened
+	0x36,                               // push
+	0x72, SIG_UINT16(0x01ae),           // lofsa pUpperDoor
+	0x4a, SIG_UINT16(0x0006),           // send 06 [ pUpperDoor setScript: sListened ]
+	0x32, SIG_UINT16(0x0131),           // jmp 0131
+	0x38, SIG_UINT16(0x0338),           // pushi trySkill [ hard-coded for floppy ]
+	0x7a,                               // push2
+	0x39, 0x09,                         // pushi 09
+	0x88, SIG_UINT16(0x01a6),           // lsg 01a6
+	0x81, 0x00,                         // lag 00
+	0x4a, SIG_UINT16(0x0008),           // send 08 [ hero trySkill: 9 global422 ]
+	SIG_ADDTOOFFSET(+0xe4),
+	// Open Door (no argument) - missing flag check
+	0x78,                               // push1
+	0x39, 0x71,                         // pushi 71
+	0x45, 0x02, SIG_UINT16(0x0002),     // callb proc0_2 02
+	0x38, SIG_UINT16(0x00fe),           // pushi clean [ hard-coded for floppy ]
+	0x76,                               // push0
+	0x54, SIG_UINT16(0x0004),           // self 04
+	SIG_END
+};
+
+static const uint16 qfg4Room627DoorResponsesFloppyPatch2[] = {
+	// Pick Lock (no argument) - missing flag check
+	0x30, PATCH_UINT16(0x001a),         // bnt 001a [ next message handler ]
+	PATCH_ADDTOOFFSET(+2),
+	0x30, PATCH_UINT16(0x00a1),         // bnt 00a1 [ normal pick lock code in duplicate handler ]
+	PATCH_ADDTOOFFSET(+6),
+	0x30, PATCH_UINT16(0x0098),         // bnt 0098 [ normal pick lock code in duplicate handler ]
+	0x78,                               // push1
+	0x39, 0x70,                         // pushi 70 [ flag 112 ]
+	0x45, 0x04, PATCH_UINT16(0x0002),   // callb proc0_4 02 [ has argument occurred? ]
+	0x2e, PATCH_UINT16(0x008e),         // bt 008e [ normal pick lock code in duplicate handler ]
+	0x33, 0x6d,                         // jmp 6d  [ continue argument code in duplicate handler ]
+	// Open Door (argument) - missing from floppy
+	0x3c,                               // dup
+	0x35, 0x0a,                         // ldi 0a
+	0x1a,                               // eq?
+	0x31, 0x07,                         // bnt 07 [ next message handler ]
+	0x38, PATCH_SELECTOR16(register),   // pushi register
+	0x78,                               // push1
+	0x78,                               // push1 [ "Ignoring the voices, you fling the door open..." ]
+	0x33, 0x0b,                         // jmp 0b
+	// Knock on Door (argument) - missing from floppy
+	0x3c,                               // dup
+	0x35, 0x0b,                         // ldi 0b
+	0x1a,                               // eq?
+	0x31, 0x45,                         // bnt 45 [ next message handler ]
+	0x38, PATCH_SELECTOR16(register),   // pushi register
+	0x78,                               // push1
+	0x7a,                               // push2 [ "Very polite of you. The door opens to your knock..." ]
+	0x72, PATCH_UINT16(0x0082),         // lofsa sListened
+	0x4a, PATCH_UINT16(0x0006),         // send 0006 [ sListened register: 1 or 2 ]
+	0x32, PATCH_UINT16(0x004c),         // jmp 004c [ continue argument code in duplicate handler ]
+	PATCH_ADDTOOFFSET(+0xe4),
+	// Open Door (no argument) - missing flag check
+	0x78,                               // push1
+	0x39, 0x70,                         // pushi 70 [ flag 112 ]
+	0x45, 0x04, PATCH_UINT16(0x0002),   // callb proc0_4 02 [ has argument occurred? ]
+	0x2f, 0x16,                         // bt 16 [ skip argument code if argument occurred ]
+	0x32, PATCH_UINT16(0xff5c),         // jmp ff5c [ continue argument code in duplicate handler ]
+	PATCH_END
+};
+
+static const uint16 qfg4Room627DoorResponsesCDSignature2[] = {
+	// Pick Lock (no argument) - missing flag check
+	0x38, SIG_UINT16(0x0101),           // pushi clean [ hard-coded for CD ]
+	0x76,                               // push0
+	SIG_MAGICDWORD,
+	0x54, SIG_UINT16(0x0004),           // self 04
+	0x78,                               // push1
+	0x39, 0x71,                         // pushi 71
+	0x45, 0x02, SIG_UINT16(0x0002),     // callb proc0_2 02
+	SIG_ADDTOOFFSET(+0x13b),
+	// Open Door (no argument) - missing flag check
+	0x78,                               // push1
+	0x39, 0x71,                         // pushi 71
+	0x45, 0x02, SIG_UINT16(0x0002),     // callb proc0_2 02
+	0x38, SIG_UINT16(0x0101),           // pushi clean [ hard-coded for CD ]
+	0x76,                               // push0
+	0x54, SIG_UINT16(0x0004),           // self 04
+	SIG_ADDTOOFFSET(+0x7c),
+	// Knock on Door (argument) - wrong message (CD regression)
+	0x78,                               // push1
+	0x39, 0x71,                         // pushi 71
+	0x45, 0x02, SIG_UINT16(0x0002),     // callb proc0_2 02
+	0x38, SIG_UINT16(0x0101),           // pushi clean [ hard-coded for CD ]
+	0x76,                               // push0
+	0x54, SIG_UINT16(0x0004),           // self 04
+	SIG_END
+};
+
+static const uint16 qfg4Room627DoorResponsesCDPatch2[] = {
+	// Pick Lock (no argument) - missing flag check
+	0x78,                               // push1
+	0x39, 0x70,                         // pushi 70 [ flag 112 ]
+	0x45, 0x04, PATCH_UINT16(0x0002),   // callb proc0_4 02 [ has argument occurred? ]
+	0x2f, 0x16,                         // bt 16 [ skip argument code if argument occurred ]
+	0x32, PATCH_UINT16(0x0089),         // jmp 0089 [ continue argument code in duplicate handler ]
+	PATCH_ADDTOOFFSET(+0x13d),
+	// Open Door (no argument) - missing flag check
+	0x78,                               // push1
+	0x39, 0x70,                         // pushi 70 [ flag 112 ]
+	0x45, 0x04, PATCH_UINT16(0x0002),   // callb proc0_4 02 [ has argument occurred? ]
+	0x2f, 0x16,                         // bt 16 [ skip argument code if argument occurred ]
+	0x32, PATCH_UINT16(0xff40),         // jmp ff40 [ continue argument code in duplicate handler ]
+	PATCH_ADDTOOFFSET(+0x7e),
+	// Knock on Door (argument) - wrong message (CD regression)
+	0x38, PATCH_SELECTOR16(register),   // pushi register
+	0x78,                               // push1
+	0x7a,                               // push2 [ "Very polite of you. The door opens to your knock..." ]
+	0x72, PATCH_UINT16(0x00b6),         // lofsa sListened
+	0x4a, PATCH_UINT16(0x0006),         // send 0006 [ sListened register: 2 ]
+	0x32, PATCH_UINT16(0xfeb4),         // jmp feb4 [ continue argument code in duplicate handler ]
+	PATCH_END
+};
+
+// When entering the great hall from room 627 while Katrina and Ad Avis argue,
+//  room 627 says that the door squeaks even if it was oiled. The flag tests are
+//  incorrect and out of sync with the logic in the great hall that plays the
+//  squeak that kills ego. This logic had other bugs in the floppy version,
+//  including setting an incorrect flag, and this patch fixes those too. The end
+//  result is that the squeak message isn't displayed if the oiled flag is set.
+//
+// Applies to: All versions
+// Responsible methods: sListened:changeState(2), sListened2:changeState(2) (CD)
+// Fixes bug: #10799
+static const uint16 qfg4Room627SqueakFloppySignature[] = {
+	0x89, 0x7d,                         // lsg 7d [ character type ]
+	0x35, SIG_MAGICDWORD, 0x02,         // ldi 02 [ thief ]
+	0x1a,                               // eq?    [ is thief? ]
+	0x31, 0x08,                         // bnt 08 [ skip oil test if thief (incorrect, removed from CD) ]
+	0x78,                               // push1
+	0x39, 0x72,                         // pushi 72 [ flag 114 ]
+	0x45, 0x04, SIG_UINT16(0x0002),     // callb proc0_4 02 [ is door oiled? ]
+	0x18,                               // not
+	0x2f, 0x07,                         // bt 07 [ squeak message ]
+	0x78,                               // push1
+	0x39, 0x71,                         // pushi 71 [ flag 113 ]
+	0x45, 0x04, SIG_UINT16(0x0002),     // callb proc0_4 02 [ selected action other than listening? (incorrect) ]
+	0x31, 0x33,                         // bnt 33 [ skip squeak message ]
+	SIG_ADDTOOFFSET(+20),
+	0x78,                               // push1
+	0x39, 0x71,                         // pushi 71 [ flag 113 ]
+	0x45, 0x02, SIG_UINT16(0x0002),     // callb proc0_2 02 [ set flag 113 (incorrect, removed from CD) ]
+	SIG_END,
+};
+
+static const uint16 qfg4Room627SqueakFloppyPatch[] = {
+	0x33, 0x05,                         // jmp 05 [ skip thief test, always test oil flag ]
+	PATCH_ADDTOOFFSET(+15),
+	0x32, PATCH_UINT16(0x0039),         // jmp 0039 [ skip squeak message if door has been oiled ]
+	PATCH_ADDTOOFFSET(+26),
+	0x32, PATCH_UINT16(0x0004),         // jmp 0004 [ don't set flag 113 ]
+	PATCH_END,
+};
+
+static const uint16 qfg4Room627SqueakCDSignature[] = {
+	0x78,                               // push1
+	0x39, 0x72,                         // pushi 72 [ flag 114 ]
+	0x45, 0x04, SIG_UINT16(0x0002),     // callb proc0_4 02 [ is door oiled? ]
+	SIG_MAGICDWORD,
+	0x18,                               // not
+	0x2f, 0x07,                         // bt 07 [ squeak message ]
+	0x78,                               // push1
+	0x39, 0x71,                         // pushi 71 [ flag 113 ]
+	0x45, 0x04, SIG_UINT16(0x0002),     // callb proc0_4 02 [ selected action other than listening? (incorrect) ]
+	0x31, 0x2c,                         // bnt 2c [ skip squeak message ]
+	SIG_END,
+};
+
+static const uint16 qfg4Room627SqueakCDPatch[] = {
+	PATCH_ADDTOOFFSET(+10),
+	0x32, PATCH_UINT16(0x0032),         // jmp 0032 [ skip squeak message if door has been oiled ]
+	PATCH_END,
+};
+
+// Looking through the keyhole in room 627 into the great hall responds with a
+//  generic message instead of the specific room description. sPeepingTom only
+//  says the great hall message at night, which isn't relevant, and didn't work
+//  since doorTeller wouldn't offer the keyhole option at night due to a missing
+//  flag check which we fix. We restore the message by removing the night test.
+//
+// Applies to: All versions
+// Responsible method: sPeepingTom:changeState(1)
+// Fixes bug: #10799
+static const uint16 qfg4GreatHallKeyholeSignature[] = {
+	SIG_MAGICDWORD,
+	0x81, 0x79,                         // lag 79 [ night ]
+	0x31, 0x1a,                         // bnt 1a [ skip keyhole message during day ]
+	0x38, SIG_SELECTOR16(say),          // pushi say
+	SIG_END
+};
+
+static const uint16 qfg4GreatHallKeyholePatch[] = {
+	0x33, 0x02,                         // jmp 02 [ say keyhole message regardless of time ]
+	PATCH_END
+};
+
 //          script, description,                                     signature                      patch
 static const SciScriptPatcherEntry qfg4Signatures[] = {
 	{  true,     0, "prevent autosave from deleting save games",   1, qfg4AutosaveSignature,         qfg4AutosavePatch },
@@ -11308,10 +13187,18 @@ static const SciScriptPatcherEntry qfg4Signatures[] = {
 	{  true,    31, "fix setScaler calls",                         1, qfg4SetScalerSignature,        qfg4SetScalerPatch },
 	{  true,    41, "fix conditional void calls",                  3, qfg4ConditionalVoidSignature,  qfg4ConditionalVoidPatch },
 	{  true,    50, "fix random revenant kopeks",                  1, qfg4SearchRevenantSignature,   qfg4SearchRevenantPatch },
+	{  true,    51, "Floppy: fix ad avis capture lockup",          1, qfg4AdAvisCaptureSignature,    qfg4AdAvisCapturePatch },
+	{  true,    53, "NRS: fix wraith lockup",                      1, qfg4WraithLockupNrsSignature,  qfg4WraithLockupNrsPatch },
 	{  true,    83, "fix incorrect array type",                    1, qfg4TrapArrayTypeSignature,    qfg4TrapArrayTypePatch },
+	{  true,   140, "fix character selection",                     1, qfg4CharacterSelectSignature,  qfg4CharacterSelectPatch },
+	{  true,   250, "fix hectapus death lockup",                   1, qfg4HectapusDeathSignature,    qfg4HectapusDeathPatch },
+	{  true,   260, "CD: fix inn door crash",                      1, qfg4InnDoorCDSignature,        qfg4InnDoorCDPatch },
 	{  true,   270, "fix town gate after a staff dream",           1, qfg4DreamGateSignature,        qfg4DreamGatePatch },
+	{  true,   270, "fix town gate doormat at night",              1, qfg4TownGateDoormatSignature,  qfg4TownGateDoormatPatch },
 	{  true,   320, "fix pathfinding at the inn",                  1, qfg4InnPathfindingSignature,   qfg4InnPathfindingPatch },
 	{  true,   320, "fix talking to absent innkeeper",             1, qfg4AbsentInnkeeperSignature,  qfg4AbsentInnkeeperPatch },
+	{  true,   320, "CD: fix domovoi never appearing",             1, qfg4DomovoiInnSignature,       qfg4DomovoiInnPatch },
+	{  true,   324, "CD: fix domovoi never appearing",             1, qfg4DomovoiInnSignature,       qfg4DomovoiInnPatch },
 	{  true,   340, "CD/Floppy: fix guild tunnel access (1/3)",    1, qfg4GuildWalkSignature1,       qfg4GuildWalkPatch1 },
 	{  true,   340, "CD/Floppy: fix guild tunnel access (2/3)",    1, qfg4GuildWalkSignature2,       qfg4GuildWalkPatch2 },
 	{  false,  340, "CD: fix guild tunnel access (3/3)",           1, qfg4GuildWalkCDSignature3,     qfg4GuildWalkCDPatch3 },
@@ -11334,6 +13221,14 @@ static const SciScriptPatcherEntry qfg4Signatures[] = {
 	{  true,   600, "fix passable closed gate after geas",         1, qfg4DungeonGateSignature,      qfg4DungeonGatePatch },
 	{  true,   630, "fix great hall entry from barrel room",       1, qfg4GreatHallEntrySignature,   qfg4GreatHallEntryPatch },
 	{  true,   633, "fix stairway pathfinding",                    1, qfg4StairwayPathfindingSignature, qfg4StairwayPathfindingPatch },
+	{  true,   633, "Floppy: fix argument message",                1, qfg4ArgumentMessageFloppySignature,  qfg4ArgumentMessageFloppyPatch },
+	{  true,   633, "fix room 627 door options",                   1, qfg4Room627DoorOptionsSignature, qfg4Room627DoorOptionsPatch },
+	{  true,   633, "fix room 627 door responses (1/2)",           1, qfg4Room627DoorResponsesSignature1, qfg4Room627DoorResponsesPatch1 },
+	{  true,   633, "Floppy: fix room 627 door responses (2/2)",   1, qfg4Room627DoorResponsesFloppySignature2, qfg4Room627DoorResponsesFloppyPatch2 },
+	{  true,   633, "CD: fix room 627 door responses (2/2)",       1, qfg4Room627DoorResponsesCDSignature2, qfg4Room627DoorResponsesCDPatch2 },
+	{  true,   633, "Floppy: fix room 627 door squeak",            1, qfg4Room627SqueakFloppySignature,  qfg4Room627SqueakFloppyPatch },
+	{  true,   633, "CD: fix room 627 door squeak",                2, qfg4Room627SqueakCDSignature,  qfg4Room627SqueakCDPatch },
+	{  true,   633, "fix great hall keyhole message",              1, qfg4GreatHallKeyholeSignature, qfg4GreatHallKeyholePatch },
 	{  true,   643, "fix iron safe's east door sending hero west", 1, qfg4SafeDoorEastSignature,     qfg4SafeDoorEastPatch },
 	{  true,   643, "fix iron safe's door oil flags",              1, qfg4SafeDoorOilSignature,      qfg4SafeDoorOilPatch },
 	{  true,   644, "fix castle door open message for rogue",      2, qfg4StuckDoorSignature,        qfg4StuckDoorPatch },
@@ -11345,15 +13240,29 @@ static const SciScriptPatcherEntry qfg4Signatures[] = {
 	{  true,   663, "CD/Floppy: fix peer bats, upper door (1/2)",  1, qfg4UpperPeerBatsSignature1,       qfg4UpperPeerBatsPatch1 },
 	{  false,  663, "CD: fix peer bats, upper door (2/2)",         1, qfg4UpperPeerBatsCDSignature2,     qfg4UpperPeerBatsCDPatch2 },
 	{  false,  663, "Floppy: fix peer bats, upper door (2/2)",     1, qfg4UpperPeerBatsFloppySignature2, qfg4UpperPeerBatsFloppyPatch2 },
+	{  true,   670, "fix look dungeon message",                    1, qfg4LookDungeonSignature,      qfg4LookDungeonPatch },
 	{  true,   710, "fix tentacle wriggle cycler",                 1, qfg4TentacleWriggleSignature,  qfg4TentacleWrigglePatch },
 	{  true,   710, "fix tentacle retraction for fighter",         1, qfg4PitRopeFighterSignature,   qfg4PitRopeFighterPatch },
 	{  true,   710, "fix tentacle retraction for mage (1/2)",      1, qfg4PitRopeMageSignature1,     qfg4PitRopeMagePatch1 },
+	{  true,   710, "NRS: fix tentacle retraction for mage (1/2)", 1, qfg4PitRopeMageNrsSignature1,  qfg4PitRopeMageNrsPatch1 },
 	{  true,   710, "fix tentacle retraction for mage (2/2)",      1, qfg4PitRopeMageSignature2,     qfg4PitRopeMagePatch2 },
+	{  true,   730, "fix ad avis timeout",                         1, qfg4AdAvisTimeoutSignature,    qfg4AdAvisTimeoutPatch },
+	{  true,   730, "Floppy: fix casting spells at ad avis",       1, qfg4AdAvisSpellsFloppySignature, qfg4AdAvisSpellsFloppyPatch },
+	{  true,   730, "CD: fix casting spells at ad avis",           2, qfg4AdAvisSpellsCDSignature,   qfg4AdAvisSpellsCDPatch },
+	{  true,   730, "NRS: fix casting spells at ad avis",          2, qfg4AdAvisSpellsNrsSignature,  qfg4AdAvisSpellsNrsPatch },
+	{  true,   730, "fix casting last spell at ad avis",           1, qfg4AdAdvisLastSpellSignature, qfg4AdAdvisLastSpellPatch },
+	{  true,   730, "fix ad avis projectile message",              1, qfg4AdAvisMessageSignature,    qfg4AdAvisMessagePatch },
+	{  true,   730, "fix throwing weapons at ad avis",             1, qfg4AdAvisThrowWeaponSignature,qfg4AdAvisThrowWeaponPatch },
+	{  true,   730, "fix fighter's spear animation",               1, qfg4FighterSpearSignature,     qfg4FighterSpearPatch },
 	{  true,   800, "fix setScaler calls",                         1, qfg4SetScalerSignature,        qfg4SetScalerPatch },
 	{  true,   800, "fix grapnel removing hero's scaler",          1, qfg4RopeScalerSignature,       qfg4RopeScalerPatch },
 	{  true,   801, "fix runes puzzle (1/2)",                      1, qfg4RunesPuzzleSignature1,     qfg4RunesPuzzlePatch1 },
 	{  true,   801, "fix runes puzzle (2/2)",                      1, qfg4RunesPuzzleSignature2,     qfg4RunesPuzzlePatch2 },
 	{  true,   803, "fix sliding down slope",                      1, qfg4SlidingDownSlopeSignature, qfg4SlidingDownSlopePatch },
+	{  true,   803, "CD: fix walking up slippery slope",           1, qfg4WalkUpSlopeCDSignature,    qfg4WalkUpSlopeCDPatch },
+	{  true,   803, "CD: fix walking down slippery slope",         1, qfg4WalkDownSlopeCDSignature,  qfg4WalkDownSlopeCDPatch },
+	{  true,   803, "NRS: fix walking down slippery slope",        1, qfg4WalkDownSlopeNrsSignature, qfg4WalkDownSlopeNrsPatch },
+	{  true,   820, "fix rabbit combat",                           1, qfg4RabbitCombatSignature,     qfg4RabbitCombatPatch },
 	{  true,   810, "fix conditional void calls",                  1, qfg4ConditionalVoidSignature,  qfg4ConditionalVoidPatch },
 	{  true,   830, "fix conditional void calls",                  2, qfg4ConditionalVoidSignature,  qfg4ConditionalVoidPatch },
 	{  true,   835, "fix conditional void calls",                  3, qfg4ConditionalVoidSignature,  qfg4ConditionalVoidPatch },
@@ -11658,6 +13567,61 @@ static const uint16 sq4CdPatchGetPointsForChangingBackClothes[] = {
 	PATCH_END
 };
 
+// The English Amiga version contains curious changes to the dress logic in
+//  Sock's which break the game and weren't included in later versions:
+//
+// 1. Purchasing the dress is recorded in flag 90 instead of mall:rFlag3
+// 2. Flag 90 is cleared when changing clothes after clearing out the ATM
+//
+// Game flags are global while mall flags are reset upon leaving the mall, which
+//  makes this look like a bug fix, but Sock's is closed when returning so this
+//  shouldn't change game logic. Unfortunately Sierra forgot to update the other
+//  scripts which query mall:rFlag3 and so they never see the dress purchase.
+//  This creates scenarios where exiting Sock's (room 371) after paying causes
+//  room 370 to kick Roger out for not paying, preventing game completion.
+//
+// Clearing the dress-purchase flag has no effect other than to allow purchasing
+//  the dress a second time as if it never happened, leaving the player without
+//  enough money to complete the game, having paid for the dress twice.
+//
+// We fix both bugs by updating the mall scripts so that they all test flag 90
+//  and never clear it. It's possible the flag change was an optimization, which
+//  many Amiga tweaks are, since it eliminated a message send in rm371:doit.
+//
+// Applies to: English Amiga Floppy
+// Responsible methods: rm371:doit, rm370:init, warningScript:changeState(1)
+// Fixes bug #11004
+static const uint16 sq4AmigaSignatureDressPurchaseFlagClear[] = {
+	SIG_MAGICDWORD,
+	0x78,                               // push1
+	0x39, 0x5a,                         // pushi 5a
+	0x45, 0x08, 0x02,                   // callb proc0_8 02 [ clear flag 90 ]
+	SIG_END
+};
+
+static const uint16 sq4AmigaPatchDressPurchaseFlagClear[] = {
+	0x32, PATCH_UINT16(0x0003),         // jmp 0003 [ don't clear flag 90 ]
+	PATCH_END
+};
+
+static const uint16 sq4AmigaSignatureDressPurchaseFlagCheck[] = {
+	SIG_MAGICDWORD,
+	0x36,                               // push [ mall ]
+	0x38, SIG_UINT16(0x0228),           // pushi rFlag3
+	0x39, 0x04,                         // pushi 04
+	0x46, SIG_UINT16(0x02bc),           // calle proc700_3 06 [ is mall:rFlag3 flag 4 set? ]
+	      SIG_UINT16(0x0003), 0x06,
+	SIG_END
+};
+
+static const uint16 sq4AmigaPatchDressPurchaseFlagCheck[] = {
+	0x78,                               // push1
+	0x39, 0x5a,                         // pushi 5a
+	0x45, 0x06, 0x02,                   // callb proc0_6 02 [ is flag 90 set? ]
+	0x32, PATCH_UINT16(0x0003),         // jmp 0003
+	PATCH_END
+};
+
 // The Big And Tall store (room 381) doesn't display its Look message in the CD
 //  version. We add the missing super:doVerb call to theStore:doVerb.
 //
@@ -11700,6 +13664,52 @@ static const uint16 sq4CdPatchBigAndTallDescription[] = {
 	0x78,                               // push1
 	0x78,                               // push1
 	0x57, 0x7a, 0x06,                   // super Sq4Feature 06 [ super doVerb: 1 ]
+	PATCH_END
+};
+
+// Clicking Do on the Monolith Burger door responds with the message for looking
+//  at the boss and clicking Taste responds with the taste message for the bush.
+//  The verb handler is missing the modNum for both and also sets the wrong cond
+//  for the second.
+//
+// Applies to: English PC CD
+// Responsible method: door:doVerb(4)
+// Fixes bug #10976
+static const uint16 sq4CdSignatureMonolithBurgerDoor[] = {
+	SIG_MAGICDWORD,
+	0x31, 0x13,                         // bnt 13
+	0x38, SIG_SELECTOR16(modNum),       // pushi modNum
+	0x78,                               // push1
+	0x38, SIG_UINT16(0x0177),           // pushi 0177
+	0x38, SIG_SELECTOR16(say),          // pushi say
+	0x78,                               // push1
+	0x78,                               // push1
+	0x81, 0x59,                         // lag 59
+	0x4a, 0x0c,                         // send 0c [ Sq4GlobalNarrator modNum 375: say: 1 ]
+	SIG_ADDTOOFFSET(+9),
+	0x38, SIG_SELECTOR16(say),          // pushi say
+	0x78,                               // push1
+	0x7a,                               // push2
+	0x81, 0x59,                         // lag 59
+	0x4a, 0x06,                         // send 06 [ Sq4GlobalNarrator say: 2 ]
+	SIG_ADDTOOFFSET(+25),
+	0x38, SIG_SELECTOR16(say),          // pushi say
+	0x78,                               // push1
+	0x39, 0x0b,                         // pushi 0b
+	0x81, 0x59,                         // lag 59
+	0x4a, 0x06,                         // send 06 [ Sq4GlobalNarrator say: 11 ]
+	SIG_END
+};
+
+static const uint16 sq4CdPatchMonolithBurgerDoor[] = {
+	PATCH_ADDTOOFFSET(+13),
+	0x36,                               // push
+	PATCH_ADDTOOFFSET(+13),
+	0x35, 0x02,                         // ldi 02
+	0x33, 0xe3,                         // jmp e3 [ Sq4GlobalNarrator modNum 375: say: 2 ]
+	PATCH_ADDTOOFFSET(+30),
+	0x35, 0x04,                         // ldi 04
+	0x33, 0xc1,                         // jmp c1 [ Sq4GlobalNarrator modNum 375: say: 4 ]
 	PATCH_END
 };
 
@@ -12148,6 +14158,171 @@ static const uint16 sq4CdPatchBikerTimepodMessage[] = {
 	PATCH_END
 };
 
+// Hiding from the Sequel Police in the electronics store (room 390) locks up
+//  the CD version and has a subsequent animation bug.
+//
+// This scene is triggered by going east to the escalator after the police
+//  arrive and then back to the electronics store. Police appear on both sides
+//  and the only way to survive is to hide in the store while they talk before
+//  splitting up. Their first message fails to set a caller, locking up the
+//  game, and their other messages contain typos and newline characters left
+//  over from floppy versions.
+//
+// We fix the lockup by passing the missing "self" parameter so that the script
+//  proceeds. This exposes the next bug, where the police walk to the beltways
+//  and instead of standing, shoot wildly into the mall. The script doesn't
+//  remove their Walk cyclers and so they continue to animate. This worked in
+//  floppy versions but the Cycle classes were upgraded in CD with different
+//  behavior. We fix this by removing the Walk cyclers.
+//
+// Applies to: English PC CD
+// Responsible method: sp1Squeeze:changeState
+// Fixes bug #10977
+static const uint16 sq4CdSignatureHzSoGoodSequelPoliceLockup[] = {
+	0x38, SIG_SELECTOR16(say),          // pushi say
+	0x78,                               // push1
+	SIG_MAGICDWORD,
+	0x78,                               // push1
+	0x72, SIG_UINT16(0x0630),           // lofsa tSP1
+	0x4a, 0x06,                         // send 06  [ tSP1 say: 1 ]
+	0x32, SIG_UINT16(0x01c1),           // jmp 01c1 [ end of method ]
+	SIG_END
+};
+
+static const uint16 sq4CdPatchHzSoGoodSequelPoliceLockup[] = {
+	PATCH_ADDTOOFFSET(+3),
+	0x7a,                               // push2
+	PATCH_ADDTOOFFSET(+4),
+	0x7c,                               // pushSelf
+	0x4a, 0x08,                         // send 06 [ tSP1 say: 1 self ]
+	0x3a,                               // toss
+	0x48,                               // ret
+	PATCH_END
+};
+
+static const uint16 sq4CdSignatureHzSoGoodSequelPoliceCycler[] = {
+	0x31, 0x20,                         // bnt 20 [ state 12 ]
+	SIG_ADDTOOFFSET(+29),
+	SIG_MAGICDWORD,
+	0x32, SIG_UINT16(0x00a9),           // jmp 00a9 [ end of method ]
+	0x3c,                               // dup
+	0x35, 0x0c,                         // ldi 0c
+	0x1a,                               // eq?
+	0x30, SIG_UINT16(0x0030),           // bnt 0030 [ state 13 ]
+	0x7a,                               // push2 [ view ]
+	0x78,                               // push1
+	0x39, 0x0d,                         // pushi 0d
+	0x38, SIG_SELECTOR16(setLoop),      // pushi setLoop
+	SIG_ADDTOOFFSET(+32),
+	0x4a, 0x24,                         // send 24 [ sp1 view: 13 setLoop: ... ]
+	SIG_ADDTOOFFSET(+11),
+	0x31, 0x21,                         // bnt 21 [ state 14 ]
+	SIG_ADDTOOFFSET(+30),
+	0x32, SIG_UINT16(0x004b),           // jmp 004b [ end of method ]
+	0x3c,                               // dup
+	0x35, 0x0e,                         // ldi 0e
+	0x1a,                               // eq?
+	0x30, SIG_UINT16(0x0030),           // bnt 0030 [ state 15 ]
+	0x7a,                               // push2 [ view ]
+	0x78,                               // push1
+	0x39, 0x0d,                         // pushi 0d
+	0x38, SIG_SELECTOR16(setLoop),      // pushi setLoop
+	SIG_ADDTOOFFSET(+37),
+	0x4a, 0x26,                         // send 26 [ sp2 view: 13 setLoop: ... ]
+	SIG_END
+};
+
+static const uint16 sq4CdPatchHzSoGoodSequelPoliceCycler[] = {
+	0x31, 0x1d,                         // bnt 1d [ state 12 ]
+	PATCH_ADDTOOFFSET(+29),
+	0x3c,                               // dup
+	0x35, 0x0c,                         // ldi 0c
+	0x1a,                               // eq?
+	0x31, 0x34,                         // bnt 34 [ state 13 ]
+	0x38, PATCH_SELECTOR16(setCycle),   // pushi setCycle
+	0x78,                               // push1
+	0x76,                               // push0
+	0x7a,                               // push2 [ view ]
+	0x78,                               // push1
+	0x39, 0x0d,                         // pushi 0d
+	0x39, PATCH_SELECTOR8(loop),        // pushi loop
+	PATCH_ADDTOOFFSET(+32),
+	0x4a, 0x2a,                         // send 2a [ sp1 setCycle: 0 view: 13 loop: ... ]
+	PATCH_ADDTOOFFSET(+11),
+	0x31, 0x1e,                         // bnt 1e [ state 14 ]
+	PATCH_ADDTOOFFSET(+30),
+	0x3c,                               // dup
+	0x35, 0x0e,                         // ldi 0e
+	0x1a,                               // eq?
+	0x31, 0x34,                         // bnt 34 [ state 15 ]
+	0x38, PATCH_SELECTOR16(setCycle),   // pushi setCycle
+	0x78,                               // push1
+	0x76,                               // push0
+	0x7a,                               // push2 [ view ]
+	0x78,                               // push1
+	0x39, 0x0d,                         // pushi 0d
+	0x39, PATCH_SELECTOR8(loop),        // pushi loop
+	PATCH_ADDTOOFFSET(+37),
+	0x4a, 0x2c,                         // send 2c [ sp2 setCycle: 0 view: 13 loop: ... ]
+	PATCH_END
+};
+
+// Room 370 in front of Sock's is missing a flag check and runs a lethal Sequel
+//  Police script when escaping the Skate-O-Rama after hiding in the electronics
+//  store. A lockup bug in the CD version prevented getting this far. As this is
+//  the wrong time to run the script, the police are drawn as if they're still
+//  swimming in zero gravity.
+//
+// Flag 23 is set when the police pursue in escalator room 400 and triggers the
+//  squeeze scripts that force entering the Skate-O-Rama in rooms 370 and 390.
+//  Flag 22 is set when exiting the Skate-O-Rama after dodging the police. The
+//  two rooms handle these flags differently and are out of sync. Room 370
+//  clears flag 23 and doesn't test 22 while room 390 doesn't clear 23 and does
+//  test 22. The result is that room 370 doesn't see that you've escaped the
+//  Skate-O-Rama and assumes the police are still pursuing from room 400.
+//
+// We fix this by only running sp1Squeeze in room 370 when coming from room 400.
+//  This is equivalent to adding the missing flag 22 check but can be done in
+//  the available bytes. To make room we use the clear-flag method's return
+//  value, which is the previous flag value, and only test if the previous room
+//  number is even, which only room 400 is. This patch is split into two parts
+//  to surround a bnt instruction whose operand size changed between versions.
+//
+// Applies to: All versions
+// Responsible method: rm570:init
+// Fixes bug #10977
+static const uint16 sq4SignatureSocksSequelPoliceFlag1[] = {
+	0x78,                               // push1
+	SIG_MAGICDWORD,
+	0x39, 0x17,                         // pushi 17
+	0x45, 0x06, 0x02,                   // callb proc0_6 [ is flag 23 set? ]
+	SIG_END
+};
+
+static const uint16 sq4PatchSocksSequelPoliceFlag1[] = {
+	PATCH_ADDTOOFFSET(+3),
+	0x45, 0x08, 0x02,                   // callb proc0_8 [ clear flag 23, was flag set? ]
+	PATCH_END
+};
+
+static const uint16 sq4SignatureSocksSequelPoliceFlag2[] = {
+	0x78,                               // push1
+	SIG_MAGICDWORD,
+	0x39, 0x17,                         // pushi 17
+	0x45, 0x08, 0x02,                   // callb proc0_8 [ clear flag 23 ]
+	SIG_ADDTOOFFSET(+0x27),
+	0x38, SIG_SELECTOR16(setRegions),   // pushi setRegions
+	SIG_END
+};
+
+static const uint16 sq4PatchSocksSequelPoliceFlag2[] = {
+	0x81, 0x0c,                         // lag 0c
+	0x78,                               // push1
+	0x12,                               // and   [ is previous room number odd? ]
+	0x2f, 0x27,                         // bt 27 [ skip sp1Squeeze ]
+	PATCH_END
+};
+
 // Clicking Walk while getting shot by the Sequel Police outside of Sock's in
 //  room 370 crashes the CD version. This causes an Oops! error in the original.
 //  The lookupSelector error comes from within the Grooper and Grycler classes
@@ -12531,6 +14706,100 @@ static const uint16 sq4CDPatchSewerLockup[] = {
 	PATCH_END
 };
 
+// SQ4CD had an easter egg room of things removed from Sierra games for legal
+//  reasons, but the room itself was removed from the game. Instead the room's
+//  pic (570) and messages (271) were left in along with the 18 digit timepod
+//  code that attempts to load the missing room 271 and of course crashes.
+//
+// This wouldn't be a problem except that the code is publicly known due to NRS'
+//  modified version of the game which includes a script 271 that recreates the
+//  room. The code appears in easter egg lists, and players who don't realize it
+//  only applies to a modified version attempt it and crash, so we disable it.
+//
+// Applies to: English PC CD
+// Responsible method: timeToTimeWarpS:changeState(1)
+// Fixes bug #11006
+static const uint16 sq4CdSignatureRemovedRoomTimepodCode[] = {
+	SIG_MAGICDWORD,
+	0x35, 0x01,                         // ldi 01 [ 1 == room 271 code was entered ]
+	0xa3, 0x72,                         // sal 72
+	SIG_END
+};
+
+static const uint16 sq4CdPatchRemovedRoomTimepodCode[] = {
+	0x35, 0x00,                         // ldi 00
+	PATCH_END
+};
+
+// Walking into Sock's dressing room (room 371) can cause ego to escape obstacle
+//  boundaries and get stuck behind the wall or counter. Similar problems occur
+//  in the original. The dressing room has no obstacle bounding the edge of the
+//  screen. Instead, rm371:doit detects if ego has hit the edge and moves him
+//  back to x coordinate 173 but doesn't change ego:y. If ego hits the edge on a
+//  diagonal pathfinding move then this can place ego around the corner of one
+//  of the obstacles that bound the top and bottom of the dressing room.
+//  rm371:doit will then move ego within the obstacle and out of bounds.
+//
+// We fix this by extending the two obstacles an additional 10 pixels past the
+//  edge of the screen so that ego can't get around their corners and get stuck.
+//  Sierra reduced one of these coordinates in later floppy versions, and it's
+//  not clear why, but this change wasn't included in the CD version.
+//
+// Applies to: All versions
+// Responsible method: rm371:init
+// Fixes bug #11055
+static const uint16 sq4SignatureSocksDressingRoomObstacles[] = {
+	0x38, SIG_ADDTOOFFSET(+2),          // pushi 321d or 319d [ x ]
+	0x39, 0x46,                         // pushi 70d  [ y ]
+	SIG_ADDTOOFFSET(+125),
+	0x38, SIG_MAGICDWORD,               // pushi 321d [ x ]
+	      SIG_UINT16(0x0141),
+	0x39, 0x49,                         // pushi 73d  [ y ]
+	SIG_END
+};
+
+static const uint16 sq4PatchSocksDressingRoomObstacles[] = {
+	0x38, PATCH_UINT16(0x014b),         // pushi 331d [ x ]
+	PATCH_ADDTOOFFSET(+127),
+	0x38, PATCH_UINT16(0x014b),         // pushi 331d [ x ]
+	PATCH_END
+};
+
+// SQ4CD lets you keep the unstable ordnance and its points for the entire game.
+//
+// The bomb in room 40 is a joke item with joke points which kills you when
+//  entering the sewer, therefore you're not allowed to pick it up after leaving
+//  the sewer. This was originally enforced in the floppy version by setting a
+//  short timer which summons the Sequel Police to kill you. The shootEgo script
+//  was refactored in the CD version and this code no longer works. Rather than
+//  fix this, Sierra left the broken code in place, and added new code to kill
+//  you when interacting with the tank if the previous room was the sewer. This
+//  is incorrect since you can walk right to room 45 and return to room 40,
+//  which defeats both checks and allows you to get and keep the bomb.
+//
+// We fix this by replacing the previous room test with a flag test. Flag 0 is
+//  set when the police are on the streets and is what the original code tested.
+//
+// Applies to: English PC CD
+// Responsible method: tankScript:changeState(2)
+// Fixes bug #11077
+static const uint16 sq4CdSignatureUnstableOrdnance[] = {
+	SIG_MAGICDWORD,
+	0x31, 0x2b,                         // bnt 2b
+	0x89, 0x0c,                         // lsg 0c [ previous room ]
+	0x35, 0x48,                         // ldi 48 [ sewer manhole ]
+	0x1a,                               // eq?    [ came from sewer? ]
+	SIG_END
+};
+
+static const uint16 sq4CdPatchUnstableOrdnance[] = {
+	PATCH_ADDTOOFFSET(+2),
+	0x78,                               // push1
+	0x76,                               // push0 [ flag 0, set when police are on streets ]
+	0x45, 0x06, 0x02,                   // callb proc0_6 02 [ is flag 0 set? ]
+	PATCH_END
+};
+
 //          script, description,                                      signature                                      patch
 static const SciScriptPatcherEntry sq4Signatures[] = {
 	{  true,     1, "Floppy: EGA intro delay fix",                    2, sq4SignatureEgaIntroDelay,                     sq4PatchEgaIntroDelay },
@@ -12539,6 +14808,7 @@ static const SciScriptPatcherEntry sq4Signatures[] = {
 	{  true,   376, "Floppy: click atm card on sequel police fix",    1, sq4FloppySignatureClickAtmCardOnSequelPolice,  sq4FloppyPatchClickAtmCardOnSequelPolice },
 	{  true,   376, "Floppy: throw stuff at sequel police fix",       1, sq4FloppySignatureThrowStuffAtSequelPolice,    sq4FloppyPatchThrowStuffAtSequelPolice },
 	{  true,   700, "Floppy: throw stuff at sequel police fix",       1, sq4FloppySignatureThrowStuffAtSequelPolice,    sq4FloppyPatchThrowStuffAtSequelPolice },
+	{  true,    40, "CD: unstable ordnance fix",                      1, sq4CdSignatureUnstableOrdnance,                sq4CdPatchUnstableOrdnance },
 	{  true,    45, "CD: walk in from below for room 45 fix",         1, sq4CdSignatureWalkInFromBelowRoom45,           sq4CdPatchWalkInFromBelowRoom45 },
 	{  true,   105, "Floppy: sewer lockup fix",                       1, sq4FloppySignatureSewerLockup,                 sq4FloppyPatchSewerLockup },
 	{  true,   105, "CD: sewer lockup fix",                           1, sq4CDSignatureSewerLockup,                     sq4CDPatchSewerLockup },
@@ -12547,13 +14817,23 @@ static const SciScriptPatcherEntry sq4Signatures[] = {
 	{  true,   290, "CD: cedric lockup fix (2/2)",                    1, sq4CdSignatureCedricLockup2,                   sq4CdPatchCedricLockup2 },
 	{  true,   370, "CD: sock's sequel police hands-off fix",         1, sq4CdSignatureSocksSequelPoliceHandsOff,       sq4CdPatchSocksSequelPoliceHandsOff },
 	{  true,   370, "CD: sock's door restore and message fix",        1, sq4CdSignatureSocksDoor,                       sq4CdPatchSocksDoor },
+	{  true,   370, "CD/Floppy: sock's sequel police flag fix (1/2)", 1, sq4SignatureSocksSequelPoliceFlag1,            sq4PatchSocksSequelPoliceFlag1 },
+	{  true,   370, "CD/Floppy: sock's sequel police flag fix (2/2)", 1, sq4SignatureSocksSequelPoliceFlag2,            sq4PatchSocksSequelPoliceFlag2 },
+	{  true,   371, "CD/Floppy: sock's dressing room obstacles fix",  1, sq4SignatureSocksDressingRoomObstacles,        sq4PatchSocksDressingRoomObstacles },
+	{ false,   370, "Amiga: dress purchase flag check fix",           1, sq4AmigaSignatureDressPurchaseFlagCheck,       sq4AmigaPatchDressPurchaseFlagCheck },
+	{ false,   371, "Amiga: dress purchase flag clear fix",           1, sq4AmigaSignatureDressPurchaseFlagClear,       sq4AmigaPatchDressPurchaseFlagClear },
+	{ false,   386, "Amiga: dress purchase flag check fix",           1, sq4AmigaSignatureDressPurchaseFlagCheck,       sq4AmigaPatchDressPurchaseFlagCheck },
 	{  true,   381, "CD: big and tall room description",              1, sq4CdSignatureBigAndTallDescription,           sq4CdPatchBigAndTallDescription },
+	{  true,   385, "CD: monolith burger door message fix",           1, sq4CdSignatureMonolithBurgerDoor,              sq4CdPatchMonolithBurgerDoor },
+	{  true,   390, "CD: hz so good sequel police lockup fix",        1, sq4CdSignatureHzSoGoodSequelPoliceLockup,      sq4CdPatchHzSoGoodSequelPoliceLockup },
+	{  true,   390, "CD: hz so good sequel police cycler fix",        1, sq4CdSignatureHzSoGoodSequelPoliceCycler,      sq4CdPatchHzSoGoodSequelPoliceCycler },
 	{  true,   391, "CD: missing Audio for universal remote control", 1, sq4CdSignatureMissingAudioUniversalRemote,     sq4CdPatchMissingAudioUniversalRemote },
 	{  true,   396, "CD: get points for changing back clothes fix",   1, sq4CdSignatureGetPointsForChangingBackClothes, sq4CdPatchGetPointsForChangingBackClothes },
 	{  true,   405, "CD/Floppy: zero gravity blast fix",              1, sq4SignatureZeroGravityBlast,                  sq4PatchZeroGravityBlast },
 	{  true,   406, "CD/Floppy: zero gravity blast fix",              1, sq4SignatureZeroGravityBlast,                  sq4PatchZeroGravityBlast },
 	{  true,   410, "CD/Floppy: zero gravity blast fix",              1, sq4SignatureZeroGravityBlast,                  sq4PatchZeroGravityBlast },
 	{  true,   411, "CD/Floppy: zero gravity blast fix",              1, sq4SignatureZeroGravityBlast,                  sq4PatchZeroGravityBlast },
+	{ false,   531, "CD: disable timepod code for removed room",      1, sq4CdSignatureRemovedRoomTimepodCode,          sq4CdPatchRemovedRoomTimepodCode },
 	{  true,   545, "CD: vohaul pocketpal text+speech fix",           1, sq4CdSignatureVohaulPocketPalTextSpeech,       sq4CdPatchVohaulPocketPalTextSpeech },
 	{  true,   610, "CD: biker bar door fix",                         1, sq4CdSignatureBikerBarDoor,                    sq4CdPatchBikerBarDoor },
 	{  true,   610, "CD: biker hands-on fix",                         3, sq4CdSignatureBikerHandsOn,                    sq4CdPatchBikerHandsOn },
@@ -13835,6 +16115,9 @@ void ScriptPatcher::processScript(uint16 scriptNr, SciSpan<byte> scriptData) {
 		signatureTable = gk2Signatures;
 		break;
 #endif
+	case GID_ICEMAN:
+		signatureTable = icemanSignatures;
+		break;
 	case GID_KQ5:
 		signatureTable = kq5Signatures;
 		break;
@@ -14000,6 +16283,23 @@ void ScriptPatcher::processScript(uint16 scriptNr, SciSpan<byte> scriptData) {
 					enablePatch(signatureTable, "Floppy: fix guild tunnel access (3/3)");
 					enablePatch(signatureTable, "Floppy: fix crest bookshelf");
 					enablePatch(signatureTable, "Floppy: fix peer bats, upper door (2/2)");
+				}
+				break;
+			case GID_SQ4:
+				// Enable the dress-purchase flag fixes for English Amiga only.
+				//  One of these patches is applied to scripts that are the same as those
+				//  in other versions which must not be patched, including German Amiga.
+				if (g_sci->getPlatform() == Common::kPlatformAmiga) {
+					// Check for buggy Sock's (room 371) script from English Amiga version
+					Resource *socksScript = g_sci->getResMan()->findResource(ResourceId(kResourceTypeScript, 371), false);
+					if (socksScript && socksScript->size() == 14340) {
+						enablePatch(signatureTable, "Amiga: dress purchase flag check fix");
+						enablePatch(signatureTable, "Amiga: dress purchase flag clear fix");
+					}
+				}
+
+				if (g_sci->isCD() && !g_sci->getResMan()->testResource(ResourceId(kResourceTypeScript, 271))) {
+					enablePatch(signatureTable, "CD: disable timepod code for removed room");
 				}
 				break;
 			default:

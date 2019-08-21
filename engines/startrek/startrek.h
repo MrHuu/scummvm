@@ -60,6 +60,7 @@ namespace StarTrek {
 
 class StarTrekEngine;
 class Room;
+class Console;
 
 typedef String(StarTrekEngine::*TextGetterFunc)(int, uintptr, String *);
 // FIXME: Eventually get rid of Common::SharedPtr and dispose of file streams properly
@@ -230,6 +231,8 @@ public:
 	StarTrekEngine(OSystem *syst, const StarTrekGameDescription *gamedesc);
 	virtual ~StarTrekEngine();
 
+	friend class Console;
+
 	Common::Error run();
 	Common::Error runGameMode(int mode, bool resume);
 
@@ -321,7 +324,7 @@ public:
 	bool isPositionSolid(int16 x, int16 y);
 	void loadRoomIndex(int roomIndex, int spawnIndex);
 
-	SharedPtr<Room> getRoom();
+	Room *getRoom();
 
 	// intro.cpp
 private:
@@ -672,7 +675,11 @@ public:
 	Common::Platform getPlatform() const;
 	uint8 getGameType() const;
 	Common::Language getLanguage() const;
-
+	
+	// _screenName = _missionName + _roomIndex
+	Common::String getScreenName() const {
+		return _missionName + (char)(_roomIndex + '0');
+	}
 
 	// Variables
 public:
@@ -689,8 +696,6 @@ public:
 
 	Common::String _missionName;
 	int _roomIndex;
-	Common::String _screenName; // _screenName = _missionName + _roomIndex
-	Common::String _mapFilename; // Similar to _screenName, but used for .map files?
 	Common::MemoryReadStreamEndian *_mapFile;
 	Fixed16 _playerActorScale;
 
@@ -775,14 +780,14 @@ public:
 
 	Graphics *_gfx;
 	Sound *_sound;
+	Console *_console;
 	SharedPtr<IWFile> _iwFile;
 
 private:
 	Common::RandomSource _randomSource;
 	Common::SineTable _sineTable;
-
+	Room *_room;
 	Common::MacResManager *_macResFork;
-	SharedPtr<Room> _room;
 };
 
 // Static function

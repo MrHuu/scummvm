@@ -231,9 +231,7 @@ void *OSystem_Android::audioThreadFunc(void *arg) {
 
 	bool paused = true;
 
-	byte *buf;
-	int offset, left, written;
-	int samples, i;
+	int offset, left, written, i;
 
 	struct timespec tv_delay;
 	tv_delay.tv_sec = 0;
@@ -245,7 +243,6 @@ void *OSystem_Android::audioThreadFunc(void *arg) {
 	tv_full.tv_sec = 0;
 	tv_full.tv_nsec = msecs_full * 1000 * 1000;
 
-	bool silence;
 	uint silence_count = 33;
 
 	while (!system->_audio_thread_exit) {
@@ -260,12 +257,12 @@ void *OSystem_Android::audioThreadFunc(void *arg) {
 			LOGD("audio thread woke up");
 		}
 
-		buf = (byte *)env->GetPrimitiveArrayCritical(bufa, 0);
+		byte *buf = (byte *)env->GetPrimitiveArrayCritical(bufa, 0);
 		assert(buf);
 
-		samples = mixer->mixCallback(buf, buf_size);
+		int samples = mixer->mixCallback(buf, buf_size);
 
-		silence = samples < 1;
+		bool silence = samples < 1;
 
 		// looks stupid, and it is, but currently there's no way to detect
 		// silence-only buffers from the mixer
@@ -353,6 +350,7 @@ void OSystem_Android::initBackend() {
 	ConfMan.registerDefault("fullscreen", true);
 	ConfMan.registerDefault("aspect_ratio", true);
 	ConfMan.registerDefault("touchpad_mouse_mode", true);
+	ConfMan.registerDefault("onscreen_control", true);
 
 	ConfMan.setInt("autosave_period", 0);
 	ConfMan.setBool("FM_high_quality", false);
@@ -362,6 +360,11 @@ void OSystem_Android::initBackend() {
 		_touchpad_mode = ConfMan.getBool("touchpad_mouse_mode");
 	else
 		ConfMan.setBool("touchpad_mouse_mode", true);
+
+	if (ConfMan.hasKey("onscreen_control"))
+		JNI::showKeyboardControl(ConfMan.getBool("onscreen_control"));
+	else
+		ConfMan.setBool("onscreen_control", true);
 
 	// must happen before creating TimerManager to avoid race in
 	// creating EventManager
@@ -414,6 +417,7 @@ bool OSystem_Android::hasFeature(Feature f) {
 			f == kFeatureOverlaySupportsAlpha ||
 			f == kFeatureOpenUrl ||
 			f == kFeatureTouchpadMode ||
+			f == kFeatureOnScreenControl ||
 			f == kFeatureClipboardSupport);
 }
 
@@ -442,6 +446,10 @@ void OSystem_Android::setFeatureState(Feature f, bool enable) {
 		ConfMan.setBool("touchpad_mouse_mode", enable);
 		_touchpad_mode = enable;
 		break;
+	case kFeatureOnScreenControl:
+		ConfMan.setBool("onscreen_control", enable);
+		JNI::showKeyboardControl(enable);
+		break;
 	default:
 		break;
 	}
@@ -459,6 +467,8 @@ bool OSystem_Android::getFeatureState(Feature f) {
 		return _use_mouse_palette;
 	case kFeatureTouchpadMode:
 		return ConfMan.getBool("touchpad_mouse_mode");
+	case kFeatureOnScreenControl:
+		return ConfMan.getBool("onscreen_control");
 	default:
 		return false;
 	}
@@ -601,6 +611,10 @@ Common::String OSystem_Android::getTextFromClipboard() {
 
 bool OSystem_Android::setTextInClipboard(const Common::String &text) {
 	return JNI::setTextInClipboard(text);
+}
+
+bool OSystem_Android::isConnectionLimited() {
+	return JNI::isConnectionLimited();
 }
 
 Common::String OSystem_Android::getSystemProperty(const char *name) const {

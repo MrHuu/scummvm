@@ -165,7 +165,7 @@ public:
 	/**
 	 * Constructor
 	 */
-	FunctionPointer(FixedStack &s) : _stack(s), _index(-1) {}
+	FunctionPointer(FixedStack &s) : _stack(s), _index(0) {}
 
 	/**
 	 * Array indexing
@@ -179,6 +179,11 @@ public:
 		_index = index;
 		return *this;
 	}
+
+	/**
+	 * Clear the function pointer
+	 */
+	void clear() { _index = 0; }
 
 	/**
 	 * Returns the index in the stack of the function pointer
@@ -253,7 +258,9 @@ private:
 	 * Gets the next code word and increases the PC counter to after it
 	 */
 	int readCodeWord() {
-		return getCodeWord(_pc += 2);
+		int v = getCodeWord(_pc);
+		_pc += 2;
+		return v;
 	}
 
 	/**

@@ -71,29 +71,20 @@ bool AdvSysMetaEngine::detectGames(const Common::FSList &fslist, DetectedGames &
 
 		gameFile.seek(0);
 		Common::String md5 = Common::computeStreamMD5AsString(gameFile, 5000);
-		int32 filesize = gameFile.size();
+		uint32 filesize = gameFile.size();
 
 		// Scan through the AdvSys game list for a match
-		const AdvSysGame *p = ADVSYS_GAMES;
+		const GlkDetectionEntry *p = ADVSYS_GAMES;
 		while (p->_md5 && p->_filesize != filesize && md5 != p->_md5)
 			++p;
 
-		if (p->_filesize) {
+		if (!p->_gameId) {
+			const PlainGameDescriptor &desc = ADVSYS_GAME_LIST[0];
+			gameList.push_back(GlkDetectedGame(desc.gameId, desc.description, filename, md5, filesize));
+		} else {
 			// Found a match
 			PlainGameDescriptor gameDesc = findGame(p->_gameId);
-			DetectedGame gd(p->_gameId, gameDesc.description, Common::EN_ANY, Common::kPlatformUnknown);
-			gd.addExtraEntry("filename", file->getName());
-
-			gameList.push_back(gd);
-		} else {
-			if (gDebugLevel > 0) {
-				// Print an entry suitable for putting into the detection_tables.h
-				debug("ENTRY0(\"%s\", \"%s\", %u),", filename.c_str(), md5.c_str(), (uint)filesize);
-			}
-
-			const PlainGameDescriptor &desc = ADVSYS_GAME_LIST[0];
-			DetectedGame gd(desc.gameId, desc.description, Common::UNK_LANG, Common::kPlatformUnknown);
-			gameList.push_back(gd);
+			gameList.push_back(GlkDetectedGame(p->_gameId, gameDesc.description, filename));
 		}
 	}
 

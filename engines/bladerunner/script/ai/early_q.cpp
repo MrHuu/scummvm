@@ -347,8 +347,8 @@ bool AIScriptEarlyQ::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 		_vm->_aiScripts->callChangeAnimationMode(kActorMcCoy, kAnimationModeCombatAim);
 		Actor_Says(kActorEarlyQ, 130, kAnimationModeTalk);
 		Actor_Says(kActorMcCoy, 3400, kAnimationModeCombatAim);
-		Actor_Says_With_Pause(kActorEarlyQ, 140, 1.0, kAnimationModeTalk);
-		Actor_Says_With_Pause(kActorEarlyQ, 150, 1.0, kAnimationModeTalk);
+		Actor_Says_With_Pause(kActorEarlyQ, 140, 1.0f, kAnimationModeTalk);
+		Actor_Says_With_Pause(kActorEarlyQ, 150, 1.0f, kAnimationModeTalk);
 		Actor_Says(kActorMcCoy, 3405, kAnimationModeCombatAim);
 		Actor_Says(kActorEarlyQ, 160, kAnimationModeTalk);
 		Actor_Says(kActorMcCoy, 3410, kAnimationModeCombatAim);
@@ -395,7 +395,7 @@ bool AIScriptEarlyQ::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 
 	case kGoalEarlyQNR04HandDrink:
 		if (Actor_Query_Inch_Distance_From_Actor(kActorMcCoy, kActorEarlyQ) > 36) {
-			Loop_Actor_Walk_To_Actor(kActorEarlyQ, kActorMcCoy, 36, kActorMcCoy, kActorMcCoy);
+			Loop_Actor_Walk_To_Actor(kActorEarlyQ, kActorMcCoy, 36, false, false);
 		}
 		Actor_Face_Actor(kActorMcCoy, kActorEarlyQ, true);
 		Actor_Face_Actor(kActorEarlyQ, kActorMcCoy, true);

@@ -76,6 +76,7 @@ const OSystem::GraphicsMode s_supportedStretchModes[] = {
 	{"pixel-perfect", _s("Pixel-perfect scaling"), STRETCH_INTEGRAL},
 	{"fit", _s("Fit to window"), STRETCH_FIT},
 	{"stretch", _s("Stretch to window"), STRETCH_STRETCH},
+	{"fit_force_aspect", _s("Fit to window (4:3)"), STRETCH_FIT_FORCE_ASPECT},
 	{nullptr, nullptr, 0}
 };
 #endif
@@ -154,7 +155,7 @@ SurfaceSdlGraphicsManager::SurfaceSdlGraphicsManager(SdlEventSource *sdlEventSou
 	_scalerProc(0), _screenChangeCount(0),
 	_mouseData(nullptr), _mouseSurface(nullptr),
 	_mouseOrigSurface(nullptr), _cursorDontScale(false), _cursorPaletteDisabled(true),
-	_currentShakePos(0), _newShakePos(0),
+	_currentShakePos(0),
 	_paletteDirtyStart(0), _paletteDirtyEnd(0),
 	_screenIsLocked(false),
 	_graphicsMutex(0),
@@ -170,18 +171,12 @@ SurfaceSdlGraphicsManager::SurfaceSdlGraphicsManager(SdlEventSource *sdlEventSou
 
 	_mouseBackup.x = _mouseBackup.y = _mouseBackup.w = _mouseBackup.h = 0;
 
-	memset(&_mouseCurState, 0, sizeof(_mouseCurState));
-
 	_graphicsMutex = g_system->createMutex();
 
 #ifdef USE_SDL_DEBUG_FOCUSRECT
 	if (ConfMan.hasKey("use_sdl_debug_focusrect"))
 		_enableFocusRectDebugCode = ConfMan.getBool("use_sdl_debug_focusrect");
 #endif
-
-	memset(&_oldVideoMode, 0, sizeof(_oldVideoMode));
-	memset(&_videoMode, 0, sizeof(_videoMode));
-	memset(&_transactionDetails, 0, sizeof(_transactionDetails));
 
 #if !defined(_WIN32_WCE) && !defined(__SYMBIAN32__) && defined(USE_SCALERS)
 	_videoMode.mode = GFX_DOUBLESIZE;
@@ -674,12 +669,8 @@ bool SurfaceSdlGraphicsManager::setGraphicsMode(int mode) {
 	return true;
 }
 
-void SurfaceSdlGraphicsManager::setGraphicsModeIntern() {
-	Common::StackLock lock(_graphicsMutex);
+ScalerProc *SurfaceSdlGraphicsManager::getGraphicsScalerProc(int mode) const {
 	ScalerProc *newScalerProc = 0;
-
-	updateShader();
-
 	switch (_videoMode.mode) {
 	case GFX_NORMAL:
 		newScalerProc = Normal1x;
@@ -722,8 +713,19 @@ void SurfaceSdlGraphicsManager::setGraphicsModeIntern() {
 		newScalerProc = DotMatrix;
 		break;
 #endif // USE_SCALERS
+	}
 
-	default:
+	return newScalerProc;
+}
+
+void SurfaceSdlGraphicsManager::setGraphicsModeIntern() {
+	Common::StackLock lock(_graphicsMutex);
+
+	updateShader();
+
+	ScalerProc *newScalerProc = getGraphicsScalerProc(_videoMode.mode);
+
+	if (!newScalerProc) {
 		error("Unknown gfx mode %d", _videoMode.mode);
 	}
 
@@ -817,7 +819,7 @@ int SurfaceSdlGraphicsManager::getStretchMode() const {
 void SurfaceSdlGraphicsManager::initSize(uint w, uint h, const Graphics::PixelFormat *format) {
 	assert(_transactionMode == kTransactionActive);
 
-	_newShakePos = 0;
+	_gameScreenShakeOffset = 0;
 
 #ifdef USE_RGB_COLOR
 	//avoid redundant format changes
@@ -1197,20 +1199,24 @@ void SurfaceSdlGraphicsManager::internUpdateScreen() {
 	ScalerProc *scalerProc;
 	int scale1;
 
+#if !SDL_VERSION_ATLEAST(2, 0, 0)
 	// If the shake position changed, fill the dirty area with blackness
-	if (_currentShakePos != _newShakePos ||
+	// When building with SDL2, the shake offset is added to the active rect instead,
+	// so this isn't needed there.
+	if (_currentShakePos != _gameScreenShakeOffset ||
 		(_cursorNeedsRedraw && _mouseBackup.y <= _currentShakePos)) {
-		SDL_Rect blackrect = {0, 0, (Uint16)(_videoMode.screenWidth * _videoMode.scaleFactor), (Uint16)(_newShakePos * _videoMode.scaleFactor)};
+		SDL_Rect blackrect = {0, 0, (Uint16)(_videoMode.screenWidth * _videoMode.scaleFactor), (Uint16)(_gameScreenShakeOffset * _videoMode.scaleFactor)};
 
 		if (_videoMode.aspectRatioCorrection && !_overlayVisible)
 			blackrect.h = real2Aspect(blackrect.h - 1) + 1;
 
 		SDL_FillRect(_hwScreen, &blackrect, 0);
 
-		_currentShakePos = _newShakePos;
+		_currentShakePos = _gameScreenShakeOffset;
 
 		_forceRedraw = true;
 	}
+#endif
 
 	// Check whether the palette was changed in the meantime and update the
 	// screen surface accordingly.
@@ -1744,12 +1750,6 @@ void SurfaceSdlGraphicsManager::setCursorPalette(const byte *colors, uint start,
 
 	_cursorPaletteDisabled = false;
 	blitCursor();
-}
-
-void SurfaceSdlGraphicsManager::setShakePos(int shake_pos) {
-	assert(_transactionMode == kTransactionNone);
-
-	_newShakePos = shake_pos;
 }
 
 void SurfaceSdlGraphicsManager::setFocusRectangle(const Common::Rect &rect) {

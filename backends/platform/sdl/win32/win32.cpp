@@ -136,7 +136,7 @@ bool OSystem_Win32::displayLogFile() {
 
 	// Try opening the log file with the default text editor
 	// log files should be registered as "txtfile" by default and thus open in the default text editor
-	HINSTANCE shellExec = ShellExecute(NULL, NULL, _logFilePath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+	HINSTANCE shellExec = ShellExecute(getHwnd(), NULL, _logFilePath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 	if ((intptr_t)shellExec > 32)
 		return true;
 
@@ -169,10 +169,10 @@ bool OSystem_Win32::displayLogFile() {
 }
 
 bool OSystem_Win32::openUrl(const Common::String &url) {
-	const uint64 result = (uint64)ShellExecute(0, 0, /*(wchar_t*)nativeFilePath.utf16()*/url.c_str(), 0, 0, SW_SHOWNORMAL);
+	HINSTANCE result = ShellExecute(getHwnd(), NULL, /*(wchar_t*)nativeFilePath.utf16()*/url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 	// ShellExecute returns a value greater than 32 if successful
-	if (result <= 32) {
-		warning("ShellExecute failed: error = %u", result);
+	if ((intptr_t)result <= 32) {
+		warning("ShellExecute failed: error = %p", (void*)result);
 		return false;
 	}
 	return true;
@@ -278,31 +278,22 @@ Common::String OSystem_Win32::getDefaultConfigFileName() {
 	return configFile;
 }
 
-Common::WriteStream *OSystem_Win32::createLogFile() {
-	// Start out by resetting _logFilePath, so that in case
-	// of a failure, we know that no log file is open.
-	_logFilePath.clear();
-
+Common::String OSystem_Win32::getDefaultLogFileName() {
 	char logFile[MAXPATHLEN];
 
 	// Use the Application Data directory of the user profile.
-	if (SHGetFolderPathFunc(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, logFile) == S_OK) {
-		strcat(logFile, "\\ScummVM");
-		CreateDirectory(logFile, NULL);
-		strcat(logFile, "\\Logs");
-		CreateDirectory(logFile, NULL);
-		strcat(logFile, "\\scummvm.log");
-
-		Common::FSNode file(logFile);
-		Common::WriteStream *stream = file.createWriteStream();
-		if (stream)
-			_logFilePath= logFile;
-
-		return stream;
-	} else {
+	if (SHGetFolderPathFunc(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, logFile) != S_OK) {
 		warning("Unable to access application data directory");
-		return 0;
+		return Common::String();
 	}
+
+	strcat(logFile, "\\ScummVM");
+	CreateDirectory(logFile, NULL);
+	strcat(logFile, "\\Logs");
+	CreateDirectory(logFile, NULL);
+	strcat(logFile, "\\scummvm.log");
+
+	return logFile;
 }
 
 namespace {

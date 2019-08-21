@@ -37,6 +37,7 @@
 #include "engines/util.h"
 #include "video/qt_decoder.h"
 
+#include "startrek/console.h"
 #include "startrek/iwfile.h"
 #include "startrek/lzss.h"
 #include "startrek/room.h"
@@ -69,6 +70,7 @@ StarTrekEngine::StarTrekEngine(OSystem *syst, const StarTrekGameDescription *gam
 	_activeMenu = nullptr;
 	_sound = nullptr;
 	_macResFork = nullptr;
+	_room = nullptr;
 
 	memset(_actionOnWalkCompletionInUse, 0, sizeof(_actionOnWalkCompletionInUse));
 
@@ -94,6 +96,7 @@ StarTrekEngine::StarTrekEngine(OSystem *syst, const StarTrekGameDescription *gam
 
 	_missionToLoad = "DEMON";
 	_roomIndexToLoad = 0;
+	_mapFile = nullptr;
 
 	_showSubtitles = true;
 	Common::fill(_r3List, _r3List + NUM_SPACE_OBJECTS, (R3 *)nullptr);
@@ -106,6 +109,8 @@ StarTrekEngine::StarTrekEngine(OSystem *syst, const StarTrekGameDescription *gam
 StarTrekEngine::~StarTrekEngine() {
 	delete _activeMenu->nextMenu;
 	delete _activeMenu;
+
+	delete _console;
 	delete _gfx;
 	delete _sound;
 	delete _macResFork;
@@ -114,6 +119,7 @@ StarTrekEngine::~StarTrekEngine() {
 Common::Error StarTrekEngine::run() {
 	_gfx = new Graphics(this);
 	_sound = new Sound(this);
+	_console = new Console(this);
 
 	if (getPlatform() == Common::kPlatformMacintosh) {
 		_macResFork = new Common::MacResManager();
@@ -622,18 +628,25 @@ Common::String StarTrekEngine::getLoadedText(int textIndex) {
 
 	Common::String str;
 	byte cur;
-	while (textIndex != 0) {
+	int curIndex = 0;
+
+	while (!txtFile->eos()) {
 		do {
 			cur = txtFile->readByte();
-			if (cur != '\0')
-				str += cur;
+			str += cur;
 		} while (cur != '\0');
-		textIndex--;
+
+		if (curIndex == textIndex) {
+			delete txtFile;
+			return str;
+		}
+
+		curIndex++;
+		str = "";
 	}
-
+	
 	delete txtFile;
-
-	return str;
+	return "";
 }
 
 } // End of namespace StarTrek

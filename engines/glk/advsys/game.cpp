@@ -28,7 +28,7 @@ namespace Glk {
 namespace AdvSys {
 
 void Decrypter::decrypt(byte *data, size_t size) {
-	for (; --size; ++data)
+	for (size_t idx = 0; idx < size; ++idx, ++data)
 		*data = ~(*data + 30);
 }
 
@@ -99,9 +99,9 @@ enum LinkField {
 };
 
 Game::Game() : Header(), _stream(nullptr), _restartFlag(false), _residentOffset(0), _wordCount(0),
-		_objectCount(0), _actionCount(0), _variableCount(0), _residentBase(nullptr),
-		_wordTable(nullptr), _wordTypeTable(nullptr), _objectTable(nullptr), _actionTable(nullptr),
-		_variableTable(nullptr), _saveArea(nullptr), _msgBlockNum(-1), _msgBlockOffset(0) {
+		_objectCount(0), _actionCount(0), _variableCount(0), _wordTable(nullptr), _wordTypeTable(nullptr),
+		_objectTable(nullptr), _actionTable(nullptr), _variableTable(nullptr), _saveArea(nullptr),
+		_msgBlockNum(-1), _msgBlockOffset(0) {
 	_msgCache.resize(MESSAGE_CACHE_SIZE);
 	for (int idx = 0; idx < MESSAGE_CACHE_SIZE; ++idx)
 		_msgCache[idx] = new CacheEntry();
@@ -133,9 +133,8 @@ bool Game::init(Common::SeekableReadStream *s) {
 		return false;
 	decrypt(&_data[0], _size);
 
-	_residentBase = &_data[0];
 	_wordTable = &_data[_wordTableOffset];
-	_wordTypeTable = &_data[_wordTypeTableOffset];
+	_wordTypeTable = &_data[_wordTypeTableOffset - 1];
 	_objectTable = &_data[_objectTableOffset];
 	_actionTable = &_data[_actionTableOffset];
 	_variableTable = &_data[_variableTableOffset];
@@ -183,8 +182,8 @@ int Game::findWord(const Common::String &word) const {
 	// Iterate over the dictionary for the word
 	for (int idx = 1; idx <= _wordCount; ++idx) {
 		int wordOffset = READ_LE_UINT16(_wordTable + idx * 2);
-		if (w == (const char *)_residentBase + wordOffset + 2)
-			return READ_LE_UINT16(_residentBase + wordOffset);
+		if (w == (const char *)_dataSpace + wordOffset + 2)
+			return readWord(wordOffset);
 	}
 
 	return NIL;
@@ -244,19 +243,23 @@ int Game::getObjectLocation(int obj) const {
 }
 
 int Game::getActionLocation(int action) const {
-	if (action < 1 || action >= _actionCount)
+	if (action < 1 || action > _actionCount)
 		error("Invalid action number %d", action);
 
 	return READ_LE_UINT16(_actionTable + action * 2);
 }
 
 int Game::getVariable(int variableNum) {
-	assert(variableNum < _variableCount);
+	if (variableNum < 1 || variableNum > _variableCount)
+		error("Invalid ariable number %d", variableNum);
+
 	return READ_LE_UINT16(_variableTable + variableNum * 2);
 }
 
 void Game::setVariable(int variableNum, int value) {
-	assert(variableNum < _variableCount);
+	if (variableNum < 1 || variableNum > _variableCount)
+		error("Invalid ariable number %d", variableNum);
+
 	WRITE_LE_UINT16(_variableTable + variableNum * 2, value);
 }
 
@@ -298,18 +301,16 @@ bool Game::hasVerb(int act, const Common::Array<int> &verbs) const {
 		Common::Array<int>::const_iterator verb = verbs.begin();
 		int word = readWord(link + L_DATA);
 
-		for (; verb < verbs.end() && word; link = readWord(link + L_NEXT)) {
+		for (; verb < verbs.end() && word; ++verb, word = readWord(word + L_NEXT)) {
 			if (*verb != readWord(word + L_DATA))
 				break;
-
-			++verb;
 		}
 
 		if (verb == verbs.end() && !word)
 			return true;
 	}
 
-	return true;
+	return false;
 }
 
 bool Game::inList(int link, int word) const {

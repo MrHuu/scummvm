@@ -22,11 +22,15 @@
 
 #include "glk/advsys/advsys.h"
 #include "common/translation.h"
+#include "common/config-manager.h"
 
 namespace Glk {
 namespace AdvSys {
 
 void AdvSys::runGame() {
+	// Check for savegame
+	_saveSlot = ConfMan.hasKey("save_slot") ? ConfMan.getInt("save_slot") : -1;
+
 	if (!initialize()) {
 		GUIErrorMessage(_("Could not start AdvSys game"));
 		return;
@@ -36,6 +40,15 @@ void AdvSys::runGame() {
 	while (!shouldQuit()) {
 		// Run game startup
 		execute(_initCodeOffset);
+
+		if (_saveSlot != -1) {
+			Common::ErrorCode err = loadGameState(_saveSlot).getCode();
+			_saveSlot = -1;
+			if (err != Common::kNoError)
+				print(_("Sorry, the savegame couldn't be restored"));
+			else
+				_pendingLine = "look";		// Do a look action after loading the savegame
+		}
 
 		// Gameplay loop
 		while (!shouldQuit() && !shouldRestart()) {
@@ -86,16 +99,24 @@ bool AdvSys::singleAction() {
 		if (execute(_afterOffset) == ABORT)
 			return false;
 		break;
+
+	default:
+		break;
 	}
 
 	return true;
 }
 
-Common::Error AdvSys::loadGameData(strid_t save) {
+Common::Error AdvSys::readSaveData(Common::SeekableReadStream *rs) {
+	if (rs->size() != (int)_saveSize)
+		return Common::kReadingFailed;
+
+	rs->read(_saveArea, rs->size());
 	return Common::kNoError;
 }
 
-Common::Error AdvSys::saveGameData(strid_t save, const Common::String &desc) {
+Common::Error AdvSys::writeGameData(Common::WriteStream *ws) {
+	ws->write(_saveArea, _saveSize);
 	return Common::kNoError;
 }
 

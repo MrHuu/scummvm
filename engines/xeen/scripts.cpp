@@ -802,6 +802,8 @@ bool Scripts::cmdTakeOrGive(ParamsIterator &params) {
 			if (!party.giveTake(mode1, val1, mode2, val2, _charIndex - 1)) {
 				if (mode2 == 79)
 					windows.closeAll();
+			} else {
+				return cmdExit(params);
 			}
 		}
 		break;
@@ -1675,7 +1677,11 @@ bool Scripts::ifProc(int action, uint32 val, int mode, int charIndex) {
 		break;
 	case 37:
 		// Might bonus (extra beyond base)
-		v = ps->_might._temporary;
+		if (party._mazeId == 82)
+			// WORKAROUND: Strength test opening sarcophagus in Northern Sphinx should use full might
+			v = ps->getStat(MIGHT);
+		else
+			v = ps->_might._temporary;
 		break;
 	case 38:
 		// Intellect bonus (extra beyond base)

@@ -66,6 +66,8 @@ public:
 	Room(StarTrekEngine *vm, const Common::String &name);
 	~Room();
 
+	friend class Console;
+
 	uint16 readRdfWord(int offset);
 
 	/**
@@ -153,8 +155,6 @@ private:
 	const RoomAction *_roomActionList;
 	int _numRoomActions;
 
-	Common::String _rdfName;
-	int _roomIndex; // ie. for DEMON2, this is 2
 	Common::HashMap<int, Common::String> _lookMessages;
 	Common::HashMap<int, Common::String> _lookWithTalkerMessages;
 	Common::HashMap<int, Common::String> _talkMessages;
@@ -212,10 +212,14 @@ private:
 	 */
 	void walkCrewman(int actorIndex, int16 destX, int16 destY, uint16 finishedAnimActionParam = 0);
 	void walkCrewmanC(int actorIndex, int16 destX, int16 destY, void (Room::*funcPtr)());      // Cmd 0x08
+
+public:
 	/**
 	 * Cmd 0x09: Loads a pair of .map and .iw files to change the room's collisions and pathfinding.
 	 */
 	void loadMapFile(const Common::String &name);
+
+private:
 	/**
 	 * Cmd 0x0a
 	 */

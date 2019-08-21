@@ -93,6 +93,7 @@ ExecutionResult VM::execute(int offset) {
 	_pc = offset;
 
 	// Clear the stack
+	_fp.clear();
 	_stack.clear();
 
 	// Iterate through the script
@@ -104,8 +105,13 @@ ExecutionResult VM::execute(int offset) {
 
 void VM::executeOpcode() {
 	// Get next opcode
-	uint opcode = getCodeByte(_pc);
-	++_pc;
+	uint opcode = readCodeByte();
+
+	if (gDebugLevel > 0) {
+		Common::String s;
+		for (int idx = (int)_stack.size() - 1; idx >= 0; --idx) s += Common::String::format("  %d", _stack[idx]);
+		debugC(kDebugScripts, "%.4x - %.2x - %d%s", _pc - 1, opcode, _stack.size(), s.c_str());
+	}
 
 	if (opcode >= OP_BRT && opcode <= OP_VOWEL) {
 		(this->*_METHODS[(int)opcode - 1])();
@@ -257,7 +263,7 @@ void VM::opEXIT() {
 }
 
 void VM::opRETURN() {
-	if (_stack.empty()) {
+	if (_fp == 0) {
 		_status = CHAIN;
 	} else {
 		int val = _stack.top();
@@ -305,28 +311,26 @@ void VM::opYORN() {
 
 void VM::opSAVE() {
 	if (saveGame().getCode() != Common::kNoError)
-		print("Sorry, the savegame couldn't be created");
+		print(_("Sorry, the savegame couldn't be created"));
 }
 
 void VM::opRESTORE() {
-	if (saveGame().getCode() != Common::kNoError)
-		print("Sorry, the savegame couldn't be restored");
+	if (loadGame().getCode() != Common::kNoError)
+		print(_("Sorry, the savegame couldn't be restored"));
 }
 
 void VM::opARG() {
 	int argNum = readCodeByte();
-	int varsSize = _stack[_fp - 3];
-	if (argNum >= varsSize)
+	if (argNum >= _fp[FP_ARGS_SIZE])
 		error("Invalid argument number");
-	_stack.top() = _stack[_fp - 4 - argNum];
+	_stack.top() = _fp[argNum + FP_ARGS];
 }
 
 void VM::opASET() {
 	int argNum = readCodeByte();
-	int varsSize = _stack[_fp - 3];
-	if (argNum >= varsSize)
+	if (argNum >= _fp[FP_ARGS_SIZE])
 		error("Invalid argument number");
-	_stack[_fp - 4 - argNum] = _stack.top();
+	_fp[argNum + FP_ARGS] = _stack.top();
 }
 
 void VM::opTMP() {
@@ -395,9 +399,9 @@ void VM::opSEND() {
 	if (val)
 		val = getObjectField(val, O_CLASS);
 	else
-		val = _fp[_fp[FP_ARGS_SIZE] + FP_ARGS];
+		val = _fp[_fp[FP_ARGS_SIZE] + FP_ARGS - 1];
 
-	if (val && (val = getObjectProperty(val, _fp[_fp[FP_ARGS_SIZE] + 1])) != 0) {
+	if (val && (val = getObjectProperty(val, _fp[_fp[FP_ARGS_SIZE] + FP_ARGS - 2])) != 0) {
 		_pc = getActionField(val, A_CODE);
 	} else {
 		// Return NIL if there's no action for the given message
@@ -441,8 +445,9 @@ bool VM::parseInput() {
 	// Initialize the parser result fields
 	_actor = _action = _dObject = _iObject = 0;
 	_ndObjects = 0;
-	_adjectiveList.clear();
 	_nouns.clear();
+	_adjectiveList.clear();
+	_adjectiveList.reserve(20);
 
 	// Get the input line
 	if (!getLine())
@@ -457,13 +462,13 @@ bool VM::parseInput() {
 	}
 
 	// Check for a verb
-	if (getVerb())
+	if (!getVerb())
 		return false;
 
 	// Get direct object, preposition, and/or indirect object
 	if (_wordPtr != _words.end()) {
 		// Get any direct objects
-		noun1 = _adjectiveList.size();
+		noun1 = _adjectiveList.size() + 1;
 		for (;;) {
 			// Get the next direct object
 			if (!getNoun())
@@ -471,7 +476,7 @@ bool VM::parseInput() {
 			++cnt1;
 
 			// Check for more direct objects
-			if (_wordPtr == _words.end() || getWordType(*_wordPtr))
+			if (_wordPtr == _words.end() || getWordType(*_wordPtr) != WT_CONJUNCTION)
 				break;
 			++_wordPtr;
 		}
@@ -483,7 +488,7 @@ bool VM::parseInput() {
 				preposition = *_wordPtr++;
 
 			// Get the indirect object
-			noun2 = _adjectiveList.size();
+			noun2 = _adjectiveList.size() + 1;
 			for (;;) {
 				// Get the indirect object
 				if (!getNoun())
@@ -514,8 +519,7 @@ bool VM::parseInput() {
 		_dObject = noun1;
 		_ndObjects = cnt1;
 		_iObject = noun2;
-	}
-	else if (noun2) {
+	} else if (noun2) {
 		if (cnt1 > 1) {
 			parseError();
 			return false;
@@ -537,7 +541,7 @@ bool VM::parseInput() {
 		flags |= A_IOBJECT;
 
 	// Find the action
-	if (!(_action == findAction(_verbs, preposition, flags))) {
+	if (!(_action = findAction(_verbs, preposition, flags))) {
 		parseError();
 		return false;
 	}
@@ -587,11 +591,11 @@ bool VM::getWord(Common::String &line) {
 
 	if (iw._number) {
 		_words.push_back(iw);
-		return false;
+		return true;
 	} else {
 		Common::String msg = Common::String::format(_("I don't know the word \"%s\".\n"), iw._text.c_str());
 		print(msg);
-		return true;
+		return false;
 	}
 }
 
@@ -609,6 +613,12 @@ uint VM::getNoun() {
 		_adjectiveList.push_back(ae);
 	}
 	_adjectiveList.push_back(AdjectiveEntry());
+	assert(_adjectiveList.size() <= 20);
+
+	if (_wordPtr == _words.end() || getWordType(*_wordPtr) != WT_NOUN) {
+		parseError();
+		return NIL;
+	}
 
 	// Add a noun entry to the list
 	Noun n;
@@ -623,7 +633,7 @@ uint VM::getNoun() {
 bool VM::getVerb() {
 	_verbs.clear();
 
-	if (*_wordPtr == NIL || getWordType(*_wordPtr) != WT_VERB) {
+	if (_wordPtr == _words.end() || getWordType(*_wordPtr) != WT_VERB) {
 		parseError();
 		return false;
 	}
@@ -631,12 +641,13 @@ bool VM::getVerb() {
 	_verbs.push_back(*_wordPtr++);
 
 	// Check for a word following the verb
-	if (!_words.empty()) {
-		_verbs.push_back(_words.front());
+	if (_wordPtr < _words.end()) {
+		_verbs.push_back(*_wordPtr);
 
 		if (checkVerb(_verbs)) {
 			++_wordPtr;
 		} else {
+			_verbs.pop_back();
 			_verbs.push_back(_words.back());
 
 			if (checkVerb(_verbs)) {
