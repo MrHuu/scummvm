@@ -37,6 +37,13 @@
 
 #define TICKS_PER_MSEC 268123
 
+#ifdef _GAME
+#define GAME_ID (char*)GAMEID
+#define GAME_PATH (char*)GAMEPATH
+#define CONF_PATH (char*)CONFPATH
+#define SAVE_PATH (char*)SAVEPATH
+#endif
+
 namespace _3DS {
 
 enum {

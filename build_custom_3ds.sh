@@ -26,12 +26,11 @@ fi
 
 if [ $GAMEID = "ALL" ] ; then
 
-	for GAMEID in COMI DIG FT SAMNMAX MONKEY MONKEY2 TENTACLE DW DW2 BBVS MYST NEVERHOOD QUEEN RIVEN TOON
+	for GAMEID in COMI DIG FT SAMNMAX MONKEY MONKEY2 TENTACLE DW DW2 BBVS MYST NEVERHOOD QUEEN RIVEN TOON QFG4
 	do
 		./build_custom_3ds.sh $GAMEID
 	done
 	exit
-
 
 elif [ $GAMEID = "BBVS" ] ; then
 
@@ -99,6 +98,10 @@ elif [ $GAMEID = "TOON" ] ; then
 
 	GAMEDAT=toon.dat
 
+elif [ $GAMEID = "QFG4" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=sci32
+
 else
 
 	echo
@@ -109,8 +112,8 @@ else
 	echo
 	echo Arguments available: 
 	echo ALL BBVS COMI DIG DW DW2 FT MONKEY MONKEY2 MYST NEVERHOOD QUEEN RIVEN SAMNMAX TENTACLE TOON
+	echo QFG4
 	echo
-	echo --USELESS INFO--
 	echo Engines available:
 	echo agi,agos,agos2,cruise,gob,hugo,kyra,lure,myst,riven,queen,saga,ihnm,scumm,scumm-7-8,he,sci,sci32,
 	echo sherlock,sky,sword1,sword2,sword25,teenagent,tinsel,toon,touche,zvision
@@ -123,7 +126,7 @@ else
 	echo mutationofjb,pink,prince,sludge,startrek,supernova,testbed,wage
 	echo -------------------------------------------------------------------------------------------
 	echo Current:
-	echo [ENGINE] HE - does not build
+	echo [ENGINE] ALL - does not initially save scummmvm.ini
 	echo
 	exit
 
@@ -138,6 +141,7 @@ else
 fi
 
 cp ./gui/themes/scummmodern.zip ./pkg/ROMFS/scummvm/themes/scummmodern.zip
+cp ./gui/themes/scummremastered.zip ./pkg/ROMFS/scummvm/themes/scummremastered.zip
 cp ./gui/themes/translations.dat ./pkg/ROMFS/scummvm/themes/translations.dat
 cp ./backends/vkeybd/packs/vkeybd_small.zip ./pkg/ROMFS/scummvm/kb/vkeybd_small.zip
 

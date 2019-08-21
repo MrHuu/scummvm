@@ -11,7 +11,7 @@ else ifneq ($(GAME),)
 	APP_DESCRIPTION := $(TARGET)
 	APP_ICON        := $(srcdir)/backends/platform/3ds/app/$(GAME)/icon.png
 	APP_BANNER_IMAGE:= $(srcdir)/backends/platform/3ds/app/$(GAME)/banner.png
-	CXXFLAGS += -D_GAME -D_$(GAME)
+	CXXFLAGS += -D_GAME -DGAMEID=\"$(GAME)\" -DGAMEPATH=\"/3ds/data/ScummVM/$(GAME)/\" -DSAVEPATH=\"/3ds/data/ScummVM/$(GAME)\" -DCONFPATH=\"/3ds/data/ScummVM/$(GAME)/scummvm.ini\"
 
 endif
 
@@ -75,5 +75,9 @@ else ifeq ($(GAME), TENTACLE)
 else ifeq ($(GAME), TOON)
 	APP_TITLE       := Toonstruck
 	APP_UNIQUE_ID   := 0xFF330
+
+else ifeq ($(GAME), QFG4)
+	APP_TITLE       := Quest for Glory 4 - Shadows Of Darkness
+	APP_UNIQUE_ID   := 0xFF331
 
 endif
