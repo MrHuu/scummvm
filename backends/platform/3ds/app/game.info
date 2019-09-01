@@ -61,7 +61,7 @@ else ifeq ($(GAME), QUEEN)
 	APP_UNIQUE_ID   := 0xFF32C
 
 else ifeq ($(GAME), RIVEN)
-	APP_TITLE       := Riven: A Sequel to Myst
+	APP_TITLE       := Riven: The Sequel to Myst
 	APP_UNIQUE_ID   := 0xFF32D
 
 else ifeq ($(GAME), SAMNMAX)
