@@ -72,7 +72,7 @@ void SavesSyncRequest::start() {
 		new Common::Callback<SavesSyncRequest, Storage::ListDirectoryResponse>(this, &SavesSyncRequest::directoryListedCallback),
 		new Common::Callback<SavesSyncRequest, Networking::ErrorResponse>(this, &SavesSyncRequest::directoryListedErrorCallback)
 	);
-	if (!_workingRequest) finishError(Networking::ErrorResponse(this));
+	if (!_workingRequest) finishError(Networking::ErrorResponse(this, "SavesSyncRequest::start: Storage couldn't create Request to list directory"));
 }
 
 void SavesSyncRequest::directoryListedCallback(Storage::ListDirectoryResponse response) {
@@ -139,22 +139,22 @@ void SavesSyncRequest::directoryListedCallback(Storage::ListDirectoryResponse re
 
 	debug(9, "\nSavesSyncRequest: ");
 	if (_filesToDownload.size() > 0) {
-		debug(9, "nothing to download");
-	} else {
 		debug(9, "download files:");
 		for (uint32 i = 0; i < _filesToDownload.size(); ++i) {
 			debug(9, " %s", _filesToDownload[i].name().c_str());
 		}
 		debug(9, "%s", "");
+	} else {
+		debug(9, "nothing to download");
 	}
 	debug(9, "SavesSyncRequest: ");
 	if (_filesToUpload.size() > 0) {
-		debug(9, "nothing to upload");
-	} else {
 		debug(9, "upload files:");
 		for (uint32 i = 0; i < _filesToUpload.size(); ++i) {
 			debug(9, " %s", _filesToUpload[i].c_str());
 		}
+	} else {
+		debug(9, "nothing to upload");
 	}
 	_totalFilesToHandle = _filesToDownload.size() + _filesToUpload.size();
 
@@ -235,7 +235,7 @@ void SavesSyncRequest::directoryListedErrorCallback(Networking::ErrorResponse er
 		new Common::Callback<SavesSyncRequest, Networking::ErrorResponse>(this, &SavesSyncRequest::directoryCreatedErrorCallback)
 	);
 	if (!_workingRequest)
-		finishError(Networking::ErrorResponse(this));
+		finishError(Networking::ErrorResponse(this, "SavesSyncRequest::directoryListedErrorCallback: Storage couldn't create Request to create remote directory"));
 }
 
 void SavesSyncRequest::directoryCreatedCallback(Storage::BoolResponse response) {
@@ -245,7 +245,7 @@ void SavesSyncRequest::directoryCreatedCallback(Storage::BoolResponse response) 
 
 	//stop syncing if failed to create saves directory
 	if (!response.value) {
-		finishError(Networking::ErrorResponse(this, false, true, "", -1));
+		finishError(Networking::ErrorResponse(this, false, true, "SavesSyncRequest::directoryCreatedCallback: failed to create remote directory", -1));
 		return;
 	}
 
@@ -284,7 +284,7 @@ void SavesSyncRequest::downloadNextFile() {
 		new Common::Callback<SavesSyncRequest, Networking::ErrorResponse>(this, &SavesSyncRequest::fileDownloadedErrorCallback)
 	);
 	if (!_workingRequest)
-		finishError(Networking::ErrorResponse(this));
+		finishError(Networking::ErrorResponse(this, "SavesSyncRequest::downloadNextFile: Storage couldn't create Request to download a file"));
 }
 
 void SavesSyncRequest::fileDownloadedCallback(Storage::BoolResponse response) {
@@ -296,7 +296,7 @@ void SavesSyncRequest::fileDownloadedCallback(Storage::BoolResponse response) {
 	if (!response.value) {
 		//delete the incomplete file
 		g_system->getSavefileManager()->removeSavefile(_currentDownloadingFile.name());
-		finishError(Networking::ErrorResponse(this, false, true, "", -1));
+		finishError(Networking::ErrorResponse(this, false, true, "SavesSyncRequest::fileDownloadedCallback: failed to download a file", -1));
 		return;
 	}
 
@@ -343,7 +343,7 @@ void SavesSyncRequest::uploadNextFile() {
 			new Common::Callback<SavesSyncRequest, Networking::ErrorResponse>(this, &SavesSyncRequest::fileUploadedErrorCallback)
 		);
 	}
-	if (!_workingRequest) finishError(Networking::ErrorResponse(this));
+	if (!_workingRequest) finishError(Networking::ErrorResponse(this, "SavesSyncRequest::uploadNextFile: Storage couldn't create Request to upload a file"));
 }
 
 void SavesSyncRequest::fileUploadedCallback(Storage::UploadResponse response) {

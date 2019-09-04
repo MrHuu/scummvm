@@ -34,6 +34,7 @@
 #include "bladerunner/crimes_database.h"
 #include "bladerunner/debugger.h"
 #include "bladerunner/dialogue_menu.h"
+#include "bladerunner/framelimiter.h"
 #include "bladerunner/font.h"
 #include "bladerunner/game_flags.h"
 #include "bladerunner/game_info.h"
@@ -216,6 +217,8 @@ BladeRunnerEngine::BladeRunnerEngine(OSystem *syst, const ADGameDescription *des
 		_actors[i]           = nullptr;
 	}
 	_debugger                = nullptr;
+	_mainLoopFrameLimiter    = nullptr;
+
 	walkingReset();
 
 	_actorUpdateCounter  = 0;
@@ -324,8 +327,9 @@ Common::Error BladeRunnerEngine::run() {
 		return Common::Error(Common::kNoGameDataFoundError, missingFileStr);
 	}
 
-	Graphics::PixelFormat format = screenPixelFormat();
-	initGraphics(640, 480, &format);
+	_screenPixelFormat = g_system->getSupportedFormats().front();
+	debug("Using pixel format: %s", _screenPixelFormat.toString().c_str());
+	initGraphics(640, 480, &_screenPixelFormat);
 
 	_system->showMouse(true);
 
@@ -524,6 +528,8 @@ bool BladeRunnerEngine::startup(bool hasSavegames) {
 
 	_cosTable1024 = new Common::CosineTable(1024); // 10-bits = 1024 points for 2*PI;
 	_sinTable1024 = new Common::SineTable(1024);
+
+	_mainLoopFrameLimiter = new Framelimiter(this, Framelimiter::kDefaultFpsRate, Framelimiter::kDefaultUseDelayMillis);
 
 	_view = new View();
 
@@ -926,6 +932,11 @@ void BladeRunnerEngine::shutdown() {
 
 	delete _screenEffects;
 	_screenEffects = nullptr;
+
+	if (_mainLoopFrameLimiter) {
+		delete _mainLoopFrameLimiter;
+		_mainLoopFrameLimiter = nullptr;
+	}
 }
 
 bool BladeRunnerEngine::loadSplash() {
@@ -954,6 +965,7 @@ bool BladeRunnerEngine::isMouseButtonDown() const {
 
 void BladeRunnerEngine::gameLoop() {
 	_gameIsRunning = true;
+	_mainLoopFrameLimiter->init();
 	do {
 		if (_playerDead) {
 			playerDied();
@@ -964,9 +976,11 @@ void BladeRunnerEngine::gameLoop() {
 }
 
 void BladeRunnerEngine::gameTick() {
+
 	handleEvents();
 
 	if (!_gameIsRunning || !_windowIsActive) {
+		_mainLoopFrameLimiter->init();
 		return;
 	}
 
@@ -975,6 +989,7 @@ void BladeRunnerEngine::gameTick() {
 			Common::Error runtimeError = Common::Error(Common::kUnknownError, _("A required game resource was not found"));
 			GUI::MessageDialog dialog(runtimeError.getDesc());
 			dialog.runModal();
+			_mainLoopFrameLimiter->init();
 			return;
 		}
 	}
@@ -1109,10 +1124,12 @@ void BladeRunnerEngine::gameTick() {
 	 // Without this condition the game may flash back to the game screen
 	 // between and ending outtake and the end credits.
 	if (!_gameOver) {
-		blitToScreen(_surfaceFront);
+		if (_mainLoopFrameLimiter->shouldExecuteScreenUpdate()) {
+			blitToScreen(_surfaceFront);
+			_mainLoopFrameLimiter->postScreenUpdate();
+		}
 	}
 
-	_system->delayMillis(10);
 }
 
 void BladeRunnerEngine::actorsUpdate() {
@@ -2248,12 +2265,12 @@ Graphics::Surface BladeRunnerEngine::generateThumbnail() const {
 		for (int x = 0; x < thumbnail.w; ++x) {
 			uint8 r, g, b;
 
-			uint16  srcPixel = *(const uint16 *)_surfaceFront.getBasePtr(CLIP(x * 8, 0, _surfaceFront.w - 1), CLIP(y * 8, 0, _surfaceFront.h - 1) );
-			uint16 *dstPixel = (uint16 *)thumbnail.getBasePtr(CLIP(x, 0, thumbnail.w - 1), CLIP(y, 0, thumbnail.h - 1));
+			uint32  srcPixel = *(const uint32 *)_surfaceFront.getBasePtr(CLIP(x * 8, 0, _surfaceFront.w - 1), CLIP(y * 8, 0, _surfaceFront.h - 1));
+			void   *dstPixel = thumbnail.getBasePtr(CLIP(x, 0, thumbnail.w - 1), CLIP(y, 0, thumbnail.h - 1));
 
 			// Throw away alpha channel as it is not needed
 			_surfaceFront.format.colorToRGB(srcPixel, r, g, b);
-			*dstPixel = thumbnail.format.RGBToColor(r, g, b);
+			drawPixel(thumbnail, dstPixel, thumbnail.format.RGBToColor(r, g, b));
 		}
 	}
 

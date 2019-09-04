@@ -28,6 +28,7 @@
 #include "bladerunner/ambient_sounds.h"
 #include "bladerunner/game_info.h"
 #include "bladerunner/subtitles.h"
+#include "bladerunner/framelimiter.h"
 #include "bladerunner/game_constants.h"
 #include "bladerunner/mouse.h"
 #include "bladerunner/savefile.h"
@@ -48,6 +49,7 @@ Spinner::Spinner(BladeRunnerEngine *vm) {
 	reset();
 	_imagePicker = new UIImagePicker(vm, kSpinnerDestinations);
 	_vqaPlayer = nullptr;
+	_framelimiter = new Framelimiter(_vm, Framelimiter::kDefaultFpsRate, Framelimiter::kDefaultUseDelayMillis);
 }
 
 Spinner::~Spinner() {
@@ -58,6 +60,11 @@ Spinner::~Spinner() {
 	if (_vqaPlayer != nullptr) {
 		_vqaPlayer->close();
 		delete _vqaPlayer;
+	}
+
+	if (_framelimiter) {
+		delete _framelimiter;
+		_framelimiter = nullptr;
 	}
 }
 
@@ -79,7 +86,8 @@ int Spinner::chooseDestination(int loopId, bool immediately) {
 	}
 
 	if (loopId < 0) {
-		_isOpen = true;
+		// call Spinner:open()
+		open();
 	} else {
 		_vm->playerLosesControl();
 		_vm->_scene->loopStartSpecial(kSceneLoopModeSpinner, loopId, immediately);
@@ -229,6 +237,7 @@ void Spinner::mouseUpCallback(int destinationImage, void *self) {
 
 void Spinner::open() {
 	_isOpen = true;
+	_framelimiter->init();
 }
 
 bool Spinner::isOpen() const {
@@ -247,34 +256,39 @@ int Spinner::handleMouseDown(int x, int y) {
 
 void Spinner::tick() {
 	if (!_vm->_windowIsActive) {
+		_framelimiter->init();
 		return;
 	}
 
-	int frame = _vqaPlayer->update();
-	assert(frame >= -1);
+	if (_framelimiter->shouldExecuteScreenUpdate()) {
+		int frame = _vqaPlayer->update();
+		assert(frame >= -1);
 
-	// vqaPlayer renders to _surfaceBack
-	blit(_vm->_surfaceBack, _vm->_surfaceFront);
+		// vqaPlayer renders to _surfaceBack
+		blit(_vm->_surfaceBack, _vm->_surfaceFront);
 
-	Common::Point p = _vm->getMousePos();
-	_imagePicker->handleMouseAction(p.x, p.y, false, false, false);
-	if (_imagePicker->hasHoveredImage()) {
-		_vm->_mouse->setCursor(1);
-	} else {
-		_vm->_mouse->setCursor(0);
+		Common::Point p = _vm->getMousePos();
+		_imagePicker->handleMouseAction(p.x, p.y, false, false, false);
+		if (_imagePicker->hasHoveredImage()) {
+			_vm->_mouse->setCursor(1);
+		} else {
+			_vm->_mouse->setCursor(0);
+		}
+		_imagePicker->draw(_vm->_surfaceFront);
+		_vm->_mouse->draw(_vm->_surfaceFront, p.x, p.y);
+		_imagePicker->drawTooltip(_vm->_surfaceFront, p.x, p.y);
+
+		if (_vm->_cutContent) {
+			_vm->_subtitles->tick(_vm->_surfaceFront);
+		}
+		_vm->blitToScreen(_vm->_surfaceFront);
+		_framelimiter->postScreenUpdate();
+
 	}
-	_imagePicker->draw(_vm->_surfaceFront);
-	_vm->_mouse->draw(_vm->_surfaceFront, p.x, p.y);
-	_imagePicker->drawTooltip(_vm->_surfaceFront, p.x, p.y);
 
-	if (_vm->_cutContent) {
-		_vm->_subtitles->tick(_vm->_surfaceFront);
-	}
-	_vm->blitToScreen(_vm->_surfaceFront);
 	if (_vm->_cutContent) {
 		tickDescription();
 	}
-	_vm->_system->delayMillis(10);
 }
 
 void Spinner::setSelectedDestination(int destination) {

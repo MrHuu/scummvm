@@ -27,6 +27,7 @@
 #include "bladerunner/audio_player.h"
 #include "bladerunner/bladerunner.h"
 #include "bladerunner/combat.h"
+#include "bladerunner/framelimiter.h"
 #include "bladerunner/font.h"
 #include "bladerunner/game_constants.h"
 #include "bladerunner/game_flags.h"
@@ -53,10 +54,16 @@ VK::VK(BladeRunnerEngine *vm) {
 	_vm = vm;
 
 	reset();
+	_framelimiter = new Framelimiter(_vm, Framelimiter::kDefaultFpsRate, Framelimiter::kDefaultUseDelayMillis);
 }
 
 VK::~VK() {
 	reset();
+
+	if (_framelimiter) {
+		delete _framelimiter;
+		_framelimiter = nullptr;
+	}
 }
 
 void VK::open(int actorId, int calibrationRatio) {
@@ -126,6 +133,7 @@ void VK::open(int actorId, int calibrationRatio) {
 	}
 
 	_isOpen = true;
+	_framelimiter->init();
 
 	_script = new VKScript(_vm);
 
@@ -190,28 +198,31 @@ void VK::close() {
 }
 
 void VK::tick() {
-	int mouseX, mouseY;
-	_vm->_mouse->getXY(&mouseX, &mouseY);
-	if (!_vm->_mouse->isDisabled()) {
-		_buttons->handleMouseAction(mouseX, mouseY, false, false, false);
+
+	if (_framelimiter->shouldExecuteScreenUpdate()) {
+		int mouseX, mouseY;
+		_vm->_mouse->getXY(&mouseX, &mouseY);
+		if (!_vm->_mouse->isDisabled()) {
+			_buttons->handleMouseAction(mouseX, mouseY, false, false, false);
+		}
+
+		draw();
+
+		if ( _vm->_debugger->_showStatsVk
+			&& !_vm->_actors[_actorId]->isSpeeching()
+			&& !_vm->_actors[kActorMcCoy]->isSpeeching()
+			&& !_vm->_actors[kActorAnsweringMachine]->isSpeeching()
+			&& !_isClosing
+		) {
+			_vm->_subtitles->setGameSubsText(Common::String::format("Calibration: %02d Ratio: %02d Anxiety: %02d%%\nReplicant: %02d%% Human: %02d%%", _calibration, _calibrationRatio, _anxiety, _replicantProbability, _humanProbability), true);
+			_vm->_subtitles->show();
+		}
+
+		_vm->_subtitles->tick(_vm->_surfaceFront);
+
+		_vm->blitToScreen(_vm->_surfaceFront);
+		_framelimiter->postScreenUpdate();
 	}
-
-	draw();
-
-	if ( _vm->_debugger->_showStatsVk
-		&& !_vm->_actors[_actorId]->isSpeeching()
-		&& !_vm->_actors[kActorMcCoy]->isSpeeching()
-		&& !_vm->_actors[kActorAnsweringMachine]->isSpeeching()
-		&& !_isClosing
-	) {
-		_vm->_subtitles->setGameSubsText(Common::String::format("Calibration: %02d Ratio: %02d Anxiety: %02d%%\nReplicant: %02d%% Human: %02d%%", _calibration, _calibrationRatio, _anxiety, _replicantProbability, _humanProbability), true);
-		_vm->_subtitles->show();
-	}
-
-	_vm->_subtitles->tick(_vm->_surfaceFront);
-
-	_vm->blitToScreen(_vm->_surfaceFront);
-	_vm->_system->delayMillis(10);
 
 	// unsigned difference is intentional
 	if (_isClosing && (_vm->_time->current() - _timeCloseStart >= 3000u) && !_script->isInsideScript()) {
@@ -762,8 +773,8 @@ void VK::drawNeedle(Graphics::Surface &surface) {
 
 	float colorIntensity = MIN(78.0f, _needleValue + 39.0f) / 78.0f;
 
-	uint16 color1 = surface.format.RGBToColor(56 - 48 * colorIntensity, 144 - 64 * colorIntensity, 184 - 96 * colorIntensity);
-	uint16 color2 = surface.format.RGBToColor(56 - 24 * colorIntensity, 144 - 32 * colorIntensity, 184 - 48 * colorIntensity);
+	uint32 color1 = surface.format.RGBToColor(56 - 48 * colorIntensity, 144 - 64 * colorIntensity, 184 - 96 * colorIntensity);
+	uint32 color2 = surface.format.RGBToColor(56 - 24 * colorIntensity, 144 - 32 * colorIntensity, 184 - 48 * colorIntensity);
 
 	surface.drawLine(203, 324, x - 2, y,     color1);
 	surface.drawLine(203, 324, x + 2, y,     color1);

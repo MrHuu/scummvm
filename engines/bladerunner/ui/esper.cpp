@@ -28,6 +28,7 @@
 #include "bladerunner/bladerunner.h"
 #include "bladerunner/debugger.h"
 #include "bladerunner/decompress_lcw.h"
+#include "bladerunner/framelimiter.h"
 #include "bladerunner/font.h"
 #include "bladerunner/game_info.h"
 #include "bladerunner/mouse.h"
@@ -66,11 +67,17 @@ ESPER::ESPER(BladeRunnerEngine *vm) {
 	reset();
 
 	_buttons = new UIImagePicker(vm, kPhotoCount + 4);
+	_framelimiter = new Framelimiter(_vm, Framelimiter::kDefaultFpsRate, Framelimiter::kDefaultUseDelayMillis);
 }
 
 ESPER::~ESPER() {
 	delete _buttons;
 	reset();
+
+	if (_framelimiter) {
+		delete _framelimiter;
+		_framelimiter = nullptr;
+	}
 }
 
 void ESPER::open(Graphics::Surface *surface) {
@@ -115,6 +122,8 @@ void ESPER::open(Graphics::Surface *surface) {
 	_vqaPlayerMain->setLoop(2, -1, kLoopSetModeJustStart, nullptr, nullptr);
 
 	_isOpen = true;
+	_framelimiter->init();
+
 	_flash = false;
 
 	_script = new ESPERScript(_vm);
@@ -207,33 +216,35 @@ void ESPER::handleMouseDown(int x, int y, bool mainButton) {
 
 void ESPER::tick() {
 	if (!_vm->_windowIsActive) {
+		_framelimiter->init();
 		return;
 	}
 
-	tickSound();
+	if (_framelimiter->shouldExecuteScreenUpdate()) {
+		tickSound();
 
-	blit(_vm->_surfaceBack, _vm->_surfaceFront);
+		blit(_vm->_surfaceBack, _vm->_surfaceFront);
 
-	int mouseX, mouseY;
-	_vm->_mouse->getXY(&mouseX, &mouseY);
-	if (!_vm->_mouse->isDisabled()) {
-		_buttons->handleMouseAction(mouseX, mouseY, false, false, false);
+		int mouseX, mouseY;
+		_vm->_mouse->getXY(&mouseX, &mouseY);
+		if (!_vm->_mouse->isDisabled()) {
+			_buttons->handleMouseAction(mouseX, mouseY, false, false, false);
+		}
+
+		if (!_isOpen) {
+			return;
+		}
+
+		draw(_vm->_surfaceFront);
+		_buttons->draw(_vm->_surfaceFront);
+		drawMouse(_vm->_surfaceFront);
+
+		tickSound();
+		_vm->_subtitles->tick(_vm->_surfaceFront);
+		_vm->blitToScreen(_vm->_surfaceFront);
+
+		_framelimiter->postScreenUpdate();
 	}
-
-	if (!_isOpen) {
-		return;
-	}
-
-	draw(_vm->_surfaceFront);
-	_buttons->draw(_vm->_surfaceFront);
-	drawMouse(_vm->_surfaceFront);
-
-	tickSound();
-	_vm->_subtitles->tick(_vm->_surfaceFront);
-	_vm->blitToScreen(_vm->_surfaceFront);
-
-	// TODO: implement 60hz lock for smoother experience
-	_vm->_system->delayMillis(10);
 
 	if (_statePhoto == kEsperPhotoStateVideoShow) {
 		if (_regionSelectedAck)	{
@@ -661,7 +672,7 @@ void ESPER::drawPhotoOpening(Graphics::Surface &surface) {
 		_timePhotoOpeningNextDiff  = 20u;
 		_timePhotoOpeningNextStart = timeNow;
 	}
-	copyImageScale(&_surfacePhoto, _viewport, &surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
+	copyImageScale(_surfacePhoto, _viewport, surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
 
 	surface.hLine(_screen.left,           _photoOpeningHeight,     _screen.right  - 1, surface.format.RGBToColor(0, 248, 0));
 	surface.vLine(_photoOpeningWidth,     _screen.top,             _screen.bottom - 1, surface.format.RGBToColor(0, 248, 0));
@@ -819,12 +830,12 @@ void ESPER::drawPhotoSharpening(Graphics::Surface &surface) {
 
 	if (_regionSelectedAck && !_regions[_regionSelected].name.empty()) {
 		_vqaPlayerPhoto->update(true, false);
-		copyImageBlur(&_surfaceViewport, Common::Rect(0, 0, 299, 263), &surface, _screen, _blur);
-		copyImageBlit(&_surfaceViewport, Common::Rect(0, 0, 0, 0), &surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
+		copyImageBlur(_surfaceViewport, Common::Rect(0, 0, 299, 263), surface, _screen, _blur);
+		copyImageBlit(_surfaceViewport, Common::Rect(0, 0, 0, 0), surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
 	} else {
 		drawPhoto(surface);
-		copyImageScale(&_surfacePhoto, _viewport, &_surfaceViewport, Common::Rect(0, 0, _screen.width(), _screen.height()));
-		copyImageBlit(&_surfaceViewport, Common::Rect(0, 0, 0, 0), &surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
+		copyImageScale(_surfacePhoto, _viewport, _surfaceViewport, Common::Rect(0, 0, _screen.width(), _screen.height()));
+		copyImageBlit(_surfaceViewport, Common::Rect(0, 0, 0, 0), surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
 
 	}
 	drawGrid(surface);
@@ -910,7 +921,7 @@ void ESPER::drawVideoZooming(Graphics::Surface &surface) {
 		flashViewport();
 	}
 
-	copyImageBlur(&_surfaceViewport, Common::Rect(0, 0, 299, 263), &surface, _screen, _blur);
+	copyImageBlur(_surfaceViewport, Common::Rect(0, 0, 299, 263), surface, _screen, _blur);
 	drawGrid(surface);
 }
 
@@ -944,7 +955,7 @@ void ESPER::drawVideoZoomOut(Graphics::Surface &surface) {
 	if (flash) {
 		flashViewport();
 	}
-	copyImageBlit(&_surfaceViewport, Common::Rect(0, 0, 0, 0), &surface, _screen);
+	copyImageBlit(_surfaceViewport, Common::Rect(0, 0, 0, 0), surface, _screen);
 	drawGrid(surface);
 	// unsigned difference is intentional
 	if (timeNow - _timeZoomNextStart > _timeZoomNextDiff && _vqaLastFrame <= 0) {
@@ -961,7 +972,7 @@ void ESPER::drawVideoZoomOut(Graphics::Surface &surface) {
 }
 
 void ESPER::drawPhoto(Graphics::Surface &surface) {
-	copyImageBlur(&_surfacePhoto, _viewport, &surface, _screen, _blur);
+	copyImageBlur(_surfacePhoto, _viewport, surface, _screen, _blur);
 }
 
 void ESPER::drawGrid(Graphics::Surface &surface) {
@@ -975,7 +986,7 @@ void ESPER::drawGrid(Graphics::Surface &surface) {
 }
 
 void ESPER::drawPhotoWithGrid(Graphics::Surface &surface) {
-	copyImageScale(&_surfacePhoto, _viewport, &surface, _screen);
+	copyImageScale(_surfacePhoto, _viewport, surface, _screen);
 	drawGrid(surface);
 }
 
@@ -1038,7 +1049,7 @@ void ESPER::drawSelection(Graphics::Surface &surface, bool crosshair, int style)
 
 void ESPER::drawVideoFrame(Graphics::Surface &surface) {
 	_vqaPlayerPhoto->update(true, false);
-	copyImageBlit(&_surfaceViewport, Common::Rect(0, 0, 0, 0), &surface, _screen);
+	copyImageBlit(_surfaceViewport, Common::Rect(0, 0, 0, 0), surface, _screen);
 }
 
 void ESPER::drawTextCoords(Graphics::Surface &surface) {
@@ -1137,16 +1148,18 @@ void ESPER::drawMouse(Graphics::Surface &surface) {
 }
 
 void ESPER::flashViewport() {
-	uint16 *ptr = (uint16 *)_surfaceViewport.getPixels();
-	for (int i = 0; i < _surfaceViewport.w * _surfaceViewport.h; ++i, ++ptr) {
-		uint8 r, g, b;
-		_surfaceViewport.format.colorToRGB(*ptr, r, g, b);
-		b *= 2;
-		*ptr = _surfaceViewport.format.RGBToColor(r, g, b);
+	for (int y = 0; y < _surfaceViewport.h; ++y) {
+		for (int x = 0; x < _surfaceViewport.w; ++x) {
+			uint8 r, g, b;
+			void *ptr = _surfaceViewport.getBasePtr(x, y);
+			_surfaceViewport.format.colorToRGB(*(uint32*)ptr, r, g, b);
+			b *= 2;
+			drawPixel(_surfaceViewport, ptr, _surfaceViewport.format.RGBToColor(r, g, b));
+		}
 	}
 }
 
-void ESPER::copyImageScale(Graphics::Surface *src, Common::Rect srcRect, Graphics::Surface *dst, Common::Rect dstRect) {
+void ESPER::copyImageScale(Graphics::Surface &src, Common::Rect srcRect, Graphics::Surface &dst, Common::Rect dstRect) {
 	if (_flash) {
 		playSound(kSfxBR031_1P, 25);
 	}
@@ -1164,22 +1177,19 @@ void ESPER::copyImageScale(Graphics::Surface *src, Common::Rect srcRect, Graphic
 			int srcX = srcRect.left;
 			int srcXCounter = 0;
 			for (int dstX = dstRect.left; dstX < dstRect.right; ++dstX) {
-				srcX = CLIP(srcX, 0, src->w - 1);
-				srcY = CLIP(srcY, 0, src->h - 1);
+				srcX = CLIP(srcX, 0, src.w - 1);
+				srcY = CLIP(srcY, 0, src.h - 1);
 
-				dstX = CLIP(dstX, 0, dst->w - 1);
-				dstY = CLIP(dstY, 0, dst->h - 1);
-
-				uint16 *srcPtr = (uint16 *)src->getBasePtr(srcX, srcY);
-				uint16 *dstPtr = (uint16 *)dst->getBasePtr(dstX, dstY);
+				dstX = CLIP(dstX, 0, dst.w - 1);
+				dstY = CLIP(dstY, 0, dst.h - 1);
 
 				uint8 r, g, b;
-				src->format.colorToRGB(*srcPtr, r, g, b);
+				src.format.colorToRGB(*(uint32*)src.getBasePtr(srcX, srcY), r, g, b);
 				if (_flash) {
 					// add blue-ish tint
 					b *= 2;
 				}
-				*dstPtr = dst->format.RGBToColor(r, g, b);
+				drawPixel(dst, dst.getBasePtr(dstX, dstY), dst.format.RGBToColor(r, g, b));
 
 				srcX += srcDstWidthRatio;
 				srcXCounter += srcDstWidthRest;
@@ -1210,22 +1220,19 @@ void ESPER::copyImageScale(Graphics::Surface *src, Common::Rect srcRect, Graphic
 					++srcX;
 				}
 
-				srcX = CLIP(srcX, 0, src->w - 1);
-				srcY = CLIP(srcY, 0, src->h - 1);
+				srcX = CLIP(srcX, 0, src.w - 1);
+				srcY = CLIP(srcY, 0, src.h - 1);
 
-				dstX = CLIP(dstX, 0, dst->w - 1);
-				dstY = CLIP(dstY, 0, dst->h - 1);
-
-				uint16 *srcPtr = (uint16 *)src->getBasePtr(srcX, srcY);
-				uint16 *dstPtr = (uint16 *)dst->getBasePtr(dstX, dstY);
+				dstX = CLIP(dstX, 0, dst.w - 1);
+				dstY = CLIP(dstY, 0, dst.h - 1);
 
 				uint8 r, g, b;
-				src->format.colorToRGB(*srcPtr, r, g, b);
+				src.format.colorToRGB(*(uint32*)src.getBasePtr(srcX, srcY), r, g, b);
 				if (_flash) {
 					// add blue-ish tint
 					b *= 2;
 				}
-				*dstPtr = dst->format.RGBToColor(r, g, b);
+				drawPixel(dst, dst.getBasePtr(dstX, dstY), dst.format.RGBToColor(r, g, b));
 			}
 
 			srcYCounter += srcRect.height();
@@ -1238,7 +1245,7 @@ void ESPER::copyImageScale(Graphics::Surface *src, Common::Rect srcRect, Graphic
 	_flash = false;
 }
 
-void ESPER::copyImageBlur(Graphics::Surface *src, Common::Rect srcRect, Graphics::Surface *dst, Common::Rect dstRect, float blur) {
+void ESPER::copyImageBlur(Graphics::Surface &src, Common::Rect srcRect, Graphics::Surface &dst, Common::Rect dstRect, float blur) {
 	if (_flash) {
 		playSound(kSfxBR031_1P, 25);
 	}
@@ -1278,22 +1285,19 @@ void ESPER::copyImageBlur(Graphics::Surface *src, Common::Rect srcRect, Graphics
 					int skipX = 0;
 					while (dstX < dstRect.right && skipX < skipXMax) {
 
-						srcX = CLIP(srcX, 0, src->w - 1);
-						srcY = CLIP(srcY, 0, src->h - 1);
+						srcX = CLIP(srcX, 0, src.w - 1);
+						srcY = CLIP(srcY, 0, src.h - 1);
 
-						dstX = CLIP(dstX, 0, dst->w - 1);
-						dstY = CLIP(dstY, 0, dst->h - 1);
-
-						uint16 *srcPtr = (uint16 *)src->getBasePtr(srcX, srcY);
-						uint16 *dstPtr = (uint16 *)dst->getBasePtr(dstX, dstY);
+						dstX = CLIP(dstX, 0, dst.w - 1);
+						dstY = CLIP(dstY, 0, dst.h - 1);
 
 						uint8 r, g, b;
-						src->format.colorToRGB(*srcPtr, r, g, b);
+						src.format.colorToRGB(*(uint32*)src.getBasePtr(srcX, srcY), r, g, b);
 						if (_flash) {
 							// add blue-ish tint
 							b *= 2;
 						}
-						*dstPtr = dst->format.RGBToColor(r, g, b);
+						drawPixel(dst, dst.getBasePtr(dstX, dstY), dst.format.RGBToColor(r, g, b));
 
 						++dstX;
 						++skipX;
@@ -1351,22 +1355,19 @@ void ESPER::copyImageBlur(Graphics::Surface *src, Common::Rect srcRect, Graphics
 							srcX += 1; // bug in original game? Is using 1 instead of skipX as for Y
 						}
 
-						srcX = CLIP(srcX, 0, src->w - 1);
-						srcY = CLIP(srcY, 0, src->h - 1);
+						srcX = CLIP(srcX, 0, src.w - 1);
+						srcY = CLIP(srcY, 0, src.h - 1);
 
-						dstX = CLIP(dstX, 0, dst->w - 1);
-						dstY = CLIP(dstY, 0, dst->h - 1);
-
-						uint16 *srcPtr = (uint16 *)src->getBasePtr(srcX, srcY);
-						uint16 *dstPtr = (uint16 *)dst->getBasePtr(dstX, dstY);
+						dstX = CLIP(dstX, 0, dst.w - 1);
+						dstY = CLIP(dstY, 0, dst.h - 1);
 
 						uint8 r, g, b;
-						src->format.colorToRGB(*srcPtr, r, g, b);
+						src.format.colorToRGB(*(uint32*)src.getBasePtr(srcX, srcY), r, g, b);
 						if (_flash) {
 							// add blue-ish tint
 							b *= 2;
 						}
-						*dstPtr = dst->format.RGBToColor(r, g, b);
+						drawPixel(dst, dst.getBasePtr(dstX, dstY), dst.format.RGBToColor(r, g, b));
 
 						++dstX;
 						++skipX;
@@ -1387,12 +1388,12 @@ void ESPER::copyImageBlur(Graphics::Surface *src, Common::Rect srcRect, Graphics
 	_flash = false;
 }
 
-void ESPER::copyImageBlit(Graphics::Surface *src, Common::Rect srcRect, Graphics::Surface *dst, Common::Rect dstRect) {
+void ESPER::copyImageBlit(Graphics::Surface &src, Common::Rect srcRect, Graphics::Surface &dst, Common::Rect dstRect) {
 	for (int y = 0; y < dstRect.height(); ++y) {
 		for (int x = 0; x < dstRect.width(); ++x) {
-			uint16 *srcPtr = (uint16 *)src->getBasePtr(CLIP(srcRect.left + x, 0, src->w - 1), CLIP(srcRect.top + y, 0, src->h - 1));
-			uint16 *dstPtr = (uint16 *)dst->getBasePtr(CLIP(dstRect.left + x, 0, dst->w - 1), CLIP(dstRect.top + y, 0, dst->h - 1));
-			*dstPtr = *srcPtr;
+			uint8 r, g, b;
+			src.format.colorToRGB(*(uint32*)src.getBasePtr(CLIP(srcRect.left + x, 0, src.w - 1), CLIP(srcRect.top + y, 0, src.h - 1)), r, g, b);
+			drawPixel(dst, dst.getBasePtr(CLIP(dstRect.left + x, 0, dst.w - 1), CLIP(dstRect.top + y, 0, dst.h - 1)), dst.format.RGBToColor(r, g, b));
 		}
 	}
 }

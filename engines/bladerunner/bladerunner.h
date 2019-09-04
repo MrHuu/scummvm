@@ -73,6 +73,7 @@ class DialogueMenu;
 class Elevator;
 class EndCredits;
 class ESPER;
+class Framelimiter;
 class Font;
 class GameFlags;
 class GameInfo;
@@ -182,6 +183,8 @@ public:
 	Actor *_actors[kActorCount];
 	Actor *_playerActor;
 
+	Graphics::PixelFormat _screenPixelFormat;
+
 	Graphics::Surface  _surfaceFront;
 	Graphics::Surface  _surfaceBack;
 
@@ -193,6 +196,8 @@ public:
 
 	Common::CosineTable *_cosTable1024;
 	Common::SineTable   *_sinTable1024;
+
+	Framelimiter *_mainLoopFrameLimiter;
 
 	bool _isWalkingInterruptible;
 	bool _interruptWalking;
@@ -237,6 +242,8 @@ public:
 
 	int    _actorUpdateCounter;
 	uint32 _actorUpdateTimeLast;
+
+	uint32 _timeOfMainGameLoopTickPrevious;
 
 private:
 	MIXArchive _archives[kArchiveCount];
@@ -323,8 +330,21 @@ static inline const Graphics::PixelFormat gameDataPixelFormat() {
 }
 
 static inline const Graphics::PixelFormat screenPixelFormat() {
-	// Should be a format supported by Android port
-	return Graphics::PixelFormat(2, 5, 5, 5, 1, 11, 6, 1, 0);
+	return ((BladeRunnerEngine*)g_engine)->_screenPixelFormat;
+}
+
+static inline void drawPixel(Graphics::Surface &surface, void* dst, uint32 value) {
+	switch (surface.format.bytesPerPixel) {
+		case 1:
+			*(uint8*)dst = (uint8)value;
+			break;
+		case 2:
+			*(uint16*)dst = (uint16)value;
+			break;
+		case 4:
+			*(uint32*)dst = (uint32)value;
+			break;
+	}
 }
 
 void blit(const Graphics::Surface &src, Graphics::Surface &dst);

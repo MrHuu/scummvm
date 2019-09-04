@@ -108,6 +108,7 @@ static const char *const selectorNameTable[] = {
 	"localize",     // Freddy Pharkas
 	"roomFlags",    // Iceman
 	"put",          // Police Quest 1 VGA
+	"newRoom",      // Police Quest 3, GK1
 	"changeState",  // Quest For Glory 1 VGA, QFG4
 	"hide",         // Quest For Glory 1 VGA, QFG4
 	"say",          // Quest For Glory 1 VGA, QFG4
@@ -148,7 +149,6 @@ static const char *const selectorNameTable[] = {
 	"fade",         // Shivers
 	"test",         // Torin
 	"get",          // Torin, GK1
-	"newRoom",      // GK1
 	"normalize",    // GK1
 	"set",          // Torin
 	"clear",        // Torin
@@ -221,6 +221,7 @@ enum ScriptPatcherSelectors {
 	SELECTOR_localize,
 	SELECTOR_roomFlags,
 	SELECTOR_put,
+	SELECTOR_newRoom,
 	SELECTOR_changeState,
 	SELECTOR_hide,
 	SELECTOR_say,
@@ -262,7 +263,6 @@ enum ScriptPatcherSelectors {
 	SELECTOR_fade,
 	SELECTOR_test,
 	SELECTOR_get,
-	SELECTOR_newRoom,
 	SELECTOR_normalize,
 	SELECTOR_set,
 	SELECTOR_clear,
@@ -1338,11 +1338,107 @@ static const uint16 ecoquest2PatchIconBarTutorial[] = {
 	PATCH_END
 };
 
+// The electronic organizer and password paper reappear in room 500 after they
+//  fall into the water when entering the canoe. rm500:init only tests if these
+//  items are in inventory. It should have also tested the canoe flag like room
+//  530 does to prevent the vacuum from reappearing.
+//
+// We fix this by only adding an item to the room if its InvI:owner is zero.
+//  This is initially zero, then set to ego when getting an item, and finally
+//  set to negative one when the item is removed from inventory.
+//
+// Applies to: All versions
+// Responsible method: rm500:init
+// Fixes bug: #11135
+static const uint16 ecoquest2SignatureRoom500Items[] = {
+	0x38, SIG_ADDTOOFFSET(+2),          // pushi test
+	0x78,                               // push1
+	SIG_MAGICDWORD,
+	0x39, 0x0b,                         // pushi 0b
+	0x81, 0x96,                         // lag 96
+	0x4a, 0x06,                         // send 06 [ cibolaFlags test: 11 ]
+	0xa5, 0x00,                         // sat 00
+	0x38, SIG_ADDTOOFFSET(+2),          // pushi test
+	0x78,                               // push1
+	0x39, 0x04,                         // pushi 04
+	0x81, 0x96,                         // lag 96
+	0x4a, 0x06,                         // send 06 [ cibolaFlags test: 4 ]
+	0xa5, 0x01,                         // sat 01
+	0x38, SIG_ADDTOOFFSET(+2),          // pushi test
+	0x78,                               // push1
+	0x39, 0x17,                         // pushi 17
+	0x81, 0x96,                         // lag 96
+	0x4a, 0x06,                         // send 06 [ cibolaFlags test: 23 ]
+	0xa5, 0x02,                         // sat 02
+	0x38, SIG_ADDTOOFFSET(+2),          // pushi test
+	SIG_ADDTOOFFSET(+636),
+	0x38, SIG_SELECTOR16(has),          // pushi has
+	0x78,                               // push1
+	0x39, 0x15,                         // pushi 15
+	0x81, 0x00,                         // lag 00
+	0x4a, 0x06,                         // send 06 [ ego has: 21 ]
+	0x18,                               // not
+	0x31, 0x13,                         // bnt 13 [ don't initialize theOrganizer ]
+	SIG_ADDTOOFFSET(+236),
+	0x38, SIG_SELECTOR16(has),          // pushi has
+	0x78,                               // push1
+	0x39, 0x0b,                         // pushi 0b
+	0x81, 0x00,                         // lag 00
+	0x4a, 0x06,                         // send 06 [ ego has: 11 ]
+	0x18,                               // not
+	0x30, SIG_UINT16(0x0058),           // bnt 0058 [ don't initialize paper ]
+	SIG_END,
+};
+
+static const uint16 ecoquest2PatchRoom500Items[] = {
+	0x39, PATCH_SELECTOR8(at),          // pushi at
+	0x3c,                               // dup [ push at, saves 1 byte ]
+	0x78,                               // push1
+	0x39, 0x15,                         // pushi 15
+	0x38, PATCH_GETORIGINALUINT16(+1),  // pushi test
+	0x3c,                               // dup [ push test, saves 2 bytes ]
+	0x3c,                               // dup [ push test, saves 2 bytes ]
+	0x3c,                               // dup [ push test, saves 2 bytes ]
+	0x78,                               // push1
+	0x39, 0x0b,                         // pushi 0b
+	0x81, 0x96,                         // lag 96
+	0x4a, 0x06,                         // send 06 [ cibolaFlags test: 11 ]
+	0xa5, 0x00,                         // sat 00
+	0x78,                               // push1
+	0x39, 0x04,                         // pushi 04
+	0x81, 0x96,                         // lag 96
+	0x4a, 0x06,                         // send 06 [ cibolaFlags test: 4 ]
+	0xa5, 0x01,                         // sat 01
+	0x78,                               // push1
+	0x39, 0x17,                         // pushi 17
+	0x81, 0x96,                         // lag 96
+	0x4a, 0x06,                         // send 06 [ cibolaFlags test: 23 ]
+	0xa5, 0x02,                         // sat 02
+	PATCH_ADDTOOFFSET(+636),
+	0x81, 0x09,                         // lag 09
+	0x4a, 0x06,                         // send 06 [ Inv at: 21 ]
+	0x38, PATCH_SELECTOR16(owner),      // pushi owner
+	0x76,                               // push0
+	0x4a, 0x04,                         // send 04 [ organizer owner? ]
+	0x78,                               // push1
+	0x2f, 0x13,                         // bt 13 [ don't initialize theOrganizer ]
+	PATCH_ADDTOOFFSET(+236),
+	0x39, 0x0b,                         // pushi 0b
+	0x81, 0x09,                         // lag 09
+	0x4a, 0x06,                         // send 06 [ Inv at: 11 ]
+	0x38, PATCH_SELECTOR16(owner),      // pushi owner
+	0x76,                               // push0
+	0x4a, 0x04,                         // send 04 [ password owner? ]
+	0x2f, 0x58,                         // bt 58 [ don't initialize paper ]
+	PATCH_END
+};
+
 //          script, description,                                        signature                          patch
 static const SciScriptPatcherEntry ecoquest2Signatures[] = {
 	{  true,     0, "icon bar tutorial",                            10, ecoquest2SignatureIconBarTutorial, ecoquest2PatchIconBarTutorial },
 	{  true,    50, "initial text not removed on ecorder",           1, ecoquest2SignatureEcorder,         ecoquest2PatchEcorder },
 	{  true,   333, "initial text not removed on ecorder tutorial",  1, ecoquest2SignatureEcorderTutorial, ecoquest2PatchEcorderTutorial },
+	{  true,   500, "room 500 items reappear",                       1, ecoquest2SignatureRoom500Items,    ecoquest2PatchRoom500Items },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -4788,6 +4884,59 @@ static const uint16 longbowPatchGreenManForestSweepFix[] = {
 	PATCH_END
 };
 
+// After rescuing Fulk in the Amiga version, rescueOfFulk stores the boat speed
+//  in a temporary variable during one state and expects it to still be there in
+//  a later state, which only worked by accident in Sierra's interpreter. This
+//  Amiga tweak was made so that on slower machines the boat would animate after
+//  Fulk and Robin leave the screen. We fix this by using the script's register
+//  property for storage instead of a temporary variable.
+//
+// Applies to: English Amiga Floppy
+// Responsible method: rescueOfFulk:changeState
+// Fixes bug: #11137
+static const uint16 longbowSignatureAmigaFulkRescue[] = {
+	SIG_MAGICDWORD,
+	0xa5, 0x00,                     // sat 00
+	0x89, 0x57,                     // lsg 87
+	SIG_ADDTOOFFSET(+10),
+	0x8d, 0x00,                     // lst 00
+	SIG_ADDTOOFFSET(+635),
+	0x8d, 0x00,                     // lst 00
+	SIG_END
+};
+
+static const uint16 longbowPatchAmigaFulkRescue[] = {
+	0x65, 0x1a,                     // aTop register
+	PATCH_ADDTOOFFSET(+12),
+	0x67, 0x1a,                     // pTos register
+	PATCH_ADDTOOFFSET(+635),
+	0x67, 0x1a,                     // pTos register
+	PATCH_END
+};
+
+// The Amiga version has an unusual speed test which takes 10 seconds to run in
+//  ScummVM, causing the test to assume a slow machine speed and reduce details
+//  throughout the game. We disable the speed test and its long delay before the
+//  the Sierra logo so that the fastest machine speed is used.
+//
+// Applies to: English Amiga Floppy
+// Responsible method: speedScript:changeState
+static const uint16 longbowSignatureAmigaSpeedTest[] = {
+	// state 1
+	0x32, SIG_UINT16(0x0164),       // jmp 0164 [ end of method ]
+	SIG_ADDTOOFFSET(+0xe9),
+	// state 2
+	SIG_MAGICDWORD,
+	0x35, 0x02,                     // ldi 02   [ fastest machine speed ]
+	0x32, SIG_UINT16(0x000f),       // jmp 000f [ set machine speed ]
+	SIG_END
+};
+
+static const uint16 longbowPatchAmigaSpeedTest[] = {
+	0x32, PATCH_UINT16(0x00e9),     // jmp 00e9 [ skip test, use fastest machine speed ]
+	PATCH_END
+};
+
 //          script, description,                                      signature                                patch
 static const SciScriptPatcherEntry longbowSignatures[] = {
 	{  true,   140, "green man riddles and forest sweep fix",      1, longbowSignatureGreenManForestSweepFix,  longbowPatchGreenManForestSweepFix },
@@ -4800,6 +4949,8 @@ static const SciScriptPatcherEntry longbowSignatures[] = {
 	{  true,   320, "day 8 archer pathfinding workaround",         1, longbowSignatureArcherPathfinding,       longbowPatchArcherPathfinding },
 	{  true,   350, "day 9 cobbler hut fix",                      10, longbowSignatureCobblerHut,              longbowPatchCobblerHut },
 	{  true,   530, "amiga pub fix",                               1, longbowSignatureAmigaPubFix,             longbowPatchAmigaPubFix },
+	{  true,   600, "amiga fulk rescue fix",                       1, longbowSignatureAmigaFulkRescue,         longbowPatchAmigaFulkRescue },
+	{  true,   803, "amiga speed test",                            1, longbowSignatureAmigaSpeedTest,          longbowPatchAmigaSpeedTest },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -7764,8 +7915,68 @@ static const uint16 pq3PatchDoctorMouthSpeed[] = {
 	PATCH_END,
 };
 
+// The house fire on day six reoccurs if you return to the hospital. Flag 66
+//  triggers the fire sequence and is always set when leaving the hospital on
+//  day 6. It's then cleared when arriving at the fire.
+//
+// We add a test for flag 57, which is set at the fire, so that flag 66 isn't
+//  set a second time. This is also what Sierra did in later versions.
+//
+// Applies to: English PC VGA Floppy
+// Responsible method: outHospital:changeState(6)
+// Fixes bug: #11089
+static const uint16 pq3SignatureHouseFireRepeats[] = {
+	0x30, SIG_UINT16(0x0068),            // bnt 0068 [ state 7 ]
+	SIG_ADDTOOFFSET(+82),
+	SIG_MAGICDWORD,
+	0x30, SIG_UINT16(0x0006),            // bnt 0006 [ don't set fire-started flag ]
+	0x78,                                // push1
+	0x39, 0x42,                          // pushi 42 [ flag 66 ]
+	0x45, 0x09, 0x02,                    // callb proc0_9 [ set fire-started flag ]
+	0x38, SIG_SELECTOR16(newRoom),       // pushi newRoom
+	0x78,                                // push1
+	0x39, 0x19,                          // pushi 19
+	0x81, 0x02,                          // lag 02
+	0x4a, 0x06,                          // send 06 [ rm033 newRoom: 25 ]
+	0x32, SIG_UINT16(0x004c),            // jmp 004c [ end of method ]
+	0x3c,                                // dup
+	0x35, 0x07,                          // ldi 07
+	0x1a,                                // eq?
+	0x30, SIG_UINT16(0x0007),            // bnt 0007 [ state 8 ]
+	0x35, 0x01,                          // ldi 01
+	0x65, 0x10,                          // aTop cycles
+	0x32, SIG_UINT16(0x003e),            // jmp 003e [ end of method ]
+	SIG_END,
+};
+
+static const uint16 pq3PatchHouseFireRepeats[] = {
+	0x30, PATCH_UINT16(0x006c),          // bnt 006c [ state 7 ]
+	PATCH_ADDTOOFFSET(+82),
+	0x31, 0x0e,                          // bnt 0e [ don't set fire-started flag ]
+	0x78,                                // push1
+	0x39, 0x39,                          // pushi 39 [ flag 57 ]
+	0x45, 0x0a, 0x02,                    // callb proc0_10 [ have you been to the fire? ]
+	0x2f, 0x06,                          // bt 06 [ don't set fire-started flag ]
+	0x78,                                // push1
+	0x39, 0x42,                          // pushi 42 [ flag 66 ]
+	0x45, 0x09, 0x02,                    // callb proc0_9 [ set fire-started flag ]
+	0x38, PATCH_SELECTOR16(newRoom),     // pushi newRoom
+	0x78,                                // push1
+	0x39, 0x19,                          // pushi 19
+	0x81, 0x02,                          // lag 02
+	0x4a, 0x06,                          // send 06 [ rm033 newRoom: 25 ]
+	0x3c,                                // dup
+	0x35, 0x07,                          // ldi 07
+	0x1a,                                // eq?
+	0x31, 0x04,                          // bnt 04 [ state 8 ]
+	0x35, 0x01,                          // ldi 01
+	0x65, 0x10,                          // aTop cycles
+	PATCH_END,
+};
+
 //          script, description,                                 signature                     patch
 static const SciScriptPatcherEntry pq3Signatures[] = {
+	{  true, 33, "prevent house fire repeating",              1, pq3SignatureHouseFireRepeats, pq3PatchHouseFireRepeats },
 	{  true, 36, "give locket missing points",                1, pq3SignatureGiveLocketPoints, pq3PatchGiveLocketPoints },
 	{  true, 36, "doctor mouth speed",                        1, pq3SignatureDoctorMouthSpeed, pq3PatchDoctorMouthSpeed },
 	SCI_SIGNATUREENTRY_TERMINATOR
@@ -13171,6 +13382,84 @@ static const uint16 qfg4GreatHallKeyholePatch[] = {
 	PATCH_END
 };
 
+// You can talk to the Burgomeister in his office when he's not there. Clicking
+//  Talk on hero shows Burgomeister options even when alone because rm300:init
+//  initializes heroTeller no matter who is in the room.
+//
+// We fix this by only initializing heroTeller when someone is in the room. The
+//  Burgomeister appears when the time of day is 3 or less and Gypsy Davy
+//  appears during room events 4, 5, and 6.
+//
+// Applies to: All versions
+// Responsible method: rm300:init
+// Fixes bug: #10754
+static const uint16 qfg4EmptyBurgoRoomSignature[] = {
+	// start of heroTeller init: ...
+	0x38, SIG_SELECTOR16(init),         // pushi init
+	SIG_MAGICDWORD,
+	0x38, SIG_UINT16(0x0005),           // pushi 0005
+	0x89, 0x00,                         // lsg 00     [ hero ]
+	0x38, SIG_UINT16(0x012c),           // pushi 300d [ modNum ]
+	0x39, 0x19,                         // pushi 25d  [ noun ]
+	0x38, SIG_UINT16(0x0080),           // pushi 128d [ verb ]
+	0x8b, 0x00,                         // lsl 00 [ event number ]
+	0x3c,                               // dup
+	0x35, 0x01,                         // ldi 01
+	0x1a,                               // eq?
+	0x31, 0x05,                         // bnt 05
+	0x35, 0x10,                         // ldi 10 [ cond ]
+	0x32, SIG_UINT16(0x0048),           // jmp 0048
+	0x3c,                               // dup
+	0x35, 0x02,                         // ldi 02
+	0x1a,                               // eq?
+	0x31, 0x04,                         // bnt 04
+	0x35, 0x11,                         // ldi 11 [ cond ]
+	0x33, 0x3e,                         // jmp 3e
+	0x3c,                               // dup
+	0x35, 0x04,                         // ldi 04
+	0x1a,                               // eq?
+	0x31, 0x04,                         // bnt 04
+	0x35, 0x13,                         // ldi 13 [ cond ]
+	0x33, 0x34,                         // jmp 34
+	0x3c,                               // dup
+	0x35, 0x05,                         // ldi 05
+	SIG_END
+};
+
+static const uint16 qfg4EmptyBurgoRoomPatch[] = {
+	0x89, 0x7b,                         // lsg 7b
+	0x35, 0x03,                         // ldi 03
+	0x24,                               // le?   [ time of day <= 3 ]
+	0x2f, 0x0e,                         // bt 0e [ burgomeister is here, call heroTeller:init ]
+	0x8b, 0x00,                         // lsl 00
+	0x35, 0x04,                         // ldi 04
+	0x22,                               // lt?   [ event number < 4 ]
+	0x2f, 0x5f,                         // bt 5f [ no gypsy, skip heroTeller:init ]
+	0x8b, 0x00,                         // lsl 00
+	0x35, 0x06,                         // ldi 06
+	0x1e,                               // gt?   [ event number > 6 ]
+	0x2f, 0x58,                         // bt 58 [ no gypsy, skip heroTeller:init ]
+	// start of heroTeller init: ...
+	0x38, PATCH_SELECTOR16(init),       // pushi init
+	0x39, 0x05,                         // pushi 05
+	0x89, 0x00,                         // lsg 00     [ hero ]
+	0x89, 0x0b,                         // lsg 0b     [ modNum ]
+	0x39, 0x19,                         // pushi 25d  [ noun ]
+	0x38, PATCH_UINT16(0x0080),         // pushi 128d [ verb ]
+	0x83, 0x00,                         // lal 00 [ event number ]
+	0x36,                               // push
+	0x31, 0x13,                         // bnt 13 [ event number == 0, next condition ]
+	0x3c,                               // dup
+	0x35, 0x05,                         // ldi 05
+	0x1e,                               // gt?
+	0x2f, 0x0d,                         // bt 0d [ event number > 5, next condition ]
+	0x3c,                               // dup
+	0x35, 0x0f,                         // ldi 0f
+	0x02,                               // add [ cond = event number + 15d ]
+	0x33, 0x31,                         // jmp 31
+	PATCH_END
+};
+
 //          script, description,                                     signature                      patch
 static const SciScriptPatcherEntry qfg4Signatures[] = {
 	{  true,     0, "prevent autosave from deleting save games",   1, qfg4AutosaveSignature,         qfg4AutosavePatch },
@@ -13195,6 +13484,7 @@ static const SciScriptPatcherEntry qfg4Signatures[] = {
 	{  true,   260, "CD: fix inn door crash",                      1, qfg4InnDoorCDSignature,        qfg4InnDoorCDPatch },
 	{  true,   270, "fix town gate after a staff dream",           1, qfg4DreamGateSignature,        qfg4DreamGatePatch },
 	{  true,   270, "fix town gate doormat at night",              1, qfg4TownGateDoormatSignature,  qfg4TownGateDoormatPatch },
+	{  true,   300, "fix empty burgomeister room teller",          1, qfg4EmptyBurgoRoomSignature,   qfg4EmptyBurgoRoomPatch },
 	{  true,   320, "fix pathfinding at the inn",                  1, qfg4InnPathfindingSignature,   qfg4InnPathfindingPatch },
 	{  true,   320, "fix talking to absent innkeeper",             1, qfg4AbsentInnkeeperSignature,  qfg4AbsentInnkeeperPatch },
 	{  true,   320, "CD: fix domovoi never appearing",             1, qfg4DomovoiInnSignature,       qfg4DomovoiInnPatch },

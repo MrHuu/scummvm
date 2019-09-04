@@ -209,6 +209,10 @@ void SceneScriptRC04::dialogueWithBulletBob() {
 		Actor_Says(kActorMcCoy, 5040, 16);
 		Actor_Says(kActorBulletBob, 550, 11);
 		Actor_Modify_Friendliness_To_Other(kActorBulletBob, kActorMcCoy, -6);
+		if (_vm->_cutContent) {
+			Actor_Modify_Friendliness_To_Other(kActorHasan, kActorMcCoy, 6);
+		}
+		Game_Flag_Set(kFlagMcCoyTalkedToBulletBobAboutHasan);
 		break;
 
 	case 610: // GOGGLES

@@ -2242,6 +2242,7 @@ void InitScript::Init_World_Waypoints() {
 	World_Waypoint_Set(551, kSetKP05_KP06, -737.31f, 0.0f, -145.05f);
 	// 552 - UNUSED
 	// 553 - kSetRC03 - Izo AI script
+	// 554 - kSetAR01_AR02 - Hasan AI script (new)
 }
 
 void InitScript::Init_SDB() {
@@ -2599,6 +2600,11 @@ void InitScript::Init_CDB() {
 	CDB_Set_Clue_Asset_Type(kClueChessTable, kClueTypeAudioRecording);
 	CDB_Set_Clue_Asset_Type(kClueStaggeredbyPunches, kClueTypeAudioRecording);
 	CDB_Set_Clue_Asset_Type(kClueMaggieBracelet, kClueTypeObject);
+	if (_vm->_cutContent) {
+		CDB_Set_Clue_Asset_Type(kClueGarterSnake, kClueTypeObject);
+		CDB_Set_Clue_Asset_Type(kClueGoldfish, kClueTypeObject);
+		CDB_Set_Clue_Asset_Type(kClueSlug, kClueTypeObject);
+	}
 	CDB_Set_Clue_Asset_Type(kClueEnvelope, kClueTypeObject);
 	CDB_Set_Clue_Asset_Type(kClueIzosFriend, kClueTypePhotograph);
 	CDB_Set_Clue_Asset_Type(kClueChinaBarSecurityPhoto, kClueTypePhotograph);

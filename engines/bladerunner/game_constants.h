@@ -578,7 +578,7 @@ enum Flags {
 	kFlagPS05toPS06                           = 136,
 	kFlagCT04HomelessTalk                     = 137,
 	kFlagPS07KleinInsulted                    = 138,
-	// 139 is never used
+	kFlagMcCoyTalkedToBulletBobAboutHasan     = 139, // Re-purposed. Original: 139 is never used
 	// 140 is never used
 	kFlagRC51Available                        = 141,
 	kFlagNotUsed142                           = 142, // is never checked
@@ -685,7 +685,7 @@ enum Flags {
 	// 243 is never used
 	// 244 is never used
 	// 245 is never used
-	// 246 is never used
+	kFlagWrongInvestigation                   = 246, // Re-purposed. Original: 246 is never used
 	kFlagArrivedFromSpinner1                  = 247,
 	kFlagSpinnerAtCT01                        = 248,
 	kFlagSpinnerAtRC01                        = 249,
@@ -1186,7 +1186,9 @@ enum Variables {
 	kVariablePoliceMazePS13TargetCounter   = 13,
 	kVariableMcCoyEvidenceMissed           = 14,
 	// variable 15 has no use
-	// variables 16 - 18 are not used
+	kVariableFishDealerBanterTalk          = 16, // Re-purposed. Original: not used
+	kVariableInsectDealerBanterTalk        = 17, // Re-purposed. Original: not used
+	kVariableHasanBanterTalk               = 18, // Re-purposed. Original: not used
 	kVariableIzoShot                       = 19, // has no use
 	// variables 20 - 23 are not used
 	kVariableBobShot                       = 24, // has no use
@@ -1822,6 +1824,16 @@ enum GameModelAnimations {
 	// 671 - 681: Howie Lee animations
 	// 682 - 687: Fish Dealer animations
 	// 688 - 697: Dino Klein animations
+	kModelAnimationKleinWalking                    = 688,
+	kModelAnimationKleinStandingIdle               = 689,
+	kModelAnimationKleinTalkScratchBackOfHead      = 690,
+	kModelAnimationKleinWorkingOnInstruments       = 691,
+	kModelAnimationKleinTalkSmallLeftHandMove      = 692,
+	kModelAnimationKleinTalkRightHandTouchFace     = 693,
+	kModelAnimationKleinTalkWideHandMotion         = 694,
+	kModelAnimationKleinTalkSuggestOrAsk           = 695,
+	kModelAnimationKleinTalkDismissive             = 696,
+	kModelAnimationKleinTalkRaisingBothHands       = 697,
 	// 698 - 704: Murray animations
 	// 705 - 715: Hawker's Barkeep animations
 	// 716 - 721: Holloway animations
@@ -1876,6 +1888,18 @@ enum GameModelAnimations {
 	// 908 - 917: Mutant 3 animations
 	// 918 - 919: Taffy Patron (Gordo's hostage) animations
 	// 920 - 930: Hasan animations
+	kModelAnimationHasanTalkWipeFaceLeftHand01    = 920, // UNUSED
+	kModelAnimationHasanIdleSlightMovement        = 921,
+	kModelAnimationHasanTalkSuggest               = 922,
+	kModelAnimationHasanTakingABiteSnakeMove      = 923,
+	kModelAnimationHasanTalkPointingRightHand     = 924, // UNUSED
+	kModelAnimationHasanTalkMovingBothHands       = 925,
+	kModelAnimationHasanTalkLeftRightLeftGesture  = 926,
+	kModelAnimationHasanTalkRaiseHandSnakeMove    = 927,
+	kModelAnimationHasanTalkMovingBothHandsAndNod = 928,
+	kModelAnimationHasanTalkWipeFaceLeftHand02    = 929, // (almost) identical to 920 (same number of frames too)
+	kModelAnimationHasanTalkUpset                 = 930,
+	// 931 - 996: Item animations
 	kModelAnimationBadge                       = 931,
 	kModelAnimationBomb                        = 932,
 	kModelAnimationCandy                       = 933,
@@ -2494,6 +2518,15 @@ enum GoalZuben {
 	kGoalZubenDiesInChapter1      =  99,
 	kGoalZubenKP07Wait            = 513, // new goal when in moonbus, Act 5
 	kGoalZubenGone                = 599
+};
+
+enum GoalHasan {
+	kGoalHasanDefault                         =   0,
+	kGoalHasanIsAway                          = 300, // original final goal for Hasan
+	kGoalHasanIsWalkingAroundIsAtCT02         = 301, // new goal for restored content
+	kGoalHasanIsWalkingAroundStayAwayFromCT02 = 302, // new goal for restored content
+	kGoalHasanIsWalkingAroundStaysAtCT02      = 303, // new goal for restored content
+	kGoalHasanIsWalkingAroundIsAway           = 304  // new goal for restored content
 };
 
 enum GoalOfficerLeary {

@@ -39,6 +39,7 @@
 #include "common/translation.h"
 #include "common/updates.h"
 #include "common/util.h"
+#include "common/text-to-speech.h"
 
 #include "audio/mididrv.h"
 #include "audio/musicplugin.h"
@@ -1523,6 +1524,11 @@ GlobalOptionsDialog::GlobalOptionsDialog(LauncherDialog *launcher)
 	_serverWasRunning = false;
 #endif
 #endif
+#ifdef USE_TTS
+	_enableTTS = false;
+	_ttsCheckbox = 0;
+	_ttsVoiceSelectionPopUp = 0;
+#endif
 }
 
 GlobalOptionsDialog::~GlobalOptionsDialog() {
@@ -1778,6 +1784,38 @@ void GlobalOptionsDialog::build() {
 	addNetworkControls(tab, "GlobalOptions_Network.", g_system->getOverlayWidth() <= 320);
 #endif // USE_SDL_NET
 #endif // USE_CLOUD
+
+	//Accessibility
+#ifdef USE_TTS
+	if (g_system->getOverlayWidth() > 320)
+		tab->addTab(_("Accessibility"));
+	else
+		tab->addTab(_c("Accessibility", "lowres"));
+	_ttsCheckbox = new CheckboxWidget(tab, "GlobalOptions_Accessibility.TTSCheckbox",
+			_("Use Text to speech"), _("Will read text in gui on mouse over."));
+	if (ConfMan.hasKey("tts_enabled"))
+		_ttsCheckbox->setState(ConfMan.getBool("tts_enabled", _domain));
+	else
+		_ttsCheckbox->setState(false);
+
+	_ttsVoiceSelectionPopUp = new PopUpWidget(tab, "GlobalOptions_Accessibility.TTSVoiceSelection");
+	Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+	Common::Array<Common::TTSVoice> voices;
+	if (ttsMan != nullptr)
+		voices = ttsMan->getVoicesArray();
+
+	for(unsigned i = 0; i < voices.size(); i++) {
+		_ttsVoiceSelectionPopUp->appendEntry(voices[i].getDescription(), i);
+	}
+	if (voices.empty())
+		_ttsVoiceSelectionPopUp->appendEntry("None", 0);
+
+	if (ConfMan.hasKey("tts_voice") && (unsigned) ConfMan.getInt("tts_voice", _domain) < voices.size())
+		_ttsVoiceSelectionPopUp->setSelectedTag(ConfMan.getInt("tts_voice", _domain)) ;
+	else
+		_ttsVoiceSelectionPopUp->setSelectedTag(0);
+
+#endif // USE_TTS
 
 	// Activate the first tab
 	tab->setActiveTab(0);
@@ -2114,6 +2152,27 @@ void GlobalOptionsDialog::apply() {
 		MessageDialog error(errorMessage);
 		error.runModal();
 	}
+#ifdef USE_TTS
+	Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+	if (newLang != oldLang) {
+		if (newLang == "C")
+			ttsMan->setLanguage("en");
+		else {
+			Common::String guiLang = newLang;
+			guiLang.setChar('\0', 2);
+			ttsMan->setLanguage(guiLang);
+		}
+		_ttsVoiceSelectionPopUp->setSelectedTag(0);
+	}
+	int volume = (ConfMan.getInt("speech_volume", "scummvm") * 100) / 256;
+	if (ConfMan.hasKey("mute", "scummvm") && ConfMan.getBool("mute", "scummvm"))
+		volume = 0;
+	ttsMan->setVolume(volume);
+	ConfMan.setBool("tts_enabled", _ttsCheckbox->getState(), _domain);
+	int selectedVoice = _ttsVoiceSelectionPopUp->getSelectedTag();
+	ConfMan.setInt("tts_voice", selectedVoice, _domain);
+	ttsMan->setVoice(selectedVoice);
+#endif
 
 	if (isRebuildNeeded) {
 		rebuild();

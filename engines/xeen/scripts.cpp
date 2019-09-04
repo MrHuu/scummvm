@@ -115,7 +115,6 @@ bool MirrorEntry::synchronize(Common::SeekableReadStream &s) {
 
 Scripts::Scripts(XeenEngine *vm) : _vm(vm) {
 	_whoWill = 0;
-	_itemType = 0;
 	_treasureItems = 0;
 	_lineNum = 0;
 	_charIndex = 0;
@@ -144,7 +143,6 @@ int Scripts::checkEvents() {
 	int ccNum = files._ccNum;
 
 	_refreshIcons = false;
-	_itemType = 0;
 	_scriptExecuted = false;
 	_dirFlag = false;
 	_whoWill = 0;
@@ -1313,7 +1311,7 @@ bool Scripts::cmdGiveEnchanted(ParamsIterator &params) {
 }
 
 bool Scripts::cmdItemType(ParamsIterator &params) {
-	_itemType = params.readByte();
+	Character::_itemType = params.readByte();
 
 	return true;
 }
@@ -1374,7 +1372,7 @@ bool Scripts::cmdDisplayBottomTwoLines(ParamsIterator &params) {
 bool Scripts::cmdDisplayLarge(ParamsIterator &params) {
 	Party &party = *g_vm->_party;
 	Common::String filename = Common::String::format("aaze2%03u.txt", party._mazeId);
-	uint offset = params.readByte();
+	uint lineNumber = params.readByte();
 
 	// Get the text data for the current maze
 	File f(filename);
@@ -1382,8 +1380,11 @@ bool Scripts::cmdDisplayLarge(ParamsIterator &params) {
 	f.read(data, f.size());
 	f.close();
 
-	// Get the message at the specified offset
-	_message = Common::String(data + offset);
+	// Get the message at the specified line
+	const char *lineP = data;
+	for (uint idx = 0; idx < lineNumber; ++idx, lineP += strlen(lineP) + 1) {}
+
+	_message = Common::String(lineP);
 	delete[] data;
 
 	// Display the message
@@ -1923,6 +1924,8 @@ void Scripts::display(bool justifyFlag, int var46) {
 
 	if (!justifyFlag)
 		_displayMessage = Common::String::format("\r\x3""c%s", _message.c_str());
+	else
+		_displayMessage = _message;
 
 	if (!w._enabled)
 		w.open();

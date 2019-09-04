@@ -354,6 +354,14 @@ protected:
 #endif // USE_SDL_NET
 
 #endif // USE_CLOUD
+	//
+	// Accessibility controls
+	//
+#ifdef USE_TTS
+	bool _enableTTS;
+	CheckboxWidget *_ttsCheckbox;
+	PopUpWidget *_ttsVoiceSelectionPopUp;
+#endif
 };
 
 } // End of namespace GUI
