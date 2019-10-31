@@ -245,6 +245,8 @@ Common::String AdlEngine::inputString(byte prompt) const {
 					s.deleteLastChar();
 				}
 				break;
+			default:
+				break;
 			};
 		} else {
 			if (s.size() < 255) {
@@ -731,6 +733,9 @@ void AdlEngine::gameLoop() {
 
 Common::Error AdlEngine::run() {
 	_display = Display_A2_create();
+	if (!_display)
+		return Common::kUnsupportedColorMode;
+
 	_console = new Console(this);
 	_display->init();
 

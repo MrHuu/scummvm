@@ -92,13 +92,11 @@ void AI::clearInventory() {
 	int keepslot = 0;
 	for (int i = 0; i < _numInventory; i++) {
 		if (!_inventory[i].keep) {
-			memset(&_inventory[i], 0, sizeof(InvEnt));
+			_inventory[i].reset();
 		} else {
 			if (i != keepslot) {
 				_inventory[keepslot] = _inventory[i];
-				_inventory[keepslot].ent = _inventory[i].ent;
-				_inventory[keepslot].keep = _inventory[i].keep;
-				memset(&_inventory[i], 0, sizeof(InvEnt));
+				_inventory[i].reset();
 			}
 			keepslot++;
 		}
@@ -125,7 +123,7 @@ int AI::queryInventory(const char *string) {
 
 	int count = 0;
 	for (int i = _numInventory - 1; i >= 0; i--)
-		if (_inventory[i].ent.entityName && strstr(_inventory[i].ent.entityName, string))
+		if (strstr(_inventory[i].ent.entityName, string))
 			count++;
 
 	return count;
@@ -152,12 +150,12 @@ bool AI::removeInvItem(const char *string, int amount) {
 		found = false;
 
 		for (int i = _numInventory - 1; i >= 0; i--)
-			if (_inventory[i].ent.entityName && strstr(_inventory[i].ent.entityName, string)) {
+			if (strstr(_inventory[i].ent.entityName, string)) {
 				int j = i;
-				memset(&_inventory[j], 0, sizeof(InvEnt));
+				_inventory[j].reset();
 				while (j < _numInventory - 1) {
-					memcpy(&_inventory[j], &_inventory[j + 1], sizeof(InvEnt));
-					memset(&_inventory[j + 1], 0, sizeof(InvEnt));
+					_inventory[j] = _inventory[j + 1];
+					_inventory[j + 1].reset();
 					j++;
 				}
 				_numInventory--;
@@ -187,10 +185,10 @@ int AI::queryInventoryType(AIType which) {
 		return 0;
 
 	int count = 0;
-	for (int i = 0; i < _numInventory; i++)
+	for (int i = 0; i < _numInventory; i++) {
 		if (_inventory[i].ent.type == which)
 			count++;
-
+	}
 	return count;
 }
 
@@ -198,9 +196,10 @@ int AI::queryInventoryTypeSlot(AIType which) {
 	if (!_numInventory)
 		return 0;
 
-	for (int i = 0; i < _numInventory; i++)
+	for (int i = 0; i < _numInventory; i++) {
 		if (_inventory[i].ent.type == which)
 			return i;
+	}
 	return -1;
 }
 
@@ -224,13 +223,13 @@ bool AI::removeInvItemType(AIType which, int amount) {
 	do {
 		found = false;
 
-		for (int i = 0; i < _numInventory; i++)
+		for (int i = 0; i < _numInventory; i++) {
 			if (_inventory[i].ent.type == which) {
 				int j = i;
-				memset(&_inventory[j], 0, sizeof(InvEnt));
+				_inventory[j].reset();
 				while (j < _numInventory - 1) {
-					memcpy(&_inventory[j], &_inventory[j + 1], sizeof(InvEnt));
-					memset(&_inventory[j + 1], 0, sizeof(InvEnt));
+					_inventory[j] = _inventory[j + 1];
+					_inventory[j + 1].reset();
 					j++;
 				}
 				_numInventory--;
@@ -239,6 +238,7 @@ bool AI::removeInvItemType(AIType which, int amount) {
 				if (!amount)
 					break;
 			}
+		}
 	} while (found && amount);
 
 	// if we haven't removed them all, return false
@@ -271,8 +271,8 @@ void AI::printYouGotMsg(const char *name) {
 	if (!name || !name[0])
 		return;
 
-	sprintf(_youGotBuffer, "Got %s", name);
-	g_hdb->_window->textOut(_youGotBuffer, kYouGotX, g_hdb->_ai->_youGotY, 120);
+	Common::String youGotString = Common::String::format("Got %s", name);
+	g_hdb->_window->textOut(youGotString.c_str(), kYouGotX, g_hdb->_ai->_youGotY, 120);
 }
 
 void AI::newDelivery(const char *itemTextName, const char *itemGfxName, const char *destTextName, const char *destGfxName, const char *id) {
@@ -284,15 +284,15 @@ void AI::newDelivery(const char *itemTextName, const char *itemGfxName, const ch
 	}
 
 	if (itemTextName)
-		strcpy(_deliveries[i].itemTextName, itemTextName);
+		Common::strlcpy(_deliveries[i].itemTextName, itemTextName, sizeof(_deliveries[0].itemTextName));
 	if (itemGfxName)
-		strcpy(_deliveries[i].itemGfxName, itemGfxName);
+		Common::strlcpy(_deliveries[i].itemGfxName, itemGfxName, sizeof(_deliveries[0].itemGfxName));
 	if (destTextName)
-		strcpy(_deliveries[i].destTextName, destTextName);
+		Common::strlcpy(_deliveries[i].destTextName, destTextName, sizeof(_deliveries[0].destTextName));
 	if (destGfxName)
-		strcpy(_deliveries[i].destGfxName, destGfxName);
+		Common::strlcpy(_deliveries[i].destGfxName, destGfxName, sizeof(_deliveries[0].destGfxName));
 
-	strcpy(_deliveries[i].id, id);
+	Common::strlcpy(_deliveries[i].id, id, sizeof(_deliveries[0].id));
 
 	_numDeliveries++;
 
@@ -303,7 +303,7 @@ bool AI::completeDelivery(const char *id) {
 	for (int i = 0; i < _numDeliveries; i++) {
 		if (!scumm_stricmp(_deliveries[i].id, id)) {
 			for (; i < _numDeliveries; i++)
-				memcpy(&_deliveries[i], &_deliveries[i + 1], sizeof(_deliveries[0]));
+				_deliveries[i] = _deliveries[i + 1];
 			_numDeliveries--;
 			if (g_hdb->isPPC())
 				g_hdb->_sound->playSound(SND_QUEST_COMPLETE);

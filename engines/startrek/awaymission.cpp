@@ -467,6 +467,8 @@ void StarTrekEngine::unloadRoom() {
 	_room = nullptr;
 	delete _mapFile;
 	_mapFile = nullptr;
+	delete _iwFile;
+	_iwFile = nullptr;
 }
 
 int StarTrekEngine::loadActorAnimWithRoomScaling(int actorIndex, const Common::String &animName, int16 x, int16 y) {
@@ -602,7 +604,7 @@ void StarTrekEngine::handleAwayMissionAction() {
 				break;
 
 			case OBJECT_ICOMM:
-				if (!_room->handleAction(ACTION_USE, OBJECT_ICOMM, -1, 0))
+				if (!_room->handleAction(ACTION_USE, OBJECT_ICOMM, 0xff, 0))
 					showTextbox("Lt. Uhura", getLoadedText(GROUNDTX_USE_COMMUNICATOR), 20, 20, TEXTCOLOR_RED, 0);
 				break;
 

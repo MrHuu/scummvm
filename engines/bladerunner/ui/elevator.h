@@ -28,22 +28,20 @@
 namespace BladeRunner {
 
 class BladeRunnerEngine;
-class Framelimiter;
-class Shape;
+class Shapes;
 class VQAPlayer;
 class UIImagePicker;
 
 class Elevator {
-	BladeRunnerEngine     *_vm;
-	Framelimiter          *_framelimiter;
-	bool                   _isOpen;
-	VQAPlayer             *_vqaPlayer;
-	int                    _buttonClicked;
-	Common::Array<Shape *> _shapes;
-	UIImagePicker         *_imagePicker;
-	int                    _actorId;
-	int                    _sentenceId;
-	uint32                 _timeSpeakDescriptionStart;
+	BladeRunnerEngine *_vm;
+	bool               _isOpen;
+	VQAPlayer         *_vqaPlayer;
+	int                _buttonClicked;
+	Shapes            *_shapes;
+	UIImagePicker     *_imagePicker;
+	int                _actorId;
+	int                _sentenceId;
+	uint32             _timeSpeakDescriptionStart;
 
 public:
 	Elevator(BladeRunnerEngine *vm);

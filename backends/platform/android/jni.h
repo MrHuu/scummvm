@@ -30,6 +30,7 @@
 
 #include "common/fs.h"
 #include "common/archive.h"
+#include "common/array.h"
 
 class OSystem_Android;
 
@@ -79,6 +80,8 @@ public:
 	static inline int writeAudio(JNIEnv *env, jbyteArray &data, int offset,
 									int size);
 
+	static Common::Array<Common::String> getAllStorageLocations();
+
 private:
 	static JavaVM *_vm;
 	// back pointer to (java) peer instance
@@ -104,6 +107,7 @@ private:
 	static jmethodID _MID_showVirtualKeyboard;
 	static jmethodID _MID_showKeyboardControl;
 	static jmethodID _MID_getSysArchives;
+	static jmethodID _MID_getAllStorageLocations;
 	static jmethodID _MID_initSurface;
 	static jmethodID _MID_deinitSurface;
 
@@ -132,8 +136,6 @@ private:
 
 	static void pushEvent(JNIEnv *env, jobject self, int type, int arg1,
 							int arg2, int arg3, int arg4, int arg5, int arg6);
-	static void enableZoning(JNIEnv *env, jobject self, jboolean enable);
-
 	static void setPause(JNIEnv *env, jobject self, jboolean value);
 
 	static jstring getCurrentCharset(JNIEnv *env, jobject self);

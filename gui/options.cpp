@@ -759,7 +759,7 @@ void OptionsDialog::apply() {
 }
 
 void OptionsDialog::close() {
-	if (getResult())
+	if (getResult() > 0)
 		apply();
 
 	Dialog::close();
@@ -1934,10 +1934,10 @@ void GlobalOptionsDialog::addCloudControls(GuiObject *boss, const Common::String
 	_storageLastSyncDesc = new StaticTextWidget(boss, prefix + "StorageLastSyncDesc", _("Last sync:"), _("When was the last time saved games were synced with this storage"));
 	_storageLastSync = new StaticTextWidget(boss, prefix + "StorageLastSyncLabel", _("<never>"), "", ThemeEngine::kFontStyleNormal);
 	if (lowres)
-		_storageSyncHint = new StaticTextWidget(boss, prefix + "StorageSyncHint", _c("Saves sync automatically on launch, after saving and on loading.", "lowres"), "", ThemeEngine::kFontStyleNormal);
+		_storageSyncHint = new StaticTextWidget(boss, prefix + "StorageSyncHint", _c("Saved games sync automatically on launch, after saving and on loading.", "lowres"), "", ThemeEngine::kFontStyleNormal);
 	else
-		_storageSyncHint = new StaticTextWidget(boss, prefix + "StorageSyncHint", _("Saves sync automatically on launch, after saving and on loading."), "", ThemeEngine::kFontStyleNormal);
-	_storageSyncSavesButton = new ButtonWidget(boss, prefix + "SyncSavesButton", _("Sync now"), _("Start saves sync"), kSyncSavesStorageCmd);
+		_storageSyncHint = new StaticTextWidget(boss, prefix + "StorageSyncHint", _("Saved games sync automatically on launch, after saving and on loading."), "", ThemeEngine::kFontStyleNormal);
+	_storageSyncSavesButton = new ButtonWidget(boss, prefix + "SyncSavesButton", _("Sync now"), _("Start saved games sync"), kSyncSavesStorageCmd);
 
 	if (lowres)
 		_storageDownloadHint = new StaticTextWidget(boss, prefix + "StorageDownloadHint", _c("You can download game files from your cloud ScummVM folder:", "lowres"));
@@ -1996,7 +1996,7 @@ void GlobalOptionsDialog::addNetworkControls(GuiObject *boss, const Common::Stri
 		_featureDescriptionLine1 = new StaticTextWidget(boss, prefix + "FeatureDescriptionLine1", _("Run server to manage files with browser (in the same network)."), "", ThemeEngine::kFontStyleNormal);
 		_featureDescriptionLine2 = new StaticTextWidget(boss, prefix + "FeatureDescriptionLine2", _("Closing options dialog will stop the server."), "", ThemeEngine::kFontStyleNormal);
 	}
-	
+
 	reflowNetworkTabLayout();
 
 }
@@ -2158,9 +2158,7 @@ void GlobalOptionsDialog::apply() {
 		if (newLang == "C")
 			ttsMan->setLanguage("en");
 		else {
-			Common::String guiLang = newLang;
-			guiLang.setChar('\0', 2);
-			ttsMan->setLanguage(guiLang);
+			ttsMan->setLanguage(newLang);
 		}
 		_ttsVoiceSelectionPopUp->setSelectedTag(0);
 	}
@@ -2349,6 +2347,8 @@ void GlobalOptionsDialog::handleCommand(CommandSender *sender, uint32 cmd, uint3
 			break;
 		case Cloud::kStorageBoxId:
 			url += "box";
+			break;
+		default:
 			break;
 		}
 
@@ -2734,7 +2734,7 @@ void GlobalOptionsDialog::reflowNetworkTabLayout() {
 			_serverInfoLabel->setLabel(_("Not running"));
 	}
 	if (_rootPathButton) _rootPathButton->setVisible(true);
-	if (_rootPath) _rootPath->setVisible(true);	
+	if (_rootPath) _rootPath->setVisible(true);
 	if (_rootPathClearButton) _rootPathClearButton->setVisible(true);
 #ifdef NETWORKING_LOCALWEBSERVER_ENABLE_PORT_OVERRIDE
 	if (_serverPortDesc) {

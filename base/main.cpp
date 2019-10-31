@@ -162,11 +162,11 @@ static Common::Error runGame(const Plugin *plugin, OSystem &system, const Common
 #endif
 
 	// Verify that the game path refers to an actual directory
-        if (!dir.exists()) {
+	if (!dir.exists()) {
 		err = Common::kPathDoesNotExist;
-        } else if (!dir.isDirectory()) {
+	} else if (!dir.isDirectory()) {
 		err = Common::kPathNotDirectory;
-        }
+	}
 
 	// Create the game engine
 	if (err.getCode() == Common::kNoError) {
@@ -264,9 +264,7 @@ static Common::Error runGame(const Plugin *plugin, OSystem &system, const Common
 #ifdef USE_TTS
 		Common::TextToSpeechManager *ttsMan;
 		if ((ttsMan = g_system->getTextToSpeechManager()) != nullptr) {
-			Common::String language = ConfMan.get("language");
-			language.setChar(2, '\0');
-			ttsMan->setLanguage(language);
+			ttsMan->setLanguage(ConfMan.get("language"));
 		}
 #endif // USE_TTS
 	}
@@ -301,9 +299,7 @@ static Common::Error runGame(const Plugin *plugin, OSystem &system, const Common
 #ifdef USE_TTS
 		Common::TextToSpeechManager *ttsMan;
 		if ((ttsMan = g_system->getTextToSpeechManager()) != nullptr) {
-			Common::String language = ConfMan.get("language");
-			language.setChar(2, '\0');
-			ttsMan->setLanguage(language);
+			ttsMan->setLanguage(ConfMan.get("language"));
 		}
 #endif // USE_TTS
 #endif // USE_TRANSLATION

@@ -650,6 +650,10 @@ bool SdlEventSource::dispatchSDLEvent(SDL_Event &ev, Common::Event &event) {
 		event.path = Common::String(ev.drop.file);
 		SDL_free(ev.drop.file);
 		return true;
+
+	case SDL_CLIPBOARDUPDATE:
+		event.type = Common::EVENT_CLIPBOARD_UPDATE;
+		return true;
 #else
 	case SDL_VIDEOEXPOSE:
 		if (_graphicsManager)
@@ -664,6 +668,8 @@ bool SdlEventSource::dispatchSDLEvent(SDL_Event &ev, Common::Event &event) {
 		event.type = Common::EVENT_QUIT;
 		return true;
 
+	default:
+		break;
 	}
 
 	if (_joystick) {
@@ -676,6 +682,8 @@ bool SdlEventSource::dispatchSDLEvent(SDL_Event &ev, Common::Event &event) {
 			return handleJoyAxisMotion(ev, event);
 		case SDL_JOYHATMOTION:
 			return handleJoyHatMotion(ev, event);
+		default:
+			break;
 		}
 	}
 
@@ -688,6 +696,8 @@ bool SdlEventSource::dispatchSDLEvent(SDL_Event &ev, Common::Event &event) {
 			return handleControllerButton(ev, event, true);
 		case SDL_CONTROLLERAXISMOTION:
 			return handleControllerAxisMotion(ev, event);
+		default:
+			break;
 		}
 	}
 #endif
@@ -975,6 +985,8 @@ bool SdlEventSource::handleJoyButtonDown(SDL_Event &ev, Common::Event &event) {
 			event.type = Common::EVENT_VIRTUAL_KEYBOARD;
 			break;
 #endif
+		default:
+			break;
 		}
 		return true;
 	}
@@ -1017,6 +1029,8 @@ bool SdlEventSource::handleJoyButtonUp(SDL_Event &ev, Common::Event &event) {
 			// Handled in key down
 			break;
 #endif
+		default:
+			break;
 		}
 		return true;
 	}

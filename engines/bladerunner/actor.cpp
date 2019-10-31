@@ -140,7 +140,7 @@ void Actor::setup(int actorId) {
 #if BLADERUNNER_ORIGINAL_BUGS
 #else
 	// if player actor was not idle and had an active _walkInfo then
-	// upon starting a new game, the player actpr wpi;d be put on the old _walkInfo
+	// upon starting a new game, the player actor would be put on the old _walkInfo
 	_walkInfo->reset();
 //	// delete _walkInfo and re-allocate it (a reset method would probably be better)
 //	if (_walkInfo != nullptr) {
@@ -301,6 +301,8 @@ void Actor::timerUpdate(int timerId) {
 				}
 			}
 			_timersLeft[kActorTimerRunningStaminaFPS] = 200u;
+			break;
+		default:
 			break;
 		}
 	}
@@ -1254,12 +1256,13 @@ bool Actor::copyClues(int actorId) {
 	bool newCluesAcquired = false;
 	Actor *otherActor = _vm->_actors[actorId];
 	for (int i = 0; i < (int)_vm->_gameInfo->getClueCount(); i++) {
-		if (hasClue(i) && !_clues->isPrivate(i) && otherActor->canAcquireClue(i) && !otherActor->hasClue(i)) {
+		int clueId = i;
+		if (hasClue(clueId) && !_clues->isPrivate(clueId) && otherActor->canAcquireClue(clueId) && !otherActor->hasClue(clueId)) {
 			int fromActorId = _id;
 			if (_id == BladeRunnerEngine::kActorVoiceOver) {
-				fromActorId = _clues->getFromActorId(i);
+				fromActorId = _clues->getFromActorId(clueId);
 			}
-			otherActor->acquireClue(i, false, fromActorId);
+			otherActor->acquireClue(clueId, false, fromActorId);
 			newCluesAcquired = true;
 		}
 	}

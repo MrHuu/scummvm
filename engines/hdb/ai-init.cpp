@@ -960,6 +960,92 @@ AI::AI() {
 		_youGotY = 306;
 	else
 		_youGotY = g_hdb->_screenHeight - 16;
+
+	_icepSnowballGfxDown = nullptr;
+	_icepSnowballGfxLeft = nullptr;
+	_icepSnowballGfxRight = nullptr;
+	_tileFroglickMiddleUD = nullptr;
+	for (int i = 0; i < 3; ++i) {
+		_tileFroglickWiggleUD[i] = nullptr;
+		_tileFroglickWiggleLeft[i] = nullptr;
+		_tileFroglickWiggleRight[i] = nullptr;
+		_gfxDragonBreathe[i] = nullptr;
+	}
+	_tileFroglickMiddleLR = nullptr;
+	_gfxDragonAsleep = nullptr;
+	for (int i = 0; i < 2; ++i)
+		_gfxDragonFlap[i] = nullptr;
+	for (int i = 0; i < 4; ++i) {
+		_gfxLaserbeamUD[i] = nullptr;
+		_gfxLaserbeamUDTop[i] = nullptr;
+		_gfxLaserbeamUDBottom[i] = nullptr;
+		_gfxLaserbeamLR[i] = nullptr;
+		_gfxLaserbeamLRLeft[i] = nullptr;
+		_gfxLaserbeamLRRight[i] = nullptr;
+	}
+	_player = nullptr;
+	_cineAbortable = false;
+	_cineAborted = false;
+	_cineAbortFunc = nullptr;
+	_cineActive = false;
+	_playerLock = false;
+	_cameraLock = false;
+	_cameraX = 0;
+	_cameraY = 0;
+	_blockpole = 0;
+	_kcHolderWhiteOff = 0;
+	_kcHolderWhiteOn = 0;
+	_kcHolderBlueOff = 0;
+	_kcHolderBlueOn = 0;
+	_kcHolderRedOff = 0;
+	_kcHolderRedOn = 0;
+	_kcHolderGreenOff = 0;
+	_kcHolderGreenOn = 0;
+	_kcHolderPurpleOff = 0;
+	_kcHolderPurpleOn = 0;
+	_kcHolderBlackOff = 0;
+	_kcHolderBlackOn = 0;
+	_numLevel2Ents = 0;
+	_numInventory = 0;
+	_numDeliveries = 0;
+	_numWaypoints = 0;
+	_numLuaList = 0;
+	_numTeleporters = 0;
+	_laserRescan = false;
+	_laserOnScreen = false;
+	_numBridges = 0;
+	_numCineBlitList = 0;
+	_numCineFreeList = 0;
+	for (int i = 0; i < 10; ++i) {
+		_cineBlitList[i] = nullptr;
+		_cineFreeList[i] = nullptr;
+	}
+	_targetDoor2S = 0;
+	_targetDoor2Nv = 0;
+	_targetDoor2Pv = 0;
+	_targetDoor2Sv = 0;
+	_target2DoorN = 0;
+	_target2DoorP = 0;
+	_target2DoorS = 0;
+	_target2DoorNv = 0;
+	_target2DoorPv = 0;
+	_target2DoorSv = 0;
+	_target3DoorN = 0;
+	_target3DoorP = 0;
+	_target3DoorS = 0;
+	_target3DoorNv = 0;
+	_target3DoorPv = 0;
+	_target3DoorSv = 0;
+	_targetBridgeU = 0;
+	_targetBridgeD = 0;
+	_targetBridgeL = 0;
+	_targetBridgeR = 0;
+	_targetBridgeMidLR = 0;
+	_targetBridgeMidUD = 0;
+	_touchplateOn = 0;
+	_touchplateOff = 0;
+	_templeTouchpOn = 0;
+	_templeTouchpOff = 0;
 }
 
 AI::~AI() {
@@ -1186,12 +1272,13 @@ void AI::restartSystem() {
 	_hereList->clear();
 
 	// Clear Bridges
-	memset(&_bridges[0], 0, sizeof(_bridges));
+	for (uint8 i = 0; i < ARRAYSIZE(_bridges); i++) {
+		_bridges[i].reset();
+	}
 	_numBridges = 0;
 
 	// Clear waypoints
-	memset(&_waypoints[0], 0, sizeof(_waypoints));
-	_numWaypoints = 0;
+	clearWaypoints();
 
 	// Clean up Player Graphics Storage
 	memset(_horrible1Gfx, 0, sizeof(_horrible1Gfx));

@@ -31,9 +31,9 @@
 namespace BladeRunner {
 
 class BladeRunnerEngine;
-class Framelimiter;
 class Font;
 class Shape;
+class Shapes;
 class VQAPlayer;
 class UIImagePicker;
 class ESPERScript;
@@ -88,7 +88,6 @@ class ESPER {
 	};
 
 	BladeRunnerEngine     *_vm;
-	Framelimiter          *_framelimiter;
 	ESPERScript           *_script;
 
 	bool _isWaiting;
@@ -103,9 +102,9 @@ class ESPER {
 	VQAPlayer *_vqaPlayerPhoto;
 	int        _vqaLastFrame;
 
-	Shape                 *_shapeButton;
-	Common::Array<Shape *> _shapesPhotos;
-	Shape                 *_shapeThumbnail;
+	Shapes *_shapesButtons;
+	Shapes *_shapesPhotos;
+	const Shape *_shapeThumbnail;
 
 	Photo _photos[kPhotoCount];
 	int   _photoIdSelected;

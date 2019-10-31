@@ -111,9 +111,10 @@ BladeRunnerEngine::BladeRunnerEngine(OSystem *syst, const ADGameDescription *des
 
 	_subtitlesEnabled = false;
 
-	_sitcomMode       = false;
-	_shortyMode       = false;
-	_cutContent       = Common::String(desc->gameId).contains("bladerunner-final");
+	_sitcomMode                = false;
+	_shortyMode                = false;
+	_noDelayMillisFramelimiter = false;
+	_cutContent                = Common::String(desc->gameId).contains("bladerunner-final");
 
 	_playerLosesControlCounter = 0;
 
@@ -133,8 +134,6 @@ BladeRunnerEngine::BladeRunnerEngine(OSystem *syst, const ADGameDescription *des
 	_walkSoundId      = -1;
 	_walkSoundVolume  = 0;
 	_walkSoundPan     = 0;
-
-	_crimesDatabase = nullptr;
 
 	_language = desc->language;
 	switch (desc->language) {
@@ -169,6 +168,7 @@ BladeRunnerEngine::BladeRunnerEngine(OSystem *syst, const ADGameDescription *des
 	_obstacles               = nullptr;
 	_sceneScript             = nullptr;
 	_time                    = nullptr;
+	_framelimiter            = nullptr;
 	_gameInfo                = nullptr;
 	_waypoints               = nullptr;
 	_gameVars                = nullptr;
@@ -217,7 +217,6 @@ BladeRunnerEngine::BladeRunnerEngine(OSystem *syst, const ADGameDescription *des
 		_actors[i]           = nullptr;
 	}
 	_debugger                = nullptr;
-	_mainLoopFrameLimiter    = nullptr;
 
 	walkingReset();
 
@@ -226,6 +225,7 @@ BladeRunnerEngine::BladeRunnerEngine(OSystem *syst, const ADGameDescription *des
 }
 
 BladeRunnerEngine::~BladeRunnerEngine() {
+	shutdown();
 }
 
 bool BladeRunnerEngine::hasFeature(EngineFeature f) const {
@@ -313,7 +313,6 @@ void BladeRunnerEngine::pauseEngineIntern(bool pause) {
 }
 
 Common::Error BladeRunnerEngine::run() {
-
 	Common::Array<Common::String> missingFiles;
 	if (!checkFiles(missingFiles)) {
 		Common::String missingFileStr = "";
@@ -323,11 +322,21 @@ Common::Error BladeRunnerEngine::run() {
 			}
 			missingFileStr += missingFiles[i];
 		}
-
+		// shutting down
 		return Common::Error(Common::kNoGameDataFoundError, missingFileStr);
 	}
 
-	_screenPixelFormat = g_system->getSupportedFormats().front();
+	Common::List<Graphics::PixelFormat> tmpSupportedFormatsList = g_system->getSupportedFormats();
+	if (!tmpSupportedFormatsList.empty()) {
+		_screenPixelFormat = tmpSupportedFormatsList.front();
+	} else {
+		// Workaround for reported issue whereby in the AndroidSDL port
+		// some devices would crash with a segmentation fault due to an empty supported formats list.
+		// TODO: A better fix for getSupportedFormats() - maybe figure why in only some device it might return an empty list
+		//
+		// Use this as a fallback format - Should be a format supported by Android port
+		_screenPixelFormat = Graphics::PixelFormat(2, 5, 5, 5, 1, 11, 6, 1, 0);
+	}
 	debug("Using pixel format: %s", _screenPixelFormat.toString().c_str());
 	initGraphics(640, 480, &_screenPixelFormat);
 
@@ -336,10 +345,9 @@ Common::Error BladeRunnerEngine::run() {
 	bool hasSavegames = !SaveFileManager::list(_targetName).empty();
 
 	if (!startup(hasSavegames)) {
-		shutdown();
+		// shutting down
 		return Common::Error(Common::kUnknownError, _("Failed to initialize resources"));
 	}
-
 
 	// improvement: Use a do-while() loop to handle the normal end-game state
 	// so that the game won't exit abruptly after end credits
@@ -404,8 +412,7 @@ Common::Error BladeRunnerEngine::run() {
 		}
 	} while (_gameOver); // if main game loop ended and _gameOver == false, then shutdown
 
-	shutdown();
-
+	// shutting down
 	return Common::kNoError;
 }
 
@@ -486,6 +493,8 @@ bool BladeRunnerEngine::startup(bool hasSavegames) {
 
 	_time = new Time(this);
 
+	_framelimiter = new Framelimiter(this);
+
 	// Try to load the SUBTITLES.MIX first, before Startup.MIX
 	// allows overriding any identically named resources (such as the original font files and as a bonus also the TRE files for the UI and dialogue menu)
 	_subtitles = new Subtitles(this);
@@ -529,8 +538,6 @@ bool BladeRunnerEngine::startup(bool hasSavegames) {
 	_cosTable1024 = new Common::CosineTable(1024); // 10-bits = 1024 points for 2*PI;
 	_sinTable1024 = new Common::SineTable(1024);
 
-	_mainLoopFrameLimiter = new Framelimiter(this, Framelimiter::kDefaultFpsRate, Framelimiter::kDefaultUseDelayMillis);
-
 	_view = new View();
 
 	_sceneObjects = new SceneObjects(this, _view);
@@ -563,8 +570,13 @@ bool BladeRunnerEngine::startup(bool hasSavegames) {
 	// get value from the ScummVM configuration manager
 	syncSoundSettings();
 
-	_sitcomMode = ConfMan.getBool("sitcom");
-	_shortyMode = ConfMan.getBool("shorty");
+	_sitcomMode                = ConfMan.getBool("sitcom");
+	_shortyMode                = ConfMan.getBool("shorty");
+
+	if (!ConfMan.hasKey("nodelaymillisfl")) {
+		ConfMan.setBool("nodelaymillisfl", false);
+	}
+	_noDelayMillisFramelimiter = ConfMan.getBool("nodelaymillisfl");
 	// BLADE.INI was read here, but it was replaced by ScummVM configuration
 
 	_chapters = new Chapters(this);
@@ -627,8 +639,10 @@ bool BladeRunnerEngine::startup(bool hasSavegames) {
 	if (!_textOptions->open("OPTIONS"))
 		return false;
 
+	_russianCP1251 = ((uint8)_textOptions->getText(0)[0]) == 209;
+
 	_dialogueMenu = new DialogueMenu(this);
-	if (!_dialogueMenu->loadText("DLGMENU"))
+	if (!_dialogueMenu->loadResources())
 		return false;
 
 	_suspectsDatabase = new SuspectsDatabase(this, _gameInfo->getSuspectCount());
@@ -643,11 +657,8 @@ bool BladeRunnerEngine::startup(bool hasSavegames) {
 
 	_mainFont = Font::load(this, "KIA6PT.FON", 1, false);
 
-	for (int i = 0; i != 43; ++i) {
-		Shape *shape = new Shape(this);
-		shape->open("SHAPES.SHP", i);
-		_shapes.push_back(shape);
-	}
+	_shapes = new Shapes(this);
+	_shapes->load("SHAPES.SHP");
 
 	_esper = new ESPER(this);
 
@@ -715,6 +726,8 @@ void BladeRunnerEngine::initChapterAndScene() {
 }
 
 void BladeRunnerEngine::shutdown() {
+	DebugMan.clearAllDebugChannels();
+
 	_mixer->stopAll();
 
 	// BLADE.INI as updated here
@@ -743,10 +756,8 @@ void BladeRunnerEngine::shutdown() {
 	delete _esper;
 	_esper = nullptr;
 
-	for (uint i = 0; i != _shapes.size(); ++i) {
-		delete _shapes[i];
-	}
-	_shapes.clear();
+	delete _shapes;
+	_shapes = nullptr;
 
 	delete _mainFont;
 	_mainFont = nullptr;
@@ -796,7 +807,11 @@ void BladeRunnerEngine::shutdown() {
 	_playerActor = nullptr;
 	delete _actors[kActorVoiceOver];
 	_actors[kActorVoiceOver] = nullptr;
-	int actorCount = (int)_gameInfo->getActorCount();
+	int actorCount = kActorCount;
+	if (_gameInfo) {
+		actorCount = (int)_gameInfo->getActorCount();
+	}
+
 	for (int i = 0; i < actorCount; ++i) {
 		delete _actors[i];
 		_actors[i] = nullptr;
@@ -898,6 +913,9 @@ void BladeRunnerEngine::shutdown() {
 		_subtitles = nullptr;
 	}
 
+	delete _framelimiter;
+	_framelimiter = nullptr;
+
 	delete _time;
 	_time = nullptr;
 
@@ -932,11 +950,6 @@ void BladeRunnerEngine::shutdown() {
 
 	delete _screenEffects;
 	_screenEffects = nullptr;
-
-	if (_mainLoopFrameLimiter) {
-		delete _mainLoopFrameLimiter;
-		_mainLoopFrameLimiter = nullptr;
-	}
 }
 
 bool BladeRunnerEngine::loadSplash() {
@@ -965,7 +978,6 @@ bool BladeRunnerEngine::isMouseButtonDown() const {
 
 void BladeRunnerEngine::gameLoop() {
 	_gameIsRunning = true;
-	_mainLoopFrameLimiter->init();
 	do {
 		if (_playerDead) {
 			playerDied();
@@ -980,7 +992,6 @@ void BladeRunnerEngine::gameTick() {
 	handleEvents();
 
 	if (!_gameIsRunning || !_windowIsActive) {
-		_mainLoopFrameLimiter->init();
 		return;
 	}
 
@@ -989,7 +1000,6 @@ void BladeRunnerEngine::gameTick() {
 			Common::Error runtimeError = Common::Error(Common::kUnknownError, _("A required game resource was not found"));
 			GUI::MessageDialog dialog(runtimeError.getDesc());
 			dialog.runModal();
-			_mainLoopFrameLimiter->init();
 			return;
 		}
 	}
@@ -1124,12 +1134,8 @@ void BladeRunnerEngine::gameTick() {
 	 // Without this condition the game may flash back to the game screen
 	 // between and ending outtake and the end credits.
 	if (!_gameOver) {
-		if (_mainLoopFrameLimiter->shouldExecuteScreenUpdate()) {
-			blitToScreen(_surfaceFront);
-			_mainLoopFrameLimiter->postScreenUpdate();
-		}
+		blitToScreen(_surfaceFront);
 	}
-
 }
 
 void BladeRunnerEngine::actorsUpdate() {
@@ -1436,7 +1442,7 @@ void BladeRunnerEngine::handleMouseAction(int x, int y, bool mainButton, bool bu
 
 		if (_debugger->_showMouseClickInfo) {
 			// Region has highest priority when overlapping
-			debug("Mouse: %02.2f, %02.2f, %02.2f", scenePosition.x, scenePosition.y, scenePosition.z);
+			debug("Mouse: %02.2f, %02.2f, %02.2f at ScreenX: %d ScreenY: %d", scenePosition.x, scenePosition.y, scenePosition.z, x, y);
 			if ((sceneObjectId < kSceneObjectOffsetActors || sceneObjectId >= kSceneObjectOffsetItems) && exitIndex >= 0) {
 				debug("Clicked on Region-Exit=%d", exitIndex);
 			} else if (regionIndex >= 0) {
@@ -1936,13 +1942,22 @@ void BladeRunnerEngine::setSubtitlesEnabled(bool newVal) {
 }
 
 Common::SeekableReadStream *BladeRunnerEngine::getResourceStream(const Common::String &name) {
+	// If the file is extracted from MIX files use it directly, it is used by Russian translation patched by Siberian Studio
+	if (Common::File::exists(name)) {
+		Common::File directFile;
+		if (directFile.open(name)) {
+			Common::SeekableReadStream *stream = directFile.readStream(directFile.size());
+			directFile.close();
+			return stream;
+		}
+	}
+
 	for (int i = 0; i != kArchiveCount; ++i) {
 		if (!_archives[i].isOpen()) {
 			continue;
 		}
 
 		// debug("getResource: Searching archive %s for %s.", _archives[i].getName().c_str(), name.c_str());
-
 		Common::SeekableReadStream *stream = _archives[i].createReadStreamForMember(name);
 		if (stream) {
 			return stream;
@@ -2186,7 +2201,7 @@ void BladeRunnerEngine::newGame(int difficulty) {
 	for (uint i = 0; i < _gameInfo->getActorCount(); ++i) {
 		_actors[i]->setup(i);
 	}
-	_actors[kActorVoiceOver]->setup(99);
+	_actors[kActorVoiceOver]->setup(kActorVoiceOver);
 
 	for (uint i = 0; i < _gameInfo->getSuspectCount(); ++i) {
 		_suspectsDatabase->get(i)->reset();
@@ -2253,6 +2268,7 @@ void BladeRunnerEngine::ISez(const Common::String &str) {
 }
 
 void BladeRunnerEngine::blitToScreen(const Graphics::Surface &src) const {
+	_framelimiter->wait();
 	_system->copyRectToScreen(src.getPixels(), src.pitch, 0, 0, src.w, src.h);
 	_system->updateScreen();
 }
@@ -2265,7 +2281,7 @@ Graphics::Surface BladeRunnerEngine::generateThumbnail() const {
 		for (int x = 0; x < thumbnail.w; ++x) {
 			uint8 r, g, b;
 
-			uint32  srcPixel = *(const uint32 *)_surfaceFront.getBasePtr(CLIP(x * 8, 0, _surfaceFront.w - 1), CLIP(y * 8, 0, _surfaceFront.h - 1));
+			uint32  srcPixel = READ_UINT32(_surfaceFront.getBasePtr(CLIP(x * 8, 0, _surfaceFront.w - 1), CLIP(y * 8, 0, _surfaceFront.h - 1)));
 			void   *dstPixel = thumbnail.getBasePtr(CLIP(x, 0, thumbnail.w - 1), CLIP(y, 0, thumbnail.h - 1));
 
 			// Throw away alpha channel as it is not needed

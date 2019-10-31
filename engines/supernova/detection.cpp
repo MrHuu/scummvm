@@ -40,7 +40,7 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 			_s("Improved mode"),
 			_s("Removes some repetitive actions, adds possibility to change verbs by keyboard"),
 			"improved",
-			false
+			true
 		}
 	},
 
@@ -62,8 +62,8 @@ static const ADGameDescription gameDescriptions[] = {
 		AD_ENTRY1s("msn_data.000", "f64f16782a86211efa919fbae41e7568", 24163),
 		Common::DE_DEU,
 		Common::kPlatformDOS,
-		ADGF_UNSTABLE,
-		GUIO1(GAMEOPTION_IMPROVED)
+		ADGF_NO_FLAGS,
+		GUIO2(GAMEOPTION_IMPROVED, GUIO_NOMIDI)
 	},
 	{
 		"msn1",
@@ -71,8 +71,8 @@ static const ADGameDescription gameDescriptions[] = {
 		AD_ENTRY1s("msn_data.000", "f64f16782a86211efa919fbae41e7568", 24163),
 		Common::EN_ANY,
 		Common::kPlatformDOS,
-		ADGF_UNSTABLE,
-		GUIO1(GAMEOPTION_IMPROVED)
+		ADGF_NO_FLAGS,
+		GUIO2(GAMEOPTION_IMPROVED, GUIO_NOMIDI)
 	},
 	// Mission Supernova 2
 	{
@@ -81,8 +81,8 @@ static const ADGameDescription gameDescriptions[] = {
 		AD_ENTRY1s("ms2_data.000", "e595610cba4a6d24a763e428d05cc83f", 24805),
 		Common::DE_DEU,
 		Common::kPlatformDOS,
-		ADGF_UNSTABLE,
-		GUIO1(GAMEOPTION_IMPROVED)
+		ADGF_NO_FLAGS,
+		GUIO2(GAMEOPTION_IMPROVED, GUIO_NOMIDI)
 	},
 	{
 		"msn2",
@@ -90,8 +90,8 @@ static const ADGameDescription gameDescriptions[] = {
 		AD_ENTRY1s("ms2_data.000", "e595610cba4a6d24a763e428d05cc83f", 24805),
 		Common::EN_ANY,
 		Common::kPlatformDOS,
-		ADGF_UNSTABLE,
-		GUIO1(GAMEOPTION_IMPROVED)
+		ADGF_NO_FLAGS,
+		GUIO2(GAMEOPTION_IMPROVED, GUIO_NOMIDI)
 	},
 	AD_TABLE_END_MARKER
 };
@@ -108,7 +108,7 @@ public:
 	}
 
 	virtual const char *getOriginalCopyright() const {
-		return "Mission Supernova (c) 1994 Thomas and Steffen Dingel";
+		return "Mission Supernova (C) 1994 Thomas and Steffen Dingel";
 	}
 
 	virtual bool hasFeature(MetaEngineFeature f) const;

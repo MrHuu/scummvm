@@ -53,6 +53,49 @@ Gfx::Gfx() {
 	memset(&_fadeInfo, 0, sizeof(_fadeInfo));
 	memset(&_snowInfo, 0, sizeof(_snowInfo));
 	memset(&_skyTiles, 0, sizeof(_skyTiles));
+
+	_tileSkyStars = 0;
+	_tileSkyStarsLeft = 0;
+	_tileSkyClouds = 0;
+	for (int i = 0; i < 4; ++i) {
+		_starField[i] = nullptr;
+		_mousePointer[2 * i] = nullptr;
+		_mousePointer[(2 * i) + 1] = nullptr;
+	}
+
+	_snowflake = nullptr;
+	_skyClouds = nullptr;
+	_starsInfo.gfx[0] = nullptr;
+	_starsInfo.gfx[1] = nullptr;
+	_starsInfo.timer = 0;
+	_starsInfo.anim = 0;
+	_starsInfo.radius = 0;
+	_starsInfo.angleSpeed = 0;
+	_starsInfo.totalTime = 0;
+	_cursorX = 0;
+	_cursorY = 0;
+	_showCursor = false;
+	_fontHeader.type = 0;
+	_fontHeader.numChars = 0;
+	_fontHeader.height = 0;
+	_fontHeader.kerning = 0;
+	_fontHeader.leading = 0;
+	_fontGfx = 0;
+	_eLeft = 0;
+	_eRight = 0;
+	_eTop = 0;
+	_eBottom = 0;
+	_currentSky = 0;
+	for (int i = 0; i < kNum3DStars; ++i) {
+		_stars3D[i].x = 0;
+		_stars3D[i].y = 0;
+		_stars3D[i].speed = 0;
+		_stars3D[i].color = 0;
+		_stars3DSlow[i].x = 0;
+		_stars3DSlow[i].y = 0;
+		_stars3DSlow[i].speed = 0;
+		_stars3DSlow[i].color = 0;
+	}
 }
 
 Gfx::~Gfx() {
@@ -378,10 +421,6 @@ void Gfx::setFade(bool fadeIn, bool black, int steps) {
 }
 
 void Gfx::updateFade() {
-	uint8 r, g, b;
-	uint16 value;
-	uint16 *ptr;
-
 	if (!_fadeInfo.active && !_fadeInfo.stayFaded)
 		return;
 
@@ -392,10 +431,11 @@ void Gfx::updateFade() {
 		if (!_fadeInfo.isBlack) {
 			// Black fade
 			for (int y = 0; y < g_hdb->_screenHeight; y++) {
-				 ptr = (uint16 *)_fadeBuffer1.getBasePtr(0, y);
+				uint16 *ptr = (uint16 *)_fadeBuffer1.getBasePtr(0, y);
 				for (int x = 0; x < g_hdb->_screenWidth; x++) {
-					 value = *ptr;
+					uint16 value = *ptr;
 					if (value) {
+						uint8 r, g, b;
 						g_hdb->_format.colorToRGB(value, r, g, b);
 						r = (r * _fadeInfo.curStep) >> 8;
 						g = (g * _fadeInfo.curStep) >> 8;
@@ -409,9 +449,11 @@ void Gfx::updateFade() {
 		} else {
 			// White fade
 			for (int y = 0; y < g_hdb->_screenHeight; y++) {
-				ptr = (uint16 *)_fadeBuffer1.getBasePtr(0, y);
+				uint16 *ptr = (uint16 *)_fadeBuffer1.getBasePtr(0, y);
 				for (int x = 0; x < g_hdb->_screenWidth; x++) {
-					value = *ptr;
+					uint16 value = *ptr;
+
+					uint8 r, g, b;
 					g_hdb->_format.colorToRGB(value, r, g, b);
 					r += (255 - r) * (256 - _fadeInfo.curStep) / 256;
 					g += (255 - g) * (256 - _fadeInfo.curStep) / 256;
@@ -456,10 +498,11 @@ void Gfx::updateFade() {
 				// Black Fade
 
 				for (int y = 0; y < g_hdb->_screenHeight; y++) {
-					ptr = (uint16 *)_fadeBuffer1.getBasePtr(0, y);
+					uint16 *ptr = (uint16 *)_fadeBuffer1.getBasePtr(0, y);
 					for (int x = 0; x < g_hdb->_screenWidth; x++) {
-						value = *ptr;
+						uint16 value = *ptr;
 						if (value) {
+							uint8 r, g, b;
 							g_hdb->_format.colorToRGB(value, r, g, b);
 							r = (r * _fadeInfo.curStep) >> 8;
 							g = (g * _fadeInfo.curStep) >> 8;
@@ -473,9 +516,10 @@ void Gfx::updateFade() {
 				// White Fade
 
 				for (int y = 0; y < g_hdb->_screenHeight; y++) {
-					ptr = (uint16 *)_fadeBuffer1.getBasePtr(0, y);
+					uint16 *ptr = (uint16 *)_fadeBuffer1.getBasePtr(0, y);
 					for (int x = 0; x < g_hdb->_screenWidth; x++) {
-						value = *ptr;
+						uint16 value = *ptr;
+						uint8 r, g, b;
 						g_hdb->_format.colorToRGB(value, r, g, b);
 						r += (255 - r) * (256 - _fadeInfo.curStep) / 256;
 						g += (255 - g) * (256 - _fadeInfo.curStep) / 256;
@@ -766,16 +810,12 @@ void Gfx::setSky(int skyIndex) {
 	}
 
 	// Setup current sky
-	if (tileIndex == _tileSkyStars) {
+	if (tileIndex == _tileSkyStars)
 		setup3DStars();
-		return;
-	} else if (tileIndex == _tileSkyStarsLeft) {
+	else if (tileIndex == _tileSkyStarsLeft)
 		setup3DStarsLeft();
-		return;
-	} else if (tileIndex == _tileSkyClouds) {
+	else if (tileIndex == _tileSkyClouds)
 		_skyClouds = getPicture(CLOUDY_SKIES);
-		return;
-	}
 }
 
 void Gfx::setup3DStars() {
@@ -783,9 +823,9 @@ void Gfx::setup3DStars() {
 		_stars3D[i].x = g_hdb->_rnd->getRandomNumber(g_hdb->_screenWidth - 1);
 		_stars3D[i].y = g_hdb->_rnd->getRandomNumber(g_hdb->_screenHeight - 1);
 		_stars3D[i].speed = g_hdb->_rnd->getRandomNumber(255);
-		if (g_hdb->isPPC()) {
+		if (g_hdb->isPPC())
 			_stars3D[i].color = g_hdb->_format.RGBToColor(_stars3D[i].speed, _stars3D[i].speed, _stars3D[i].speed);
-		} else {
+		else {
 			_stars3D[i].speed >>= 1;
 			_stars3D[i].color = _stars3D[i].speed / 64;
 		}
@@ -814,9 +854,9 @@ void Gfx::draw3DStars() {
 			_starField[_stars3D[i].color]->drawMasked((int)_stars3D[i].x, (int)_stars3D[i].y);
 			_stars3D[i].y += (_stars3D[i].speed >> 5) + 1;
 		}
-		if (_stars3D[i].y > g_hdb->_screenHeight) {
+
+		if (_stars3D[i].y > g_hdb->_screenHeight)
 			_stars3D[i].y = 0;
-		}
 	}
 }
 
@@ -828,20 +868,19 @@ void Gfx::draw3DStarsLeft() {
 		else
 			_starField[_stars3DSlow[i].color]->drawMasked((int)_stars3DSlow[i].x, (int)_stars3DSlow[i].y);
 		_stars3DSlow[i].x -= _stars3DSlow[i].speed;
-		if (_stars3DSlow[i].x < 0) {
+		if (_stars3DSlow[i].x < 0)
 			_stars3DSlow[i].x = g_hdb->_screenWidth - 1;
-		}
 	}
 }
 
 void Gfx::drawSky() {
 	int tile = _skyTiles[_currentSky - 1];
 
-	if (tile == _tileSkyStars) {
+	if (tile == _tileSkyStars)
 		draw3DStars();
-	} else if (tile == _tileSkyStarsLeft) {
+	else if (tile == _tileSkyStarsLeft)
 		draw3DStarsLeft();
-	} else if (tile == _tileSkyClouds) {
+	else if (tile == _tileSkyClouds) {
 		static int offset = 0, wait = 0;
 		for (int j = -64; j < g_hdb->_screenHeight; j += 64) {
 			for (int i = -64; i < g_hdb->_screenWidth; i += 64) {
@@ -858,7 +897,6 @@ void Gfx::drawSky() {
 }
 
 static const int snowXVList[13] = {0, -1, -1, -2, -2, -1, 0, 0, 0, -1, -2, -1, 0};
-
 
 void Gfx::drawSnow() {
 	if (_snowInfo.active == false)
@@ -1257,12 +1295,11 @@ void Gfx::drawBonusStars() {
 }
 
 void Gfx::drawDebugInfo(Tile *_debugLogo, int fps) {
-	char buff[64];
-
 	_debugLogo->drawMasked(g_hdb->_screenWidth - 32, 0);
 
 	// Draw  FPS
 	setCursor(0, 0);
+	char buff[64];
 	sprintf(buff, "FPS: %d", fps);
 	drawText(buff);
 

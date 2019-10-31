@@ -34,7 +34,8 @@ class MacResManager;
 namespace Graphics {
 
 struct MacMenuItem;
-struct MacMenuSubItem;
+struct MacMenuSubMenu;
+typedef Common::Array<MacMenuItem *> ItemArray;
 
 struct MacMenuData {
 	int menunum;
@@ -58,14 +59,15 @@ public:
 	void addStaticMenus(const MacMenuData *data);
 	void calcDimensions();
 
-	int addMenuItem(const Common::String &name);
-	int addMenuItem(const Common::U32String &name);
-	void addMenuSubItem(int id, const Common::String &text, int action, int style = 0, char shortcut = 0, bool enabled = true);
-	void addMenuSubItem(int id, const Common::U32String &text, int action, int style = 0, char shortcut = 0, bool enabled = true);
+	MacMenuSubMenu *addSubMenu(MacMenuSubMenu *submenu, int index = -1);
+	int addMenuItem(MacMenuSubMenu *submenu, const Common::String &text, int action = -1, int style = 0, char shortcut = 0, bool enabled = true);
+	int addMenuItem(MacMenuSubMenu *submenu, const Common::U32String &text, int action = 0, int style = 0, char shortcut = 0, bool enabled = true);
 	void loadMenuResource(Common::MacResManager *resFork, uint16 id);
 	void loadMenuBarResource(Common::MacResManager *resFork, uint16 id);
 	void createSubMenuFromString(int id, const char *string, int commandId);
 	void clearSubMenu(int id);
+
+	MacMenuSubMenu *getSubmenu(MacMenuSubMenu *submenu, int index);
 
 	bool draw(ManagedSurface *g, bool forceRedraw = false);
 	bool processEvent(Common::Event &event);
@@ -81,6 +83,8 @@ public:
 	bool isVisible() { return _isVisible; }
 	void setVisible(bool visible) { _isVisible = visible; _contentIsDirty = true; }
 
+	void printMenu(int level = 0, MacMenuSubMenu *submenu = nullptr);
+
 	Common::Rect _bbox;
 
 private:
@@ -89,10 +93,13 @@ private:
 
 private:
 	const Font *getMenuFont();
-	const Common::String getAcceleratorString(MacMenuSubItem *item, const char *prefix);
-	int calculateMenuWidth(MacMenuItem *menu);
-	void calcMenuBounds(MacMenuItem *menu);
-	void renderSubmenu(MacMenuItem *menu);
+	const Common::String getAcceleratorString(MacMenuItem *item, const char *prefix);
+	void processTabs();
+	void processSubmenuTabs(MacMenuSubMenu *submenu);
+
+	int calcSubMenuWidth(MacMenuSubMenu *menu);
+	void calcSubMenuBounds(MacMenuSubMenu *menu, int x, int y);
+	void renderSubmenu(MacMenuSubMenu *menu, bool recursive = true);
 
 	bool keyEvent(Common::Event &event);
 	bool mouseClick(int x, int y);
@@ -101,14 +108,19 @@ private:
 
 	bool processMenuShortCut(byte flags, uint16 ascii);
 
-	Common::Array<MacMenuItem *> _items;
+	void drawSubMenuArrow(ManagedSurface *dst, int x, int y, int color);
+
+	ItemArray _items;
 
 	const Font *_font;
 
 	bool _menuActivated;
 	bool _isVisible;
 
+	bool _dimensionsDirty;
+
 	int _activeItem;
+	Common::Array<MacMenuSubMenu *> _menustack;
 	int _activeSubItem;
 
 	void (*_ccallback)(int action, Common::String &text, void *data);

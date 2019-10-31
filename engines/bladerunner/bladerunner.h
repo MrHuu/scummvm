@@ -91,7 +91,7 @@ class SceneObjects;
 class SceneScript;
 class Scores;
 class Settings;
-class Shape;
+class Shapes;
 class SliceAnimations;
 class SliceRenderer;
 class Spinner;
@@ -99,7 +99,6 @@ class Subtitles;
 class SuspectsDatabase;
 class TextResource;
 class Time;
-class KIAShapes;
 class Vector3;
 class View;
 class VK;
@@ -126,6 +125,7 @@ public:
 
 	Common::String   _languageCode;
 	Common::Language _language;
+	bool             _russianCP1251;
 
 	ActorDialogueQueue *_actorDialogueQueue;
 	ScreenEffects      *_screenEffects;
@@ -166,6 +166,7 @@ public:
 	SuspectsDatabase   *_suspectsDatabase;
 	Time               *_time;
 	View               *_view;
+	Framelimiter       *_framelimiter;
 	VK                 *_vk;
 	Waypoints          *_waypoints;
 	int                *_gameVars;
@@ -178,7 +179,7 @@ public:
 	TextResource       *_textVK;
 	TextResource       *_textOptions;
 
-	Common::Array<Shape*> _shapes;
+	Shapes *_shapes;
 
 	Actor *_actors[kActorCount];
 	Actor *_playerActor;
@@ -197,8 +198,6 @@ public:
 	Common::CosineTable *_cosTable1024;
 	Common::SineTable   *_sinTable1024;
 
-	Framelimiter *_mainLoopFrameLimiter;
-
 	bool _isWalkingInterruptible;
 	bool _interruptWalking;
 	bool _playerActorIdle;
@@ -215,6 +214,7 @@ public:
 	bool _subtitlesEnabled;  // tracks the state of whether subtitles are enabled or disabled from ScummVM GUI option or KIA checkbox (the states are synched)
 	bool _sitcomMode;
 	bool _shortyMode;
+	bool _noDelayMillisFramelimiter;
 	bool _cutContent;
 
 	int _walkSoundId;
@@ -329,6 +329,18 @@ static inline const Graphics::PixelFormat gameDataPixelFormat() {
 	return Graphics::PixelFormat(2, 5, 5, 5, 1, 10, 5, 0, 15);
 }
 
+static inline void getGameDataColor(uint16 color, uint8 &a, uint8 &r, uint8 &g, uint8 &b) {
+	// gameDataPixelFormat().colorToARGB(vqaColor, a, r, g, b);
+	// using pixel format functions is too slow on some ports because of runtime checks
+	uint8 r5 = (color >> 10) & 0x1F;
+	uint8 g5 = (color >>  5) & 0x1F;
+	uint8 b5 = (color      ) & 0x1F;
+	a = color >> 15;
+	r = (r5 << 3) | (r5 >> 2);
+	g = (g5 << 3) | (g5 >> 2);
+	b = (b5 << 3) | (b5 >> 2);
+}
+
 static inline const Graphics::PixelFormat screenPixelFormat() {
 	return ((BladeRunnerEngine*)g_engine)->_screenPixelFormat;
 }
@@ -343,6 +355,8 @@ static inline void drawPixel(Graphics::Surface &surface, void* dst, uint32 value
 			break;
 		case 4:
 			*(uint32*)dst = (uint32)value;
+			break;
+		default:
 			break;
 	}
 }

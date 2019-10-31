@@ -144,6 +144,8 @@ int OSystem_3DS::getGraphicsMode() const {
 void OSystem_3DS::initSize(uint width, uint height,
                                    const Graphics::PixelFormat *format) {
 	debug("3ds initsize w:%d h:%d", width, height);
+	loadConfig();
+
 	_gameWidth = width;
 	_gameHeight = height;
 	_gameTopTexture.create(width, height, _pfGameTexture);
@@ -265,20 +267,28 @@ void OSystem_3DS::unlockScreen() {
 }
 
 void OSystem_3DS::updateScreen() {
-
 	if (sleeping || exiting)
 		return;
 
 // 	updateFocus();
 
-	C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+	C3D_FrameBegin(0);
+		_gameTopTexture.transfer();
+		if (_overlayVisible) {
+			_overlay.transfer();
+		}
+		if (_cursorVisible && config.showCursor) {
+			_cursorTexture.transfer();
+		}
+	C3D_FrameEnd(0);
+
+	C3D_FrameBegin(0);
 		// Render top screen
 		C3D_RenderTargetClear(_renderTargetTop, C3D_CLEAR_ALL, 0x00000000, 0);
 		C3D_FrameDrawOn(_renderTargetTop);
 		if (config.screen == kScreenTop || config.screen == kScreenBoth) {
 			C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _projectionLocation, &_projectionTop);
 			C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _modelviewLocation, _gameTopTexture.getMatrix());
-			_gameTopTexture.render();
 			_gameTopTexture.render();
 			if (_overlayVisible && config.screen == kScreenTop) {
 				C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _modelviewLocation, _overlay.getMatrix());
@@ -296,7 +306,6 @@ void OSystem_3DS::updateScreen() {
 		if (config.screen == kScreenBottom || config.screen == kScreenBoth) {
 			C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _projectionLocation, &_projectionBottom);
 			C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _modelviewLocation, _gameBottomTexture.getMatrix());
-			_gameTopTexture.render();
 			_gameTopTexture.render();
 			if (_overlayVisible) {
 				C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _modelviewLocation, _overlay.getMatrix());
@@ -397,13 +406,11 @@ void OSystem_3DS::updateFocus() {
 void OSystem_3DS::showOverlay() {
 	_overlayVisible = true;
 	updateSize();
-	updateScreen();
 }
 
 void OSystem_3DS::hideOverlay() {
 	_overlayVisible = false;
 	updateSize();
-	updateScreen();
 }
 
 Graphics::PixelFormat OSystem_3DS::getOverlayFormat() const {
@@ -415,8 +422,11 @@ void OSystem_3DS::clearOverlay() {
 }
 
 void OSystem_3DS::grabOverlay(void *buf, int pitch) {
+	byte *dst = (byte *)buf;
+
 	for (int y = 0; y < getOverlayHeight(); ++y) {
-		memcpy(buf, _overlay.getBasePtr(0, y), pitch);
+		memcpy(dst, _overlay.getBasePtr(0, y), getOverlayWidth() * _pfGameTexture.bytesPerPixel);
+		dst += pitch;
 	}
 }
 
@@ -443,7 +453,7 @@ bool OSystem_3DS::showMouse(bool visible) {
 void OSystem_3DS::warpMouse(int x, int y) {
 	_cursorX = x;
 	_cursorY = y;
-	warning("x:%d y:%d", x, y);
+
 	// TODO: adjust for _cursorScalable ?
 	int offsetx = 0;
 	int offsety = 0;
@@ -480,7 +490,7 @@ void OSystem_3DS::setMouseCursor(const void *buf, uint w, uint h,
 	}
 
 	if ( w != 0 && h != 0 ) {
-		_cursor.copyRectToSurface(buf, w, 0, 0, w, h);
+		_cursor.copyRectToSurface(buf, w * _pfCursor.bytesPerPixel, 0, 0, w, h);
 	}
 
 	flushCursor();
@@ -495,6 +505,29 @@ void OSystem_3DS::setCursorPalette(const byte *colors, uint start, uint num) {
 	flushCursor();
 }
 
+namespace {
+template<typename SrcColor>
+void applyKeyColor(Graphics::Surface *src, Graphics::Surface *dst, const SrcColor keyColor) {
+	assert(dst->format.bytesPerPixel == 4);
+	assert((dst->w >= src->w) && (dst->h >= src->h));
+
+	for (uint y = 0; y < src->h; ++y) {
+		SrcColor *srcPtr = (SrcColor *)src->getBasePtr(0, y);
+		uint32 *dstPtr = (uint32 *)dst->getBasePtr(0, y);
+
+		for (uint x = 0; x < src->w; ++x) {
+			const SrcColor color = *srcPtr++;
+
+			if (color == keyColor) {
+				*dstPtr = 0;
+			}
+
+			dstPtr++;
+		}
+	}
+}
+} // End of anonymous namespace
+
 void OSystem_3DS::flushCursor() {
 	if (_cursor.getPixels()) {
 		Graphics::Surface *converted = _cursor.convertTo(_pfGameTexture, _cursorPaletteEnabled ? _cursorPalette : _palette);
@@ -504,17 +537,11 @@ void OSystem_3DS::flushCursor() {
 		delete converted;
 
 		if (_pfCursor.bytesPerPixel == 1) {
-			uint* dest = (uint*) _cursorTexture.getPixels();
-			byte* src = (byte*) _cursor.getPixels();
-			for (int y = 0; y < _cursor.h; ++y) {
-				for (int x = 0; x < _cursor.w; ++x) {
-					if (*src++ == _cursorKeyColor)
-						*dest++ = 0;
-					else
-						dest++;
-				}
-				dest += _cursorTexture.w - _cursorTexture.actualWidth;
-			}
+			applyKeyColor<byte>(&_cursor, &_cursorTexture, _cursorKeyColor);
+		} else if (_pfCursor.bytesPerPixel == 2) {
+			applyKeyColor<uint16>(&_cursor, &_cursorTexture, _cursorKeyColor);
+		} else if (_pfCursor.bytesPerPixel == 4) {
+			applyKeyColor<uint32>(&_cursor, &_cursorTexture, _cursorKeyColor);
 		}
 	}
 }

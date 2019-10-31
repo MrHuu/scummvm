@@ -209,6 +209,12 @@ bool GuiManager::loadNewTheme(Common::String id, ThemeEngine::GraphicsMode gfx, 
 	return true;
 }
 
+void GuiManager::redrawFull() {
+	_redrawStatus = kRedrawFull;
+	redraw();
+	_system->updateScreen();
+}
+
 void GuiManager::redraw() {
 	ThemeEngine::ShadingStyle shading;
 
@@ -632,8 +638,6 @@ void GuiManager::initTextToSpeech() {
 	Common::String currentLanguage = TransMan.getCurrentLanguage();
 	if (currentLanguage == "C")
 		currentLanguage = "en";
-	else
-		currentLanguage.setChar('\0', 2);
 	ttsMan->setLanguage(currentLanguage);
 #endif
 	int volume = (ConfMan.getInt("speech_volume", "scummvm") * 100) / 256;

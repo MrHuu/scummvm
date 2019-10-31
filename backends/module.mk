@@ -65,6 +65,7 @@ MODULE_OBJS += \
 	networking/curl/networkreadstream.o \
 	networking/curl/curlrequest.o \
 	networking/curl/curljsonrequest.o \
+	networking/curl/postrequest.o \
 	networking/curl/request.o
 endif
 
@@ -161,6 +162,8 @@ ifdef POSIX
 MODULE_OBJS += \
 	fs/posix/posix-fs.o \
 	fs/posix/posix-fs-factory.o \
+	fs/posix-drives/posix-drives-fs.o \
+	fs/posix-drives/posix-drives-fs-factory.o \
 	fs/chroot/chroot-fs-factory.o \
 	fs/chroot/chroot-fs.o \
 	plugins/posix/posix-provider.o \
@@ -312,7 +315,6 @@ MODULE_OBJS += \
 	fs/psp/psp-fs-factory.o \
 	fs/psp/psp-stream.o \
 	plugins/psp/psp-provider.o \
-	saves/psp/psp-saves.o \
 	timer/psp/timer.o
 endif
 

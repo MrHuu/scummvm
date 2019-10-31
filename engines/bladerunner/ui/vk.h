@@ -31,9 +31,8 @@
 namespace BladeRunner {
 
 class BladeRunnerEngine;
-class Framelimiter;
 class VKScript;
-class Shape;
+class Shapes;
 class UIImagePicker;
 class VQAPlayer;
 
@@ -48,17 +47,16 @@ class VK {
 	};
 
 	BladeRunnerEngine *_vm;
-	Framelimiter      *_framelimiter;
 
 	VKScript *_script;
 
 	UIImagePicker *_buttons;
-	Common::Array<Shape *> _shapes;
+	Shapes        *_shapes;
 
 	VQAPlayer *_vqaPlayerMain;
 	VQAPlayer *_vqaPlayerEye;
-	int  _vqaFrameMain;
-	bool _vqaLoopEnded;
+	int        _vqaFrameMain;
+	bool       _vqaLoopEnded;
 
 	Graphics::Surface _surfaceEye;
 

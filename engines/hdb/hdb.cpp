@@ -90,6 +90,27 @@ HDBGame::HDBGame(OSystem *syst, const ADGameDescription *gameDesc) : Engine(syst
 	_monkeystone14 = STARS_MONKEYSTONE_14_FAKE;
 	_monkeystone21 = STARS_MONKEYSTONE_21_FAKE;
 
+	_gameShutdown = false;
+	_progressGfx = nullptr;
+	_progressMarkGfx = nullptr;
+	_loadingScreenGfx = nullptr;
+	_logoGfx = nullptr;
+	_progressCurrent = -1;
+	_progressXOffset = -1;
+	_progressMax = -1;
+	_gameState = GAME_TITLE;
+	_actionMode = -1;
+	_pauseFlag = false;
+	_debugFlag = -1;
+	_debugLogo = nullptr;
+	_dx = 0;
+	_dy = 0;
+	_changeLevel = false;
+	_saveInfo.active = false;
+	_saveInfo.slot = 0;
+	_loadInfo.active = false;
+	_loadInfo.slot = 0;
+
 	syncSoundSettings();
 }
 
@@ -159,7 +180,7 @@ bool HDBGame::init() {
 	_menu->startTitle();
 
 	_gameShutdown = false;
-	_pauseFlag = 0;
+	_pauseFlag = false;
 	_systemInit = true;
 	if (!g_hdb->isPPC())
 		_loadingScreenGfx = _gfx->loadPic(PIC_LOADSCREEN);
@@ -302,15 +323,15 @@ bool HDBGame::restartMap() {
 
 bool HDBGame::startMap(const char *name) {
 	// save last mapname
-	strcpy(_lastMapname, _currentMapname);
+	Common::strlcpy(_lastMapname, _currentMapname, sizeof(_lastMapname));
 
 	// set current mapname
-	strcpy(_currentMapname, name);
-	strcat(_currentMapname, ".MSM");
+	Common::strlcpy(_currentMapname, name, sizeof(_currentMapname));
+	Common::strlcat(_currentMapname, ".MSM", sizeof(_currentMapname));
 
 	// set current luaname
-	strcpy(_currentLuaName, name );
-	strcat(_currentLuaName, ".LUA");
+	Common::strlcpy(_currentLuaName, name, sizeof(_currentLuaName));
+	Common::strlcat(_currentLuaName, ".LUA", sizeof(_currentLuaName));
 
 	restartMap();
 
@@ -355,11 +376,10 @@ void HDBGame::paint() {
 	}
 
 	// Draw FPS on Screen in Debug Mode
-	if (_debugFlag == 1) {
+	if (_debugFlag == 1)
 		_gfx->drawDebugInfo(_debugLogo, _frames.size());
-	} else if (_debugFlag == 2) {
+	else if (_debugFlag == 2)
 		_debugLogo->drawMasked(_screenWidth - 32, 0);
-	}
 
 	_gfx->updateVideo();
 }
@@ -367,10 +387,6 @@ void HDBGame::paint() {
 // builds a waypoint list if an entity is not next to player,
 //	or gives info on an entity, or actually uses an entity
 void HDBGame::setTargetXY(int x, int y) {
-	AIEntity *e, *p;
-	int px, py;
-	bool oneTileAway;
-
 	// if ANY button is pressed
 	if (_input->getButtons() || _ai->_playerEmerging)
 		return;
@@ -383,14 +399,14 @@ void HDBGame::setTargetXY(int x, int y) {
 	if (!x)
 		return;
 
-	e = _ai->findEntity(x, y);
-	p = _ai->getPlayer();
+	AIEntity *e = _ai->findEntity(x, y);
+	AIEntity *p = _ai->getPlayer();
 
 	if (!p)
 		return;
 
-	px = p->x / kTileWidth;
-	py = p->y / kTileHeight;
+	int px = p->x / kTileWidth;
+	int py = p->y / kTileHeight;
 
 	// Are we on a touchplate and trying to move within the waiting period?
 	if (p->touchpWait)
@@ -408,7 +424,7 @@ void HDBGame::setTargetXY(int x, int y) {
 			return;
 	}
 
-	oneTileAway = (abs(px - x) + abs(py - y) < 2);
+	bool oneTileAway = (abs(px - x) + abs(py - y) < 2);
 
 	// If any entity has been targeted
 	if (e && !_ai->waypointsLeft()) {
@@ -529,41 +545,29 @@ void HDBGame::startMoveMap(int x, int y) {
 
 void HDBGame::moveMap(int x, int y) {
 	int	ox, oy;
-
 	g_hdb->_map->getMapXY(&ox, &oy);
 
 	ox += (_dx - x) / 8;
 	oy += (_dy - y) / 8;
 
-	if (ox < 0)
-		ox = 0;
-	else if (ox > g_hdb->_map->mapPixelWidth() - 240)
-		ox = g_hdb->_map->mapPixelWidth() - 240;
-
-	if (oy < 0)
-		oy = 0;
-	else if (oy > g_hdb->_map->mapPixelHeight() - 320)
-			oy = g_hdb->_map->mapPixelHeight() - 320;
+	ox = CLIP(ox, 0, g_hdb->_map->mapPixelWidth() - 240);
+	oy = CLIP(oy, 0, g_hdb->_map->mapPixelHeight() - 320);
 
 	g_hdb->_map->setMapXY(ox, oy);
 }
 
 // PLAYER is trying to use this entity
 void HDBGame::useEntity(AIEntity *e) {
-
-	AIEntity *p, temp;
-	bool added;
-
-	p = _ai->getPlayer();
+	AIEntity *p = _ai->getPlayer();
 	// Check if entity is on same level or if its a stairtop
-	if ((p->level != e->level) && !(_map->getMapBGTileFlags(p->tileX, p->tileY) & kFlagStairTop)) {
+	if ((p->level != e->level) && !(_map->getMapBGTileFlags(p->tileX, p->tileY) & kFlagStairTop))
 		return;
-	}
 
-	added = false;
+	bool added = false;
 
+	AIEntity temp;
 	if (_ai->getTableEnt(e->type)) {
-		memcpy(&temp, e, sizeof(AIEntity));
+		temp = *e;
 
 		_ai->getItemSound(e->type);
 
@@ -571,37 +575,27 @@ void HDBGame::useEntity(AIEntity *e) {
 		if (added) {
 			e = &temp;
 
-			if (temp.aiUse) {
+			if (temp.aiUse)
 				temp.aiUse(&temp);
-			}
 
-			if (temp.luaFuncUse[0]) {
+			if (temp.luaFuncUse[0])
 				_lua->callFunction(temp.luaFuncUse, 0);
-			}
 		}
-
 	} else {
 		// These should be run over or run through
-		if (_ai->walkThroughEnt(e->type) || e->type == AI_NONE) {
+		if (_ai->walkThroughEnt(e->type) || e->type == AI_NONE)
 			return;
-		}
 
-		if (e->aiUse) {
+		if (e->aiUse)
 			e->aiUse(e);
-		}
 
-		if (e->luaFuncUse[0]) {
+		if (e->luaFuncUse[0])
 			_lua->callFunction(e->luaFuncUse, 0);
-		}
 	}
 
 	// PUSHING
 	// If its a pushable object, push it. Unless it's in/on water.
 	if (e->type == AI_CRATE || e->type == AI_LIGHTBARREL || e->type == AI_BOOMBARREL || e->type == AI_MAGIC_EGG || e->type == AI_ICE_BLOCK || e->type == AI_FROGSTATUE || e->type == AI_DIVERTER) {
-		int	xDir, yDir, chX, chY;
-		uint32 flags;
-		AIEntity *e2;
-
 		// if it's floating, don't touch!
 		if (e->state >= STATE_FLOATING && e->state <= STATE_FLOATRIGHT) {
 			g_hdb->_ai->lookAtEntity(e);
@@ -610,7 +604,8 @@ void HDBGame::useEntity(AIEntity *e) {
 			return;
 		}
 
-		xDir = yDir = 0;
+		int xDir = 0;
+		int yDir = 0;
 		if (p->tileX > e->tileX)
 			xDir = -2;
 		else if (p->tileX < e->tileX)
@@ -625,9 +620,9 @@ void HDBGame::useEntity(AIEntity *e) {
 		if (xDir && yDir)
 			return;
 
-		chX = p->tileX + xDir;
-		chY = p->tileY + yDir;
-
+		int chX = p->tileX + xDir;
+		int chY = p->tileY + yDir;
+		uint32 flags;
 		// are we going to push this over a sliding surface? (ok)
 		// are we going to push this into a blocking tile? (not ok)
 		if (e->level == 2) {
@@ -680,7 +675,7 @@ void HDBGame::useEntity(AIEntity *e) {
 
 		// are we going to push this into a gem?
 		// if it's a goodfairy, make it move!
-		e2 = g_hdb->_ai->findEntityIgnore(chX, chY, &g_hdb->_ai->_dummyLaser);
+		AIEntity *e2 = g_hdb->_ai->findEntityIgnore(chX, chY, &g_hdb->_ai->_dummyLaser);
 		if (e2 && e2->type == ITEM_GEM_WHITE) {
 			g_hdb->_ai->addAnimateTarget(e2->x, e2->y, 0, 3, ANIM_NORMAL, false, false, GEM_FLASH);
 			g_hdb->_ai->removeEntity(e2);
@@ -799,19 +794,16 @@ void HDBGame::useEntity(AIEntity *e) {
 	}
 
 	// Look at Entity
-	if (e->type != AI_RAILRIDER_ON) {
+	if (e->type != AI_RAILRIDER_ON)
 		_ai->lookAtEntity(e);
-	}
 
 	// Grab animation
-	if (added) {
+	if (added)
 		_ai->animGrabbing();
-	}
 
 	// Can't push it - make a sound
-	if (e->type == AI_HEAVYBARREL) {
+	if (e->type == AI_HEAVYBARREL)
 		g_hdb->_sound->playSound(SND_GUY_UHUH);
-	}
 }
 
 void HDBGame::setupProgressBar(int maxCount) {
@@ -850,7 +842,7 @@ void HDBGame::drawLoadingScreen() {
 
 struct MapName {
 	const char *fName, *printName;
-} mapNames[] = {
+} static mapNames[] = {
 	{	"MAP00",			"HDS Colby Jack" },
 	{	"MAP01",			"Servandrones, Inc." },
 	{	"MAP02",			"Pushbot Storage" },
@@ -885,15 +877,12 @@ struct MapName {
 };
 
 void HDBGame::setInMapName(const char *name) {
-	int i = 0;
-
-	while (mapNames[i].fName) {
+	for (uint i = 0; i < ARRAYSIZE(mapNames); i++) {
 		if (!scumm_stricmp(name, mapNames[i].fName)) {
 			memset(&_inMapName, 0, 32);
 			strcpy(_inMapName, mapNames[i].printName);
 			return;
 		}
-		i++;
 	}
 
 	memset(&_inMapName, 0, 32);
@@ -936,25 +925,26 @@ Common::Error HDBGame::run() {
 #endif
 
 	if (ConfMan.hasKey("boot_param")) {
-		char mapname[20];
 		int arg = ConfMan.getInt("boot_param");
 		int actionMode = MIN(arg / 100, 1);
 		int level = MIN(arg % 100, 31);
 
 		setActionMode(actionMode);
 
-		if (level <= 30)
-			snprintf(mapname, 10, "MAP%02d", level);
-		else
-			strcpy(mapname, "CINE_OUTRO");
+		Common::String mapNameString = Common::String::format("MAP%02d", level);
 
-		if (isDemo())
-			strcat(mapname, "_DEMO");
+		if (level > 30) {
+			mapNameString = "CINE_OUTRO";
+		}
 
-		debug("Starting level %s in %s", mapname, getActionMode() ? "Action Mode" : "Puzzle Mode");
+		if (isDemo()) {
+			mapNameString += "_DEMO";
+		}
+
+		debug("Starting level %s in %s Mode", mapNameString.c_str(), getActionMode() ? "Action" : "Puzzle");
 
 		_ai->clearPersistent();
-		startMap(mapname);
+		startMap(mapNameString.c_str());
 
 		_gameState = GAME_PLAY;
 	} else {

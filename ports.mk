@@ -91,15 +91,19 @@ scummvm.docktileplugin: ScummVMDockTilePlugin
 	cp ScummVMDockTilePlugin scummvm.docktileplugin/Contents/MacOS/
 	chmod 644 scummvm.docktileplugin/Contents/MacOS/ScummVMDockTilePlugin
 
+scummvm.docktileplugin64: ScummVMDockTilePlugin64
+	mkdir -p scummvm.docktileplugin/Contents
+	cp $(srcdir)/dists/macosx/dockplugin/Info.plist scummvm.docktileplugin/Contents
+	mkdir -p scummvm.docktileplugin/Contents/MacOS
+	mv ScummVMDockTilePlugin64 ScummVMDockTilePlugin
+	cp ScummVMDockTilePlugin scummvm.docktileplugin/Contents/MacOS/
+	chmod 644 scummvm.docktileplugin/Contents/MacOS/ScummVMDockTilePlugin
+
 endif
 
 bundle_name = ScummVM.app
 
-ifdef USE_DOCKTILEPLUGIN
-bundle: scummvm-static scummvm.docktileplugin
-else
-bundle: scummvm-static
-endif
+bundle-pack:
 	mkdir -p $(bundle_name)/Contents/MacOS
 	mkdir -p $(bundle_name)/Contents/Resources
 	echo "APPL????" > $(bundle_name)/Contents/PkgInfo
@@ -135,6 +139,16 @@ endif
 ifdef USE_DOCKTILEPLUGIN
 	mkdir -p $(bundle_name)/Contents/PlugIns
 	cp -r scummvm.docktileplugin $(bundle_name)/Contents/PlugIns/
+endif
+
+ifdef USE_DOCKTILEPLUGIN
+bundle: scummvm-static scummvm.docktileplugin bundle-pack
+
+bundle64: scummvm-static scummvm.docktileplugin64 bundle-pack
+else
+bundle: scummvm-static bundle-pack
+
+bundle64: scummvm-static bundle-pack
 endif
 
 iphonebundle: iphone
@@ -316,6 +330,10 @@ ifdef USE_FREETYPE2
 OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libfreetype.a $(STATICLIBPATH)/lib/libbz2.a
 endif
 
+ifdef USE_ICONV
+OSX_STATIC_LIBS += -liconv
+endif
+
 ifdef USE_VORBIS
 OSX_STATIC_LIBS += \
 		$(STATICLIBPATH)/lib/libvorbisfile.a \
@@ -335,8 +353,12 @@ OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libogg.a
 endif
 
 ifdef USE_FLUIDSYNTH
+# If iconv was not yet added, add it now as we need it for libfluidsynth
+ifndef USE_ICONV
+OSX_STATIC_LIBS += -liconv
+endif
 OSX_STATIC_LIBS += \
-                -liconv -framework CoreMIDI -framework CoreAudio\
+                -framework CoreMIDI -framework CoreAudio\
                 $(STATICLIBPATH)/lib/libfluidsynth.a \
                 $(STATICLIBPATH)/lib/libglib-2.0.a \
                 $(STATICLIBPATH)/lib/libintl.a
@@ -474,7 +496,7 @@ endif
 	@echo Creating Code::Blocks project files...
 	@cd $(srcdir)/dists/codeblocks && ../../devtools/create_project/create_project ../.. --codeblocks >/dev/null && git add -f engines/plugins_table.h *.workspace *.cbp
 	@echo Creating MSVC project files...
-	@cd $(srcdir)/dists/msvc && ../../devtools/create_project/create_project ../.. --msvc >/dev/null && git add -f engines/plugins_table.h *.sln *.vcxproj *.vcxproj.filters *.props
+	@cd $(srcdir)/dists/msvc && ../../devtools/create_project/create_project ../.. --msvc-version 12 --msvc >/dev/null && git add -f engines/plugins_table.h *.sln *.vcxproj *.vcxproj.filters *.props
 	@echo
 	@echo All is done.
 	@echo Now run

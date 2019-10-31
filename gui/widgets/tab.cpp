@@ -195,6 +195,9 @@ void TabWidget::handleCommand(CommandSender *sender, uint32 cmd, uint32 data) {
 			setFirstVisible(_firstVisibleTab + 1, false);
 		}
 		break;
+
+	default:
+		break;
 	}
 }
 
@@ -218,7 +221,8 @@ void TabWidget::handleMouseDown(int x, int y, int button, int clickCount) {
 }
 
 void TabWidget::handleMouseMoved(int x, int y, int button) {
-	assert(y < _tabHeight);
+	if (y < 0 || y >= _tabHeight)
+		return;
 
 	if (x < 0)
 		return;

@@ -23,7 +23,7 @@
 #ifndef GRAPHICS_MACGUI_MACWINDOWMANAGER_H
 #define GRAPHICS_MACGUI_MACWINDOWMANAGER_H
 
-#include "common/array.h"
+#include "common/hashmap.h"
 #include "common/list.h"
 #include "common/events.h"
 
@@ -57,10 +57,12 @@ enum {
 };
 
 enum {
-	kWMModeNone         = 0,
-	kWMModeNoDesktop    = (1 << 0),
-	kWMModeAutohideMenu = (1 << 1),
-	kWMModalMenuMode = (1 << 2)
+	kWMModeNone         	= 0,
+	kWMModeNoDesktop    	= (1 << 0),
+	kWMModeAutohideMenu 	= (1 << 1),
+	kWMModalMenuMode 		= (1 << 2),
+	kWMModeForceBuiltinFonts= (1 << 3),
+	kWMModeUnicode			= (1 << 4)
 };
 
 }
@@ -97,7 +99,7 @@ void macDrawPixel(int x, int y, int color, void *data);
  */
 class MacWindowManager {
 public:
-	MacWindowManager();
+	MacWindowManager(uint32 mode = 0);
 	~MacWindowManager();
 
 	/**
@@ -211,9 +213,10 @@ public:
 
 	void pauseEngine(bool pause);
 
-	void setMode(uint32 mode) { _mode = mode; }
+	void setMode(uint32 mode);
 
 	void setEnginePauseCallback(void *engine, void (*pauseCallback)(void *engine, bool pause));
+	void setEngineRedrawCallback(void *engine, void (*redrawCallback)(void *engine));
 
 	void passPalette(const byte *palette, uint size);
 
@@ -241,7 +244,7 @@ public:
 
 private:
 	Common::List<BaseMacWindow *> _windowStack;
-	Common::Array<BaseMacWindow *> _windows;
+	Common::HashMap<uint, BaseMacWindow *> _windows;
 
 	Common::List<BaseMacWindow *> _windowsToRemove;
 	bool _needsRemoval;
@@ -256,8 +259,10 @@ private:
 	MacMenu *_menu;
 	uint32 _menuDelay;
 
-	void *_engine;
+	void *_engineP;
+	void *_engineR;
 	void (*_pauseEngineCallback)(void *engine, bool pause);
+	void (*_redrawEngineCallback)(void *engine);
 
 	bool _cursorIsArrow;
 };

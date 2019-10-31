@@ -357,6 +357,11 @@ void SupernovaEngine::setTextSpeed() {
 	int boxWidth = stringWidth > 110 ? stringWidth : 110;
 	int boxHeight = 27;
 
+	// Disable improved mode temporarilly so that Key 1-5 are received below
+	// instead of being mapped to action selection.
+	bool hasImprovedMode = _improved;
+	_improved = false;
+
 	_gm->animationOff();
 	_gm->saveTime();
 	saveScreen(boxX, boxY, boxWidth, boxHeight);
@@ -398,6 +403,8 @@ void SupernovaEngine::setTextSpeed() {
 	restoreScreen();
 	_gm->loadTime();
 	_gm->animationOn();
+
+	_improved = hasImprovedMode;
 }
 
 void SupernovaEngine::showHelpScreen1() {
@@ -468,7 +475,7 @@ Common::SeekableReadStream *SupernovaEngine::getBlockFromDatFile(Common::String 
 		return nullptr;
 	}
 
-	uint32 gameBlockSize;
+	uint32 gameBlockSize = 0;
 	while (!f.eos()) {
 		int part = f.readByte();
 		gameBlockSize = f.readUint32LE();
@@ -494,7 +501,8 @@ Common::SeekableReadStream *SupernovaEngine::getBlockFromDatFile(Common::String 
 			return f.readStream(size);
 		} else {
 			f.skip(size);
-			readSize += size;
+			// size + 4 bytes for id + 4 bytes for lang + 4 bytes for size
+			readSize += size + 12;
 		}
 	}
 
@@ -689,6 +697,9 @@ bool SupernovaEngine::deserialize(Common::ReadStream *in, int version) {
 bool SupernovaEngine::loadGame(int slot) {
 	if (slot < 0)
 		return false;
+
+	// Stop any sound currently playing.
+	_sound->stop();
 
 	// Make sure no message is displayed as this would otherwise delay the
 	// switch to the new location until a mouse click.

@@ -88,7 +88,7 @@ AIEntity *AI::spawn(AIType type, AIDir dir, int x, int y, const char *funcInit, 
 	return e;
 }
 
-bool AI::cacheEntGfx(AIEntity *e, bool init) {
+bool AI::cacheEntGfx(AIEntity *e, bool initFlag) {
 	int i = 0;
 	while (true) {
 		if (aiEntList[i].type == END_AI_TYPES)
@@ -425,7 +425,7 @@ bool AI::cacheEntGfx(AIEntity *e, bool init) {
 
 			e->aiInit = aiEntList[i].initFunc;
 			e->aiInit2 = aiEntList[i].initFunc2;
-			if (init) {
+			if (initFlag) {
 				e->aiInit(e);
 				if (e->aiInit2)
 					e->aiInit2(e);
@@ -579,7 +579,7 @@ AIEntity *AI::findEntityType(AIType type, int x, int y) {
 void AI::getEntityXY(const char *entName, int *x, int *y) {
 	for (Common::Array<AIEntity *>::iterator it = _ents->begin(); it != _ents->end(); ++it) {
 		AIEntity *e = *it;
-		if (e->entityName && !scumm_stricmp(entName, e->entityName)) {
+		if (!scumm_stricmp(entName, e->entityName)) {
 			*x = e->tileX;
 			*y = e->tileY;
 			return;
@@ -588,7 +588,7 @@ void AI::getEntityXY(const char *entName, int *x, int *y) {
 
 	for (Common::Array<AIEntity *>::iterator jt = _floats->begin(); jt != _floats->end(); ++jt) {
 		AIEntity *e = *jt;
-		if (e->entityName && !scumm_stricmp(entName, e->entityName)) {
+		if (!scumm_stricmp(entName, e->entityName)) {
 			*x = e->tileX;
 			*y = e->tileY;
 			return;
@@ -608,10 +608,10 @@ void AI::getEntityXY(const char *entName, int *x, int *y) {
 bool AI::useLuaEntity(const char *initName) {
 	for (Common::Array<AIEntity *>::iterator it = _ents->begin(); it != _ents->end(); ++it) {
 		AIEntity *e = *it;
-		if (e->entityName && !scumm_stricmp(initName, e->entityName)) {
+		if (!scumm_stricmp(initName, e->entityName)) {
 			e->aiUse(e);
 			checkActionList(e, e->tileX, e->tileY, true);
-			if (e->luaFuncUse)
+			if (e->luaFuncUse[0])
 				g_hdb->_lua->callFunction(e->luaFuncUse, 0);
 			return true;
 		}
@@ -619,7 +619,7 @@ bool AI::useLuaEntity(const char *initName) {
 
 	// Check _actions list for activation as well
 	for (int i = 0; i < kMaxActions; i++) {
-		if (_actions[i].entityName && !scumm_stricmp(initName, _actions[i].entityName)) {
+		if (!scumm_stricmp(initName, _actions[i].entityName)) {
 			checkActionList(&_dummyPlayer, _actions[i].x1, _actions[i].y1, false);
 			checkActionList(&_dummyPlayer, _actions[i].x2, _actions[i].y2, false);
 		}
@@ -631,7 +631,7 @@ bool AI::useLuaEntity(const char *initName) {
 void AI::removeLuaEntity(const char *initName) {
 	for (uint i = 0; i < _ents->size(); i++) {
 		AIEntity *e = _ents->operator[](i);
-		if (e->entityName && !scumm_stricmp(initName, e->entityName)) {
+		if (!scumm_stricmp(initName, e->entityName)) {
 			removeEntity(e);
 			i--;
 		}
@@ -641,7 +641,7 @@ void AI::removeLuaEntity(const char *initName) {
 void AI::animLuaEntity(const char *initName, AIState st) {
 	for (Common::Array<AIEntity *>::iterator it = _ents->begin(); it != _ents->end(); ++it) {
 		AIEntity *e = *it;
-		if (e->entityName && !scumm_stricmp(initName, e->entityName)) {
+		if (!scumm_stricmp(initName, e->entityName)) {
 			e->state = st;
 			e->animFrame = 0;
 			e->animDelay = e->animCycle;
@@ -652,7 +652,7 @@ void AI::animLuaEntity(const char *initName, AIState st) {
 void AI::setLuaAnimFrame(const char *initName, AIState st, int frame) {
 	for (Common::Array<AIEntity *>::iterator it = _ents->begin(); it != _ents->end(); ++it) {
 		AIEntity *e = *it;
-		if (e->entityName && !scumm_stricmp(initName, e->entityName)) {
+		if (!scumm_stricmp(initName, e->entityName)) {
 			e->state = st;
 			e->animFrame = frame;
 			e->animDelay = e->animCycle;
@@ -1100,7 +1100,7 @@ void AI::animateEntity(AIEntity *e) {
 			if ((e->tileX + xOff == _waypoints[_numWaypoints - 1].x &&
 				 e->tileY + yOff == _waypoints[_numWaypoints - 1].y) &&
 				 e->level == _waypoints[_numWaypoints - 1].level) {
-				memset(&_waypoints[0], 0, sizeof(_waypoints));
+				clearWaypoints();
 				_numWaypoints = 1;
 				_waypoints[0].x = e->tileX + xOff;
 				_waypoints[0].y = e->tileY + yOff;
@@ -1795,7 +1795,7 @@ void AI::drawEnts(int x, int y, int w, int h) {
 			e->onScreen = 0;
 			debugN(5, "not on screen");
 		}
-		debug(5, ""); // newline
+		debug(5, "%s", ""); // newline
 	}
 
 	if (stunTimer < g_hdb->getTimeSlice()) {

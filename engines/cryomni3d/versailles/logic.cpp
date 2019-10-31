@@ -2697,6 +2697,9 @@ IMG_CB(88003) {
 		case 5:
 			callback = &CryOmni3DEngine_Versailles::img_88003f;
 			break;
+		default:
+			error("BUG: Invalid bomb state");
+			break;
 		}
 		ZonFixedImage::CallbackFunctor *functor =
 		    new Common::Functor1Mem<ZonFixedImage *, void, CryOmni3DEngine_Versailles>(this, callback);
@@ -4308,6 +4311,9 @@ void CryOmni3DEngine_Versailles::filterEventLevel5UpdatePlaceStates() {
 			// Ladder is on the scaffolding
 			setPlaceState(16, 5);
 			break;
+		default:
+			error("BUG: Invalid ladder state");
+			break;
 		}
 	} else {
 		// Curtain is opened
@@ -4323,6 +4329,9 @@ void CryOmni3DEngine_Versailles::filterEventLevel5UpdatePlaceStates() {
 		case 2:
 			// Ladder is on the scaffolding
 			setPlaceState(16, 6);
+			break;
+		default:
+			error("BUG: Invalid ladder state");
 			break;
 		}
 	}

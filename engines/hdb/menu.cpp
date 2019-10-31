@@ -207,7 +207,6 @@ Menu::Menu() {
 	_contArrowRight = NULL;
 	_contAssign = NULL;
 
-	_waitingForKey = false;
 	_warpPlaque = NULL;
 	_hdbLogoScreen = NULL;
 
@@ -258,6 +257,27 @@ Menu::Menu() {
 
 	_versionGfx = NULL;
 	_warpGfx = NULL;
+
+	_warpBackoutX = 0;
+	_warpBackoutY = 0;
+	_titleCycle = 0;
+	_titleDelay = 0;
+	_resumeSong = SONG_NONE;
+	_rocketY = 0;
+	_rocketYVel = 0;
+	_nebulaX = 0;
+	_nebulaYVel = 0;
+	_nebulaWhich = 0;
+	_quitScreen = nullptr;
+	_quitTimer = 0;
+	_handangoGfx = nullptr;
+	_clickDelay = 0;
+	_saveSlot = 0;
+	_quitActive = 0;
+	_optionsXV = 0;
+	_oBannerY = 0;
+	_introSong = SONG_NONE;
+	_titleSong = SONG_NONE;
 }
 
 Menu::~Menu() {
@@ -821,9 +841,8 @@ void Menu::drawMenu() {
 					g_hdb->_gfx->drawText(_saveGames[i].mapName);
 
 					g_hdb->_gfx->setCursor(_saveSlotX + 180, i * 32 + _saveSlotY);
-					char buff[16];
-					sprintf(buff, "%02d:%02d", seconds / 3600, (seconds / 60) % 60);
-					g_hdb->_gfx->drawText(buff);
+					Common::String buff = Common::String::format("%02d:%02d", seconds / 3600, (seconds / 60) % 60);
+					g_hdb->_gfx->drawText(buff.c_str());
 				}
 			}
 		}
@@ -838,27 +857,27 @@ void Menu::drawMenu() {
 		_titleLogo->drawMasked(centerPic(_titleLogo), _rocketY + _mTitleY);
 		_menuBackoutGfx->drawMasked(_warpBackoutX, g_hdb->_menu->_warpBackoutY);
 
-		char string[32];
+		Common::String textString;
 		for (int i = 0; i < 10; i++) {
-			sprintf(string, "Map %2d", i);
+			textString = Common::String::format("Map %2d", i);
 			g_hdb->_gfx->setCursor(_warpX + 4, i * 16 + _warpY);
-			g_hdb->_gfx->drawText(string);
+			g_hdb->_gfx->drawText(textString.c_str());
 		}
 		for (int i = 0; i < 10; i++) {
-			sprintf(string, "Map %d", i + 10);
+			textString = Common::String::format("Map %d", i + 10);
 			g_hdb->_gfx->setCursor(_warpX + 80, i * 16 + _warpY);
-			g_hdb->_gfx->drawText(string);
+			g_hdb->_gfx->drawText(textString.c_str());
 		}
 		for (int i = 0; i < 10; i++) {
-			sprintf(string, "Map %d", i + 20);
+			textString = Common::String::format("Map %d", i + 20);
 			g_hdb->_gfx->setCursor(_warpX + 160, i * 16 + _warpY);
-			g_hdb->_gfx->drawText(string);
+			g_hdb->_gfx->drawText(textString.c_str());
 		}
 
 		if (_warpActive > 1) {
 			g_hdb->_gfx->setCursor(_warpX + 60, _warpY + 164);
-			sprintf(string, "Warping to MAP%d", _warpActive - 2);
-			g_hdb->_gfx->centerPrint(string);
+			textString = Common::String::format("Warping to MAP%d", _warpActive - 2);
+			g_hdb->_gfx->centerPrint(textString.c_str());
 		}
 	} else if (_quitActive) {
 		//-------------------------------------------------------------------
@@ -1291,7 +1310,7 @@ void Menu::fillSavegameSlots() {
 		} else {
 			Graphics::skipThumbnail(*in);
 
-			strcpy(_saveGames[i].saveID, saveGameFile.c_str());
+			Common::strlcpy(_saveGames[i].saveID, saveGameFile.c_str(), sizeof(_saveGames[0].saveID));
 			_saveGames[i].seconds = in->readUint32LE();
 			in->read(_saveGames[i].mapName, 32);
 			delete in;
@@ -1481,8 +1500,8 @@ void Menu::processInput(int x, int y) {
 			y >= _optionsY + kOptionLineSPC * 4 + 24 && y <= _optionsY + kOptionLineSPC * 4 + 40) {
 			// Voices ON/OFF
 			if (!g_hdb->isVoiceless()) {
-				int value = g_hdb->_sound->getVoiceStatus();
-				value ^= 1;
+				bool value = g_hdb->_sound->getVoiceStatus();
+				value ^= true;
 				g_hdb->_sound->setVoiceStatus(value);
 				g_hdb->_sound->playSound(SND_GUI_INPUT);
 			}
@@ -1585,11 +1604,11 @@ void Menu::processInput(int x, int y) {
 				g_hdb->_gfx->updateVideo();
 			_warpActive = 0;
 
-			char string[16];
-			sprintf(string, "MAP%02d", map);
+			Common::String mapString = Common::String::format("MAP%02d", map);
 
-			if (g_hdb->isDemo())
-				strcat(string, "_DEMO");
+			if (g_hdb->isDemo()) {
+				mapString += "_DEMO";
+			}
 
 			freeMenu();
 			g_hdb->setGameState(GAME_PLAY);
@@ -1597,7 +1616,7 @@ void Menu::processInput(int x, int y) {
 			g_hdb->_ai->clearPersistent();
 			g_hdb->resetTimer();
 			g_hdb->_sound->playSound(SND_POP);
-			g_hdb->startMap(string);
+			g_hdb->startMap(mapString.c_str());
 		}
 	} else if (_quitActive) {
 		//-------------------------------------------------------------------

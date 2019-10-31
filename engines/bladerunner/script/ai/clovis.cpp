@@ -241,6 +241,8 @@ int AIScriptClovis::GetFriendlinessModifierIfGetsClue(int otherActorId, int clue
 	case kClueMcCoyRetiredLutherLance:
 	case kClueMcCoyIsInsane:
 		return -5;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -708,7 +710,7 @@ bool AIScriptClovis::UpdateAnimation(int *animation, int *frame) {
 		if (flag) {
 			*animation = 227;
 			_animationState = 0;
-			Actor_Change_Animation_Mode(kActorClovis, 0);
+			Actor_Change_Animation_Mode(kActorClovis, kAnimationModeIdle);
 		}
 		break;
 
@@ -880,7 +882,7 @@ bool AIScriptClovis::UpdateAnimation(int *animation, int *frame) {
 		if (flag) {
 			_animationState = 13;
 			*animation = 208;
-			Actor_Change_Animation_Mode(kActorClovis, 4);
+			Actor_Change_Animation_Mode(kActorClovis, kAnimationModeCombatIdle);
 		}
 		break;
 
@@ -901,7 +903,7 @@ bool AIScriptClovis::UpdateAnimation(int *animation, int *frame) {
 		if (flag) {
 			_animationState = 13;
 			*animation = 208;
-			Actor_Change_Animation_Mode(kActorClovis, 4);
+			Actor_Change_Animation_Mode(kActorClovis, kAnimationModeCombatIdle);
 		}
 		break;
 
@@ -922,7 +924,7 @@ bool AIScriptClovis::UpdateAnimation(int *animation, int *frame) {
 		if (flag) {
 			_animationState = 13;
 			*animation = 208;
-			Actor_Change_Animation_Mode(kActorClovis, 4);
+			Actor_Change_Animation_Mode(kActorClovis, kAnimationModeCombatIdle);
 		}
 		break;
 
@@ -943,7 +945,7 @@ bool AIScriptClovis::UpdateAnimation(int *animation, int *frame) {
 		if (flag) {
 			*animation = 227;
 			_animationState = 0;
-			Actor_Change_Animation_Mode(kActorClovis, 0);
+			Actor_Change_Animation_Mode(kActorClovis, kAnimationModeIdle);
 		}
 		break;
 
@@ -964,7 +966,7 @@ bool AIScriptClovis::UpdateAnimation(int *animation, int *frame) {
 		if (flag) {
 			*animation = 227;
 			_animationState = 0;
-			Actor_Change_Animation_Mode(kActorClovis, 0);
+			Actor_Change_Animation_Mode(kActorClovis, kAnimationModeIdle);
 		}
 		break;
 
@@ -1081,7 +1083,7 @@ bool AIScriptClovis::UpdateAnimation(int *animation, int *frame) {
 		if (flag) {
 			_animationState = 13;
 			*animation = 208;
-			Actor_Change_Animation_Mode(kActorClovis, 4);
+			Actor_Change_Animation_Mode(kActorClovis, kAnimationModeCombatIdle);
 		}
 		break;
 
@@ -1102,7 +1104,7 @@ bool AIScriptClovis::UpdateAnimation(int *animation, int *frame) {
 		if (flag) {
 			_animationState = 13;
 			*animation = 208;
-			Actor_Change_Animation_Mode(kActorClovis, 4);
+			Actor_Change_Animation_Mode(kActorClovis, kAnimationModeCombatIdle);
 		}
 		break;
 
@@ -1123,7 +1125,7 @@ bool AIScriptClovis::UpdateAnimation(int *animation, int *frame) {
 		if (flag) {
 			*animation = 227;
 			_animationState = 0;
-			Actor_Change_Animation_Mode(kActorClovis, 0);
+			Actor_Change_Animation_Mode(kActorClovis, kAnimationModeIdle);
 		}
 		break;
 
@@ -1499,6 +1501,9 @@ bool AIScriptClovis::ChangeAnimationMode(int mode) {
 	case 54:
 		_animationFrame = 0;
 		_animationState = 32;
+		break;
+
+	default:
 		break;
 	}
 

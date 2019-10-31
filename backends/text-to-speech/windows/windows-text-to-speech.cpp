@@ -28,7 +28,18 @@
 #if defined(USE_TTS) && defined(WIN32)
 #include <basetyps.h>
 #include <windows.h>
-#include <Servprov.h>
+#include <servprov.h>
+
+// Mingw-w64 is missing symbols for two guids declared in sapi.h which are used
+//  by sphelper-scummvm.h. Mingw32 doesn't include any sapi headers or libraries
+//  so the only way to currently build there is to manually use Microsoft's, in
+//  which case the guids will be defined by their library.
+#if defined(__MINGW32__) && defined(__MINGW64_VERSION_MAJOR)
+#include <initguid.h>
+DEFINE_GUID(SPDFID_Text, 0x7ceef9f9, 0x3d13, 0x11d2, 0x9e, 0xe7, 0x00, 0xc0, 0x4f, 0x79, 0x73, 0x96);
+DEFINE_GUID(SPDFID_WaveFormatEx, 0xc31adbae, 0x527f, 0x4ff5, 0xa2, 0x30, 0xf6, 0x2b, 0xb6, 0x1f, 0xf7, 0x0c);
+#endif
+
 #include <sapi.h>
 #include "backends/text-to-speech/windows/sphelper-scummvm.h"
 #include "backends/platform/sdl/win32/win32_wrapper.h"
@@ -128,6 +139,7 @@ DWORD WINAPI startSpeech(LPVOID parameters) {
 		WaitForSingleObject(*params->mutex, INFINITE);
 		// check again, when we have exclusive access to the queue
 		if (params->queue->empty() || *(params->state) == WindowsTextToSpeechManager::PAUSED) {
+			ReleaseMutex(*params->mutex);
 			break;
 		}
 		WCHAR *currentSpeech = params->queue->front();
@@ -231,18 +243,16 @@ bool WindowsTextToSpeechManager::stop() {
 		resume();
 	_audio->SetState(SPAS_STOP, 0);
 	WaitForSingleObject(_speechMutex, INFINITE);
+	// Delete the speech queue
 	while (!_speechQueue.empty()) {
 		if (_speechQueue.front() != NULL)
 			free(_speechQueue.front());
 		_speechQueue.pop_front();
 	}
-	_speechQueue.push_back(NULL);
+	// Stop the current speech
+	_voice->Speak(NULL, SPF_PURGEBEFORESPEAK | SPF_ASYNC, 0);
+	_speechState = READY;
 	ReleaseMutex(_speechMutex);
-	if (_thread != NULL) {
-		WaitForSingleObject(_thread, INFINITE);
-		CloseHandle(_thread);
-		_thread = NULL;
-	}
 	_audio->SetState(SPAS_RUN, 0);
 	return false;
 }
@@ -328,9 +338,7 @@ void WindowsTextToSpeechManager::setVolume(unsigned volume) {
 }
 
 void WindowsTextToSpeechManager::setLanguage(Common::String language) {
-	if (language == "C")
-		language = "en";
-	_ttsState->_language = language;
+	Common::TextToSpeechManager::setLanguage(language);
 	updateVoices();
 	setVoice(0);
 }
@@ -461,7 +469,7 @@ void WindowsTextToSpeechManager::updateVoices() {
 
 	if (_ttsState->_availableVoices.empty()) {
 		_speechState = NO_VOICE;
-		warning("No voice is available");
+		warning("No voice is available for language: %s", _ttsState->_language.c_str());
 	} else if (_speechState == NO_VOICE)
 		_speechState = READY;
 }

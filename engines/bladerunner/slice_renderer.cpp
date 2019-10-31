@@ -38,7 +38,7 @@ SliceRenderer::SliceRenderer(BladeRunnerEngine *vm) {
 	_vm = vm;
 	_pixelFormat = screenPixelFormat();
 
-	for (int i = 0; i < 942; i++) { // yes, its going just to 942 and not 997
+	for (int i = 0; i < ARRAYSIZE(_animationsShadowEnabled); i++) { // original game ss going just yp to 942 and not 997
 		_animationsShadowEnabled[i] = true;
 	}
 	_animation = -1;
@@ -614,9 +614,9 @@ void SliceRenderer::drawShadowInWorld(int transparency, Graphics::Surface &surfa
 		0.0f, 0.0f, 1.0f, _position.z);
 
 	Matrix4x3 mRotation(
-		cosf(_facing), -sinf(_facing), 0.0f, 0.0f,
-		sinf(_facing),  cosf(_facing), 0.0f, 0.0f,
-		          0.0f,          0.0f, 1.0f, 0.0f);
+		cos(_facing), -sin(_facing), 0.0f, 0.0f,
+		sin(_facing),  cos(_facing), 0.0f, 0.0f,
+		        0.0f,          0.0f, 1.0f, 0.0f);
 
 	Matrix4x3 mScale(
 		_frameScale.x,          0.0f,              0.0f, 0.0f,
@@ -731,7 +731,7 @@ void SliceRenderer::drawShadowPolygon(int transparency, Graphics::Surface &surfa
 				int index = (x & 3) + ((y & 3) << 2);
 				if (transparency - ditheringFactor[index] <= 0) {
 					uint8 r, g, b;
-					surface.format.colorToRGB(*(uint32*)pixel, r, g, b);
+					surface.format.colorToRGB(READ_UINT32(pixel), r, g, b);
 					r *= 0.75f;
 					g *= 0.75f;
 					b *= 0.75f;

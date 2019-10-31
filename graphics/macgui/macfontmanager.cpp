@@ -25,7 +25,9 @@
 #include "common/macresman.h"
 #include "graphics/fonts/bdf.h"
 #include "graphics/fonts/macfont.h"
+#include "graphics/fonts/ttf.h"
 
+#include "graphics/macgui/macwindowmanager.h"
 #include "graphics/macgui/macfontmanager.h"
 
 namespace Graphics {
@@ -85,12 +87,21 @@ static const char *const fontStyleSuffixes[] = {
 	"Extend"
 };
 
-MacFontManager::MacFontManager() {
+MacFontManager::MacFontManager(uint32 mode) : _mode(mode) {
 	for (uint i = 0; i < ARRAYSIZE(fontNames); i++)
 		if (fontNames[i])
 			_fontIds.setVal(fontNames[i], i);
 
-	loadFonts();
+	if (_mode & MacGUIConstants::kWMModeForceBuiltinFonts) {
+		_builtInFonts = true;
+	} else {
+		loadFonts();
+	}
+}
+
+MacFontManager::~MacFontManager() {
+	for(Common::HashMap<int, const Graphics::Font *>::iterator it = _uniFonts.begin(); it != _uniFonts.end(); it++)
+		delete it->_value;
 }
 
 void MacFontManager::loadFontsBDF() {
@@ -278,7 +289,25 @@ const Font *MacFontManager::getFont(MacFont macFont) {
 		}
 	}
 
-	if (_builtInFonts || !font)
+#ifdef USE_FREETYPE2
+	if (!font) {
+		if (_mode & kWMModeUnicode) {
+			if (macFont.getSize() <= 0) {
+				debug(1, "MacFontManager::getFont() - Font size <= 0!");
+			}
+			Common::HashMap<int, const Graphics::Font *>::iterator pFont = _uniFonts.find(macFont.getSize());
+
+			if (pFont != _uniFonts.end()) {
+				font = pFont->_value;
+			} else {
+				font = Graphics::loadTTFFontFromArchive("FreeSans.ttf", macFont.getSize(), Graphics::kTTFSizeModeCharacter, 0, Graphics::kTTFRenderModeMonochrome);
+				_uniFonts[macFont.getSize()] = font;
+			}
+		}
+	}
+#endif
+
+	if (!font)
 		font = FontMan.getFontByUsage(macFont.getFallback());
 
 	return font;

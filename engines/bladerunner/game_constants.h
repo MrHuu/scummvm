@@ -369,9 +369,9 @@ enum Clues {
 	kClueKingstonKitchenBox2               = 263, // ESPER hard-copy
 	kClueCrystalsCigarette                 = 264,
 	kClueSpinnerKeys                       = 265,
-	kClueAct2Ended                         = 266,
-	kClueAct3Ended                         = 267,
-	kClueAct4Ended                         = 268,
+	kClueAct2Ended                         = 266, // is acquired but never checked. Has no type and seems like a placeholder
+	kClueAct3Ended                         = 267, // unused
+	kClueAct4Ended                         = 268, // unused
 	kClueExpertBomber                      = 269,
 	kClueAmateurBomber                     = 270,
 	kClueVKLucyReplicant                   = 271,
@@ -2523,9 +2523,9 @@ enum GoalZuben {
 enum GoalHasan {
 	kGoalHasanDefault                         =   0,
 	kGoalHasanIsAway                          = 300, // original final goal for Hasan
-	kGoalHasanIsWalkingAroundIsAtCT02         = 301, // new goal for restored content
-	kGoalHasanIsWalkingAroundStayAwayFromCT02 = 302, // new goal for restored content
-	kGoalHasanIsWalkingAroundStaysAtCT02      = 303, // new goal for restored content
+	kGoalHasanIsWalkingAroundIsAtAR02         = 301, // new goal for restored content
+	kGoalHasanIsWalkingAroundStayAwayFromAR02 = 302, // new goal for restored content
+	kGoalHasanIsWalkingAroundStaysAtAR02      = 303, // new goal for restored content
 	kGoalHasanIsWalkingAroundIsAway           = 304  // new goal for restored content
 };
 

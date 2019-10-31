@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Mission Supernova Part 2 1.0\n"
 "Report-Msgid-Bugs-To: scummvm-devel@lists.scummvm.org\n"
 "POT-Creation-Date: 2019-06-13 00:06+0100\n"
-"PO-Revision-Date: 2019-06-12 23:15+0000\n"
+"PO-Revision-Date: 2019-09-13 00:00+0000\n"
 "Last-Translator: Thierry Crozat <criezy@scummvm.org>\n"
 "Language-Team: none\n"
 "Language: en\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 3.3\n"
+"X-Generator: Weblate 3.7.1\n"
 
 #: ../../ms2/ms2.c:1641
 msgid "Gehe"
@@ -316,7 +316,7 @@ msgstr "You are hearing footsteps."
 
 #: ../../ms2/ms2_mus.c:232
 msgid "Um das Schloss zu îffnen,|brauchst du einige Zeit."
-msgstr "You will take some time,|to pick that lock."
+msgstr "You will take some time|to pick that lock."
 
 #: ../../ms2/ms2_mus.c:238
 msgid "Du gerÑtst in Panik|und ziehst die Keycard|aus der TÅr."
@@ -746,7 +746,7 @@ msgstr "Note"
 
 #: ../../ms2/ms2_pyra.c:1211
 msgid "Darauf steht:|\"Wenn du fast am Ziel|bist, tu folgendes:|Sauf!\""
-msgstr "It reads:|\"When you're almost there,|do the following:|Drink!\""
+msgstr "It reads:|\"When you are almost there,|do the following:|Toast!\""
 
 #: ../../ms2/ms2_pyra.c:1255
 msgid "Es ist ca. 10 Meter tief."
@@ -849,15 +849,15 @@ msgstr "It is empty."
 
 #: ../../ms2/ms2_r1.c:97
 msgid "Du findest ein kleines GerÑt,|einen Ausweis und einen Xa."
-msgstr "You find a small device,|an ID card and a Xa."
+msgstr "You find a small device,|an ID card and one Xa."
 
 #: ../../ms2/ms2_r1.c:109
 msgid "Du heftest den|Magnet an die Stange."
-msgstr "You attach the|magnet to the pole."
+msgstr "You attach the|magnet to the rod."
 
 #: ../../ms2/ms2_r1.c:110
 msgid "Stange mit Magnet"
-msgstr "Pole with magnet"
+msgstr "Rod with magnet"
 
 #: ../../ms2/ms2_r1.c:111
 msgid "Raffiniert!"
@@ -979,11 +979,11 @@ msgstr "Five minutes later ..."
 
 #: ../../ms2/ms2_r1.c:433
 msgid "Du hast doch schon eine Stange"
-msgstr "You already have a pole"
+msgstr "You already have a rod"
 
 #: ../../ms2/ms2_r1.c:436
 msgid "Du sÑgst eine der Stangen ab."
-msgstr "You saw off one of the poles."
+msgstr "You saw off one of the rods."
 
 #: ../../ms2/ms2_r1.c:444
 msgid "Du betrittst das einzige|offene GeschÑft, das|du finden kannst."
@@ -1185,11 +1185,11 @@ msgstr "I AM Horst Hummel!"
 
 #: ../../ms2/ms2_r1.c:761
 msgid "Geben Sie's auf!"
-msgstr "Give it up!"
+msgstr "In your dreams!"
 
 #: ../../ms2/ms2_r1.c:762
 msgid "An Ihrer Gestik merkt man, da· Sie|ein verkleideter Axacussaner sind."
-msgstr "You can tell from your gestures that you are|a disguised Axacussan."
+msgstr "I can tell from the way you move that you are|a disguised Axacussan."
 
 #: ../../ms2/ms2_r1.c:763
 msgid "Der echte Hummel bewegt sich|anders, irgendwie ruckartig."
@@ -1473,7 +1473,7 @@ msgstr "Seller"
 
 #: ../../ms2/ms2_r2.c:36
 msgid "Was? DafÅr wollen Sie die Karte haben?"
-msgstr "What? Do you want the card for that?"
+msgstr "What? Do you want the ticket for that?"
 
 #: ../../ms2/ms2_r2.c:37
 msgid "Sie sind wohl nicht ganz Åber|die aktuellen Preise informiert!"
@@ -1519,7 +1519,7 @@ msgstr "Thank you for your purchase!"
 
 #: ../../ms2/ms2_r2.c:77
 msgid "Was bieten Sie mir|denn nun fÅr die Karte?"
-msgstr "What will you offer me|for the card?"
+msgstr "What will you offer me|for the ticket?"
 
 #: ../../ms2/ms2_r2.c:81
 msgid "Hallo, Sie!"
@@ -1571,7 +1571,7 @@ msgstr "From whom?"
 
 #: ../../ms2/ms2_r2.c:99
 msgid "Diese Information kostet einen Xa."
-msgstr "This information costs a Xa."
+msgstr "This information costs one Xa."
 
 #: ../../ms2/ms2_r2.c:104
 msgid "Wie Sie meinen."
@@ -1579,7 +1579,7 @@ msgstr "As you say."
 
 #: ../../ms2/ms2_r2.c:110
 msgid "Sie kînnen die Karte von MIR bekommen!"
-msgstr "You can get the card from ME!"
+msgstr "You can get the ticket from ME!"
 
 #: ../../ms2/ms2_r2.c:111
 msgid "Aber nur eine Teilnahmekarte,|keine Eintrittskarte."
@@ -1599,7 +1599,7 @@ msgstr "That's a good offer!"
 
 #: ../../ms2/ms2_r2.c:135
 msgid "DafÅr gebe ich Ihnen meine|letzte Teilnahmekarte!"
-msgstr "For that I give you my|last participation card!"
+msgstr "For that I give you my|last participation ticket!"
 
 #: ../../ms2/ms2_r2.c:140
 msgid "(Dieser Trottel!)"
@@ -1897,7 +1897,7 @@ msgid ""
 "Wieso betonen Sie, da· es|Ihre freie Entscheidung war?|Haben Sie Angst, da· "
 "man Ihnen|nicht glaubt?"
 msgstr ""
-"Why do you stress that|it was your own decision?|Are you afraid that nobody "
+"Why do you stress that it was your own decision?|Are you afraid that nobody "
 "will believe you otherwise?"
 
 #: ../../ms2/ms2_r2.c:494
@@ -1924,7 +1924,7 @@ msgid ""
 "gearbeitet haben?"
 msgstr ""
 "You are a chef by profession.|What was the name of the restaurant|where you "
-"worked|on Earth?"
+"worked on Earth?"
 
 #: ../../ms2/ms2_r2.c:508
 msgid "Hmm, da· wei· ich nicht mehr."
@@ -1956,15 +1956,15 @@ msgid ""
 "Sie sind ein Roboter!|Das merkt man schon an|Ihrer dummen Antwort!|Sie sind "
 "nicht optimal|programmiert!"
 msgstr ""
-"You are a robot!|It is obvious from|your stupid answer!|You are not even "
-"programmed|correctly!"
+"You are a robot!|It is obvious from your stupid answer!|You are not even "
+"programmed correctly!"
 
 #: ../../ms2/ms2_r2.c:533
 msgid ""
 "Wenn Sie jetzt nicht mit Ihren|Beleidigungen aufhîren, mu· ich|Ihnen das "
 "Mikrofon abschalten!"
 msgstr ""
-"If you do not stop right now|with your insults, I will have|to turn off the "
+"If you do not stop right now with your insults,|I will have to turn off the "
 "microphone!"
 
 #: ../../ms2/ms2_r2.c:534
@@ -2048,7 +2048,7 @@ msgstr "I am the plumber. I'm supposed to fix a pipe here."
 
 #: ../../ms2/ms2_r2.c:688
 msgid "Ja, hîrt sich gut an."
-msgstr "Yes, it sounds good."
+msgstr "Yes, that sounds good."
 
 #: ../../ms2/ms2_r2.c:689
 msgid "Krumme GeschÑfte? FÅr wen halten Sie mich? Auf Wiedersehen!"
@@ -2250,8 +2250,8 @@ msgid ""
 "Wenn du es bis zur Alarmanlage|geschafft hast, hÑngst du dich|mit dem Sauger "
 "an die Wand,|damit du keinen Druck-Alarm auslîst."
 msgstr ""
-"If you make it to the alarm system,|you'll use the sucker to hang on the "
-"wall|to avoid triggering the pressure alarm."
+"If you make it to the alarm system,|you'll use the suction cup to hang on "
+"the wall|to avoid triggering the pressure alarm."
 
 #: ../../ms2/ms2_r2.c:789
 msgid "Die Alarmanlage schaltest du|mit einem speziellen GerÑt aus."
@@ -2299,7 +2299,7 @@ msgid ""
 "GebÑuderteil eingedrungen sind."
 msgstr ""
 "You stand in front of the Orzeng Museum,|while the gangsters have already "
-"penetrated|into another part of the building."
+"entered|into another part of the building."
 
 #: ../../ms2/ms2_r2.c:837
 msgid ""
@@ -2429,8 +2429,8 @@ msgid ""
 "Ich hatte es scheinbar etwas zu|eilig, aber ich mu·te unbedingt|zu den "
 "Dreharbeiten nach Xenon!"
 msgstr ""
-"Apparently I was too much in a hurry,|but I had to be at the film shooting "
-"in Xenon!"
+"Apparently I was too much in a hurry,|but I had to be at a film shooting in "
+"Xenon!"
 
 #: ../../ms2/ms2_r2.c:1146
 msgid "Mich wundert, da· es die Leute|hier so gelassen nehmen."
@@ -2489,7 +2489,7 @@ msgstr "Axacussan"
 
 #: ../../ms2/ms2_r2.c:1207
 msgid "Teilnahmekarte"
-msgstr "Participation card"
+msgstr "Participation ticket"
 
 #: ../../ms2/ms2_r2.c:1216
 msgid "Axacussanerin"
@@ -2715,7 +2715,7 @@ msgstr ""
 
 #: ../../ms2/ms2_s.c:138
 msgid "Au·erdem sind die Leute von der|Artus GmbH hervorragende Freunde."
-msgstr "In addition, the people of|Artus GmbH are excellent friends."
+msgstr "In addition, the people at|Artus GmbH are excellent friends."
 
 #: ../../ms2/ms2_s.c:139
 msgid ""
@@ -2762,8 +2762,7 @@ msgstr "Suddenly, a speaker's voice|distracts you from the television."
 msgid ""
 "\"Sehr geehrte Damen und Herren,|wir sind soeben auf dem Flughafen|von "
 "Axacuss City gelandet.\""
-msgstr ""
-"\"Ladies and Gentlemen,|We just landed at the airport|at Axacuss City.\""
+msgstr "\"Ladies and Gentlemen,|We just landed at Axacuss City Airport.\""
 
 #: ../../ms2/ms2_s.c:166
 msgid ""
@@ -2784,7 +2783,7 @@ msgid ""
 "\"Ich mu· beweisen, da· dieser|Roboter der falsche Horst|Hummel ist!\", "
 "denkst du."
 msgstr ""
-"\"I have to prove that this robot|is the wrong Horst|Hummel!\", you think to "
+"\"I must prove that this robot|is not the real Horst|Hummel!\", you think to "
 "yourself."
 
 #: ../../ms2/ms2_s.c:192
