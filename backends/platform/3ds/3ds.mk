@@ -1,45 +1,65 @@
-include backends/platform/3ds/app/game.info
+TARGET := scummvm
 
+APP_TITLE       := ScummVM
+APP_DESCRIPTION := Point-and-click adventure game engines
 APP_AUTHOR      := ScummVM Team
-APP_BANNER_AUDIO:= $(srcdir)/backends/platform/3ds/app/banner.wav
+APP_ICON        := $(srcdir)/backends/platform/3ds/app/icon.png
+
 APP_RSF         := $(srcdir)/backends/platform/3ds/app/scummvm.rsf
+APP_BANNER_IMAGE:= $(srcdir)/backends/platform/3ds/app/banner.png
+APP_BANNER_AUDIO:= $(srcdir)/backends/platform/3ds/app/banner.wav
 
 ARCH     := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 CXXFLAGS += -std=gnu++11
 ASFLAGS  += -mfloat-abi=hard
 LDFLAGS  += -specs=3dsx.specs $(ARCH) -L$(DEVKITPRO)/libctru/lib -L$(DEVKITPRO)/portlibs/3ds/lib
 
-MAKEROM_PARAMS := -elf $(EXECUTABLE) -rsf $(APP_RSF) -banner $(TARGET).bnr -icon $(TARGET).smdh -DAPP_UNIQUE_ID=$(APP_UNIQUE_ID)
-
-ifneq ($(GAME),)
-	APP_ROMFS		:= $(srcdir)/pkg/ROMFS
-	MAKEROM_PARAMS	+= -DAPP_ROMFS="$(APP_ROMFS)" -D_GAME="$(TARGET)"
-endif
-
 .PHONY: clean_3ds
 
 clean: clean_3ds
 
 clean_3ds:
+	$(RM) backends/platform/3ds/shader.shbin
+	$(RM) backends/platform/3ds/shader_shbin.h
+	$(RM) $(TARGET).smdh
 	$(RM) $(TARGET).3dsx
+	$(RM) $(TARGET).bnr
+	$(RM) $(TARGET).romfs
 	$(RM) $(TARGET).cia
+	$(RM) -rf romfs
+
+romfs: $(DIST_FILES_THEMES) $(DIST_FILES_ENGINEDATA) $(DIST_FILES_NETWORKING) $(DIST_FILES_VKEYBD)
+	@rm -rf romfs
+	@mkdir -p romfs
+	@cp $(DIST_FILES_THEMES) romfs/
+ifdef DIST_FILES_ENGINEDATA
+	@cp $(DIST_FILES_ENGINEDATA) romfs/
+endif
+ifdef DIST_FILES_NETWORKING
+	@cp $(DIST_FILES_NETWORKING) romfs/
+endif
+ifdef DIST_FILES_VKEYBD
+	@cp $(DIST_FILES_VKEYBD) romfs/
+endif
 
 $(TARGET).smdh: $(APP_ICON)
 	@smdhtool --create "$(APP_TITLE)" "$(APP_DESCRIPTION)" "$(APP_AUTHOR)" $(APP_ICON) $@
 	@echo built ... $(notdir $@)
 
-$(TARGET).3dsx: $(EXECUTABLE) $(TARGET).smdh
-	@3dsxtool $< $@ --smdh=$(TARGET).smdh
+$(TARGET).3dsx: $(EXECUTABLE) $(TARGET).smdh romfs
+	@3dsxtool $< $@ --smdh=$(TARGET).smdh --romfs=romfs
 	@echo built ... $(notdir $@)
 	
 $(TARGET).bnr: $(APP_BANNER_IMAGE) $(APP_BANNER_AUDIO)
 	@bannertool makebanner -o $@ -i $(APP_BANNER_IMAGE) -a $(APP_BANNER_AUDIO)
 	@echo built ... $(notdir $@)
 
-.cia: $(TARGET).cia
-	
-$(TARGET).cia: $(EXECUTABLE) $(APP_RSF) $(TARGET).smdh $(TARGET).bnr
-	@makerom -f cia -target t -exefslogo -o $@ $(MAKEROM_PARAMS)
+$(TARGET).romfs: romfs
+	@3dstool -cvtf romfs $(TARGET).romfs --romfs-dir romfs
+	@echo built ... $(notdir $@)
+
+$(TARGET).cia: $(EXECUTABLE) $(APP_RSF) $(TARGET).smdh $(TARGET).bnr $(TARGET).romfs
+	@makerom -f cia -target t -exefslogo -o $@ -elf $(EXECUTABLE) -rsf $(APP_RSF) -banner $(TARGET).bnr -icon $(TARGET).smdh -romfs $(TARGET).romfs
 	@echo built ... $(notdir $@)
 
 #---------------------------------------------------------------------------------

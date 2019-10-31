@@ -36,8 +36,8 @@
 #include "common/str.h"
 #include "config.h"
 
-#include "backends/fs/posix/posix-fs-factory.h"
-#include "backends/fs/posix/posix-fs.h"
+#include "backends/fs/posix-drives/posix-drives-fs-factory.h"
+#include "backends/fs/posix-drives/posix-drives-fs.h"
 #include <unistd.h>
 #include <time.h>
 
@@ -77,14 +77,13 @@ OSystem_3DS::OSystem_3DS():
 	sleeping(false)
 {
 	chdir("sdmc:/");
-	_fsFactory = new POSIXFilesystemFactory();
-	
-//-- Standalone builds
-#ifdef _GAME
-	Posix::assureDirectoryExists( GAME_PATH );
-#else
-	Posix::assureDirectoryExists("/3ds/ScummVM/");
-#endif
+
+	DrivesPOSIXFilesystemFactory *fsFactory = new DrivesPOSIXFilesystemFactory();
+	fsFactory->addDrive("sdmc:");
+	fsFactory->addDrive("romfs:");
+	_fsFactory = fsFactory;
+
+	Posix::assureDirectoryExists("/3ds/scummvm/saves/");
 }
 
 OSystem_3DS::~OSystem_3DS() {
@@ -107,29 +106,11 @@ void OSystem_3DS::initBackend() {
 	ConfMan.registerDefault("aspect_ratio", true);
 	if (!ConfMan.hasKey("vkeybd_pack_name"))
 		ConfMan.set("vkeybd_pack_name", "vkeybd_small");
-//-- Standalone builds
-#ifdef _GAME
-	if (!ConfMan.hasKey("vkeybdpath"))
-		ConfMan.set("vkeybdpath", "romfs:/scummvm/kb");
-	if (!ConfMan.hasKey("themepath"))
-		ConfMan.set("themepath", "romfs:/scummvm/themes");
-#else
-	if (!ConfMan.hasKey("vkeybdpath"))
-		ConfMan.set("vkeybdpath", "scummvm/kb");
-	if (!ConfMan.hasKey("themepath"))
-		ConfMan.set("themepath", "scummvm");
-#endif
 	if (!ConfMan.hasKey("gui_theme"))
 		ConfMan.set("gui_theme", "builtin");
 
 	_timerManager = new DefaultTimerManager();
-
-//-- Standalone builds
-#ifdef _GAME
-	_savefileManager = new DefaultSaveFileManager( SAVE_PATH );
-#else
-	_savefileManager = new DefaultSaveFileManager("/3ds/ScummVM");
-#endif
+	_savefileManager = new DefaultSaveFileManager("sdmc:/3ds/scummvm/saves/");
 
 	initGraphics();
 	initAudio();
@@ -145,12 +126,11 @@ void OSystem_3DS::updateConfig() {
 }
 
 Common::String OSystem_3DS::getDefaultConfigFileName() {
-//-- Standalone builds
-#ifdef _GAME
-	return CONF_PATH;
-#else
-	return "/3ds/ScummVM/scummvm.ini";
-#endif
+	return "sdmc:/3ds/scummvm/scummvm.ini";
+}
+
+void OSystem_3DS::addSysArchivesToSearchSet(Common::SearchSet &s, int priority) {
+	s.add("RomFS", new Common::FSDirectory("romfs:/"), priority);
 }
 
 uint32 OSystem_3DS::getMillis(bool skipRecord) {
