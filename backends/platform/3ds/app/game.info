@@ -80,4 +80,20 @@ else ifeq ($(GAME), QFG4)
 	APP_TITLE       := Quest for Glory 4 - Shadows Of Darkness
 	APP_UNIQUE_ID   := 0xFF331
 
+else ifeq ($(GAME), PHANTASMAGORIA)
+	APP_TITLE       := Phantasmagoria
+	APP_UNIQUE_ID   := 0x1F332
+
+else ifeq ($(GAME), MANIAC)
+	APP_TITLE       := Maniac Mansion
+	APP_UNIQUE_ID   := 0x1F333
+
+else ifeq ($(GAME), LSL1)
+	APP_TITLE       := Leisure Suit Larry in the Land of the Lounge Lizards
+	APP_UNIQUE_ID   := 0x1F334
+
+else ifeq ($(GAME), BBDOU)
+	APP_TITLE       := Beavis & Butt-Head: Do U.
+	APP_UNIQUE_ID   := 0x1F335
+
 endif
