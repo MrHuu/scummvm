@@ -83,7 +83,12 @@ OSystem_3DS::OSystem_3DS():
 	fsFactory->addDrive("romfs:");
 	_fsFactory = fsFactory;
 
+//-- Standalone builds
+#ifdef _GAME
+	Posix::assureDirectoryExists( GAME_PATH );
+#else
 	Posix::assureDirectoryExists("/3ds/scummvm/saves/");
+#endif
 }
 
 OSystem_3DS::~OSystem_3DS() {
@@ -110,7 +115,13 @@ void OSystem_3DS::initBackend() {
 		ConfMan.set("gui_theme", "builtin");
 
 	_timerManager = new DefaultTimerManager();
+
+//-- Standalone builds
+#ifdef _GAME
+	_savefileManager = new DefaultSaveFileManager( SAVE_PATH );
+#else
 	_savefileManager = new DefaultSaveFileManager("sdmc:/3ds/scummvm/saves/");
+#endif	
 
 	initGraphics();
 	initAudio();
@@ -126,7 +137,12 @@ void OSystem_3DS::updateConfig() {
 }
 
 Common::String OSystem_3DS::getDefaultConfigFileName() {
+//-- Standalone builds
+#ifdef _GAME
+	return CONF_PATH;
+#else
 	return "sdmc:/3ds/scummvm/scummvm.ini";
+#endif
 }
 
 void OSystem_3DS::addSysArchivesToSearchSet(Common::SearchSet &s, int priority) {

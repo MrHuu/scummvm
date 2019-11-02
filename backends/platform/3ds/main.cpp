@@ -24,6 +24,14 @@
 #include <3ds.h>
 
 int main(int argc, char *argv[]) {
+	
+//-- Standalone builds
+#ifdef _GAME
+	char* n_argv[] = {GAME_ID"[ScummVM]","--path=romfs:/game",GAME_ID,NULL};
+	argv = n_argv;
+	argc = 3;
+#endif
+
 	// Initialize basic libctru stuff
 	gfxInitDefault();
 	cfguInit();

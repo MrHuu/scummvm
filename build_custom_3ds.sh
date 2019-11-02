@@ -14,11 +14,9 @@ export PORTLIBS=$DEVKITPRO/portlibs/3ds
 GAMEID=$1
 GAMEDAT=NONE
 
+rm -r ./romfs
+
 mkdir -p ./pkg
-mkdir -p ./pkg/ROMFS
-mkdir -p ./pkg/ROMFS/scummvm
-mkdir -p ./pkg/ROMFS/scummvm/kb
-mkdir -p ./pkg/ROMFS/scummvm/themes
 
 if [ $# -eq 0 ] ; then
 	GAMEID=NOTSET
@@ -132,24 +130,14 @@ else
 
 fi
 
-cp -R ./backends/platform/3ds/app/${GAMEID}/game ./pkg/ROMFS/
-
 if [ $GAMEDAT = "NONE" ] ; then
-	GAMEDAT=NONE
+	make .cia GAME=${GAMEID} || exit 1
 else
-	cp ./dists/engine-data/${GAMEDAT} ./pkg/ROMFS/game/${GAMEDAT}
+	make .cia GAME=${GAMEID} GAMEDAT=${GAMEDAT} || exit 1
 fi
-
-cp ./gui/themes/scummmodern.zip ./pkg/ROMFS/scummvm/themes/scummmodern.zip
-cp ./gui/themes/scummremastered.zip ./pkg/ROMFS/scummvm/themes/scummremastered.zip
-cp ./gui/themes/translations.dat ./pkg/ROMFS/scummvm/themes/translations.dat
-cp ./backends/vkeybd/packs/vkeybd_small.zip ./pkg/ROMFS/scummvm/kb/vkeybd_small.zip
-
-make .cia GAME=${GAMEID} || exit 1
 
 mv -f ./${GAMEID}[ScummVM].cia ./pkg/${GAMEID}[ScummVM].cia
 
-rm -r ./pkg/ROMFS
 rm -f ./scummvm.elf
 rm -f ./${GAMEID}[ScummVM].bnr
 rm -f ./${GAMEID}[ScummVM].icn

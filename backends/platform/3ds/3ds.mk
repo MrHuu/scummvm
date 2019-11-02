@@ -1,12 +1,7 @@
-TARGET := scummvm
+include backends/platform/3ds/app/game.info
 
-APP_TITLE       := ScummVM
-APP_DESCRIPTION := Point-and-click adventure game engines
 APP_AUTHOR      := ScummVM Team
-APP_ICON        := $(srcdir)/backends/platform/3ds/app/icon.png
-
 APP_RSF         := $(srcdir)/backends/platform/3ds/app/scummvm.rsf
-APP_BANNER_IMAGE:= $(srcdir)/backends/platform/3ds/app/banner.png
 APP_BANNER_AUDIO:= $(srcdir)/backends/platform/3ds/app/banner.wav
 
 ARCH     := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
@@ -40,6 +35,12 @@ endif
 ifdef DIST_FILES_VKEYBD
 	@cp $(DIST_FILES_VKEYBD) romfs/
 endif
+ifdef GAME
+	@cp -R ./backends/platform/3ds/app/$(GAME)/game romfs/
+ifdef GAMEDAT
+	@cp ./dists/engine-data/$(GAMEDAT) romfs/$(GAMEDAT)
+endif
+endif
 
 $(TARGET).smdh: $(APP_ICON)
 	@smdhtool --create "$(APP_TITLE)" "$(APP_DESCRIPTION)" "$(APP_AUTHOR)" $(APP_ICON) $@
@@ -54,8 +55,14 @@ $(TARGET).bnr: $(APP_BANNER_IMAGE) $(APP_BANNER_AUDIO)
 	@echo built ... $(notdir $@)
 
 $(TARGET).cia: $(EXECUTABLE) $(APP_RSF) $(TARGET).smdh $(TARGET).bnr romfs
+ifeq ($(GAME),)
 	@makerom -f cia -target t -exefslogo -o $@ -elf $(EXECUTABLE) -rsf $(APP_RSF) -banner $(TARGET).bnr -icon $(TARGET).smdh -DAPP_ROMFS=romfs/
+else
+	@makerom -f cia -target t -exefslogo -o $@ -elf $(EXECUTABLE) -rsf $(APP_RSF) -banner $(TARGET).bnr -icon $(TARGET).smdh -DAPP_ROMFS=romfs/ -D_GAME="$(TARGET)"
+endif
 	@echo built ... $(notdir $@)
+
+.cia: $(TARGET).cia
 
 #---------------------------------------------------------------------------------
 # rules for assembling GPU shaders
