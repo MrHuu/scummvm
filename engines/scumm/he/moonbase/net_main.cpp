@@ -383,6 +383,8 @@ void Net::remoteSendDataErrorCallback(Networking::ErrorResponse error) {
 }
 
 void Net::remoteSendArray(int typeOfSend, int sendTypeParam, int priority, int arrayIndex) {
+	debug(1, "Net::remoteSendArray(%d, %d, %d, %d)", typeOfSend, sendTypeParam, priority, arrayIndex & ~0x33539000); // PN_RemoteSendArrayCommand
+
 	ScummEngine_v100he::ArrayHeader *ah = (ScummEngine_v100he::ArrayHeader *)_vm->getResourceAddress(rtString, arrayIndex & ~0x33539000);
 
 	Common::String jsonData = Common::String::format(
@@ -392,12 +394,35 @@ void Net::remoteSendArray(int typeOfSend, int sendTypeParam, int priority, int a
 	int32 size = (FROM_LE_32(ah->dim1end) - FROM_LE_32(ah->dim1start) + 1) *
 		(FROM_LE_32(ah->dim2end) - FROM_LE_32(ah->dim2start) + 1);
 
-	for (int i = 0; i < size - 1; i++)
-		jsonData += Common::String::format("%d, ", ah->data[i]);
+	for (int i = 0; i < size; i++) {
+		int32 data;
 
+		switch (FROM_LE_32(ah->type)) {
+		case ScummEngine_v100he::kByteArray:
+		case ScummEngine_v100he::kStringArray:
+			data = ah->data[i];
+			break;
+
+		case ScummEngine_v100he::kIntArray:
+			data = (int16)READ_LE_UINT16(ah->data + i * 2);
+			break;
+
+		case ScummEngine_v100he::kDwordArray:
+			data = (int32)READ_LE_UINT32(ah->data + i * 4);
+			break;
+
+		default:
+			error("Net::remoteSendArray(): Unknown array type %d for array %d", FROM_LE_32(ah->type), arrayIndex);
+		}
+
+		jsonData += Common::String::format("%d, ", data);
+
+		if (i < size - 1)
+			jsonData += ", ";
+		else
+			jsonData += "]";
 	jsonData += Common::String::format("%d]", ah->data[size - 1]);
-
-	warning("STUB: Net::remoteSendArray(%d, %d, %d, %d)", typeOfSend, sendTypeParam, priority, arrayIndex & ~0x33539000); // PN_RemoteSendArrayCommand
+	}
 
 	remoteSendData(typeOfSend, sendTypeParam, PACKETTYPE_REMOTESENDSCUMMARRAY, jsonData, 0);
 }
@@ -497,22 +522,16 @@ bool Net::remoteReceiveData() {
 	uint from = _packetdata->child("from")->asIntegerNumber();
 	uint type = _packetdata->child("type")->asIntegerNumber();
 
-	int datalen = _packetdata->child("data")->asArray().size();
-	for (uint i = 0; i < datalen; i++) {
-		_packbuffer[i] = _packetdata->child("data")->asArray()[i]->asIntegerNumber();
-	}
-
-	Common::MemoryReadStream pack(_packbuffer, datalen);
-
 	uint32 *params;
 
 	switch (type) {
 	case PACKETTYPE_REMOTESTARTSCRIPT:
 		{
+			int datalen = _packetdata->child("data")->child("params")->asArray().size();
 			params = (uint32 *)_tmpbuffer;
 
-			for (int i = 0; i < 24; i++) {
-				*params = pack.readUint32LE();
+			for (int i = 0; i < datalen; i++) {
+				*params = _packetdata->child("data")->child("params")->asArray()[i]->asIntegerNumber();
 				params++;
 			}
 
@@ -522,10 +541,11 @@ bool Net::remoteReceiveData() {
 
 	case PACKETTYPE_REMOTESTARTSCRIPTRETURN:
 		{
+			int datalen = _packetdata->child("data")->child("params")->asArray().size();
 			params = (uint32 *)_tmpbuffer;
 
-			for (int i = 0; i < 24; i++) {
-				*params = pack.readUint32LE();
+			for (int i = 0; i < datalen; i++) {
+				*params = _packetdata->child("data")->child("params")->asArray()[i]->asIntegerNumber();
 				params++;
 			}
 
@@ -553,7 +573,41 @@ bool Net::remoteReceiveData() {
 			// and unpack it into an scumm array :-)
 
 			newArray = _vm->findFreeArrayId();
-			unpackageArray(newArray, _packbuffer, datalen);
+
+			int dim1start = _packetdata->child("data")->child("dim1start")->asIntegerNumber();
+			int dim1end   = _packetdata->child("data")->child("dim1end")->asIntegerNumber();
+			int dim2start = _packetdata->child("data")->child("dim2start")->asIntegerNumber();
+			int dim2end   = _packetdata->child("data")->child("dim2end")->asIntegerNumber();
+			int atype     = _packetdata->child("data")->child("type")->asIntegerNumber();
+
+			byte *data = _vm->defineArray(newArray, atype, dim2start, dim2end, dim1start, dim1end);
+
+			int32 size = (dim1end - dim1start + 1) * (dim2end - dim2start + 1);
+
+			int32 value;
+
+			for (int i = 0; i < size; i++) {
+				value = _packetdata->child("data")->child("data")->asArray()[i]->asIntegerNumber();
+
+				switch (atype) {
+				case ScummEngine_v100he::kByteArray:
+				case ScummEngine_v100he::kStringArray:
+					data[i] = value;
+					break;
+
+				case ScummEngine_v100he::kIntArray:
+					WRITE_LE_UINT16(data + i * 2, value);
+					break;
+
+				case ScummEngine_v100he::kDwordArray:
+					WRITE_LE_UINT32(data + i * 4, value);
+					break;
+
+				default:
+					error("Net::remoteReceiveData(): Unknown array type %d", atype);
+				}
+			}
+
 			memset(_tmpbuffer, 0, 25 * 4);
 			WRITE_UINT32(_tmpbuffer, newArray);
 
