@@ -24,7 +24,7 @@ fi
 
 if [ $GAMEID = "ALL" ] ; then
 
-	for GAMEID in COMI DIG FT SAMNMAX MONKEY MONKEY2 TENTACLE DW DW2 BBVS MYST NEVERHOOD QUEEN RIVEN TOON QFG4
+	for GAMEID in COMI DIG FT SAMNMAX MONKEY MONKEY2 TENTACLE DW DW2 BBVS MYST NEVERHOOD QUEEN RIVEN TOON QFG4 PHANTASMAGORIA BBDOU LSL1 MANIAC
 	do
 		./build_custom_3ds.sh $GAMEID
 	done
@@ -100,6 +100,22 @@ elif [ $GAMEID = "QFG4" ] ; then
 
 	./configure --host=3ds --disable-all-engines --enable-engine=sci32
 
+elif [ $GAMEID = "PHANTASMAGORIA" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=sci32
+
+elif [ $GAMEID = "MANIAC" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm
+
+elif [ $GAMEID = "LSL1" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=agi
+
+elif [ $GAMEID = "BBDOU" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=illusions
+
 else
 
 	echo
@@ -110,7 +126,7 @@ else
 	echo
 	echo Arguments available: 
 	echo ALL BBVS COMI DIG DW DW2 FT MONKEY MONKEY2 MYST NEVERHOOD QUEEN RIVEN SAMNMAX TENTACLE TOON
-	echo QFG4
+	echo QFG4 PHANTASMAGORIA MANIAC LSL1 BBDOU
 	echo
 	echo Engines available:
 	echo agi,agos,agos2,cruise,gob,hugo,kyra,lure,myst,riven,queen,saga,ihnm,scumm,scumm-7-8,he,sci,sci32,
