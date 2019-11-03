@@ -49,7 +49,7 @@ $(TARGET).smdh: $(APP_ICON)
 $(TARGET).3dsx: $(EXECUTABLE) $(TARGET).smdh romfs
 	@3dsxtool $< $@ --smdh=$(TARGET).smdh --romfs=romfs
 	@echo built ... $(notdir $@)
-	
+
 $(TARGET).bnr: $(APP_BANNER_IMAGE) $(APP_BANNER_AUDIO)
 	@bannertool makebanner -o $@ -i $(APP_BANNER_IMAGE) -a $(APP_BANNER_AUDIO)
 	@echo built ... $(notdir $@)
@@ -58,7 +58,7 @@ $(TARGET).cia: $(EXECUTABLE) $(APP_RSF) $(TARGET).smdh $(TARGET).bnr romfs
 ifeq ($(GAME),)
 	@makerom -f cia -target t -exefslogo -o $@ -elf $(EXECUTABLE) -rsf $(APP_RSF) -banner $(TARGET).bnr -icon $(TARGET).smdh -DAPP_ROMFS=romfs/
 else
-	@makerom -f cia -target t -exefslogo -o $@ -elf $(EXECUTABLE) -rsf $(APP_RSF) -banner $(TARGET).bnr -icon $(TARGET).smdh -DAPP_ROMFS=romfs/ -D_GAME="$(TARGET)"
+	@makerom -f cia -target t -exefslogo -o $@ -elf $(EXECUTABLE) -rsf $(APP_RSF) -banner $(TARGET).bnr -icon $(TARGET).smdh -DAPP_ROMFS=romfs/ -DAPP_UNIQUE_ID=$(APP_UNIQUE_ID) -D_GAME="$(TARGET)"
 endif
 	@echo built ... $(notdir $@)
 

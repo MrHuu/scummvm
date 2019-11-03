@@ -24,11 +24,15 @@ fi
 
 if [ $GAMEID = "ALL" ] ; then
 
-	for GAMEID in COMI DIG FT SAMNMAX MONKEY MONKEY2 TENTACLE DW DW2 BBVS MYST NEVERHOOD QUEEN RIVEN TOON QFG4 PHANTASMAGORIA BBDOU LSL1 MANIAC
+	for GAMEID in BBDOU BBVS COMI DIG DW DW2 FT HDB LSL1 MANIAC MONKEY MONKEY2 MYST NEVERHOOD PHANTASMAGORIA QFG4 QUEEN RIVEN SAMNMAX TENTACLE TOON
 	do
 		./build_custom_3ds.sh $GAMEID
 	done
 	exit
+
+elif [ $GAMEID = "BBDOU" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=illusions
 
 elif [ $GAMEID = "BBVS" ] ; then
 
@@ -45,7 +49,7 @@ elif [ $GAMEID = "DIG" ] ; then
 elif [ $GAMEID = "DW" ] ; then
 
 	./configure --host=3ds --disable-all-engines --enable-engine=tinsel
-	
+
 elif [ $GAMEID = "DW2" ] ; then
 
 	./configure --host=3ds --disable-all-engines --enable-engine=tinsel
@@ -53,6 +57,18 @@ elif [ $GAMEID = "DW2" ] ; then
 elif [ $GAMEID = "FT" ] ; then
 
 	./configure --host=3ds --disable-all-engines --enable-engine=scumm-7-8
+
+elif [ $GAMEID = "HDB" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=hdb
+
+elif [ $GAMEID = "LSL1" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=agi
+
+elif [ $GAMEID = "MANIAC" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm
 
 elif [ $GAMEID = "MONKEY" ] ; then
 
@@ -67,11 +83,19 @@ elif [ $GAMEID = "MYST" ] ; then
 	./configure --host=3ds --disable-all-engines --enable-engine=myst
 
 elif [ $GAMEID = "NEVERHOOD" ] ; then
-	
+
 	./configure --host=3ds --disable-all-engines --enable-engine=neverhood
-	
+
 	GAMEDAT=neverhood.dat
-	
+
+elif [ $GAMEID = "PHANTASMAGORIA" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=sci32
+
+elif [ $GAMEID = "QFG4" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=sci32
+
 elif [ $GAMEID = "QUEEN" ] ; then
 
 	./configure --host=3ds --disable-all-engines --enable-engine=queen
@@ -96,26 +120,6 @@ elif [ $GAMEID = "TOON" ] ; then
 
 	GAMEDAT=toon.dat
 
-elif [ $GAMEID = "QFG4" ] ; then
-
-	./configure --host=3ds --disable-all-engines --enable-engine=sci32
-
-elif [ $GAMEID = "PHANTASMAGORIA" ] ; then
-
-	./configure --host=3ds --disable-all-engines --enable-engine=sci32
-
-elif [ $GAMEID = "MANIAC" ] ; then
-
-	./configure --host=3ds --disable-all-engines --enable-engine=scumm
-
-elif [ $GAMEID = "LSL1" ] ; then
-
-	./configure --host=3ds --disable-all-engines --enable-engine=agi
-
-elif [ $GAMEID = "BBDOU" ] ; then
-
-	./configure --host=3ds --disable-all-engines --enable-engine=illusions
-
 else
 
 	echo
@@ -125,8 +129,8 @@ else
 	echo *ONLY single Arguments
 	echo
 	echo Arguments available: 
-	echo ALL BBVS COMI DIG DW DW2 FT MONKEY MONKEY2 MYST NEVERHOOD QUEEN RIVEN SAMNMAX TENTACLE TOON
-	echo QFG4 PHANTASMAGORIA MANIAC LSL1 BBDOU
+	echo  BBDOU BBVS COMI DIG DW DW2 FT LSL1 MANIAC MONKEY MONKEY2 MYST NEVERHOOD PHANTASMAGORIA QFG4
+	echo  QUEEN RIVEN SAMNMAX TENTACLE TOON
 	echo
 	echo Engines available:
 	echo agi,agos,agos2,cruise,gob,hugo,kyra,lure,myst,riven,queen,saga,ihnm,scumm,scumm-7-8,he,sci,sci32,

@@ -15,13 +15,21 @@ else ifneq ($(GAME),)
 
 endif
 
-ifeq ($(GAME), BBVS)
+ifeq ($(GAME), BBDOU)
+	APP_TITLE       := Beavis & Butt-Head: Do U.
+	APP_UNIQUE_ID   := 0x1F335
+
+else ifeq ($(GAME), BBVS)
 	APP_TITLE       := Beavis & Butt-head in Virtual Stupidity
 	APP_UNIQUE_ID   := 0xFF322
 
 else ifeq ($(GAME), COMI)
 	APP_TITLE       := The Curse of Monkey Island
 	APP_UNIQUE_ID   := 0xFF323
+
+else ifeq ($(GAME), DIG)
+	APP_TITLE       := The Dig
+	APP_UNIQUE_ID   := 0xFF326
 
 else ifeq ($(GAME), DW)
 	APP_TITLE       := Discworld
@@ -31,13 +39,21 @@ else ifeq ($(GAME), DW2)
 	APP_TITLE       := Discworld II: Missing Presumed...!?
 	APP_UNIQUE_ID   := 0xFF325
 
-else ifeq ($(GAME), DIG)
-	APP_TITLE       := The Dig
-	APP_UNIQUE_ID   := 0xFF326
-
 else ifeq ($(GAME), FT)
 	APP_TITLE       := Full Throttle
 	APP_UNIQUE_ID   := 0xFF327
+
+else ifeq ($(GAME), HDB)
+	APP_TITLE       := Hyperspace Delivery Boy!
+	APP_UNIQUE_ID   := 0x1F336
+
+else ifeq ($(GAME), LSL1)
+	APP_TITLE       := Leisure Suit Larry in the Land of the Lounge Lizards
+	APP_UNIQUE_ID   := 0x1F334
+
+else ifeq ($(GAME), MANIAC)
+	APP_TITLE       := Maniac Mansion
+	APP_UNIQUE_ID   := 0x1F333
 
 else ifeq ($(GAME), MONKEY)
 	APP_TITLE       := The Secret of Monkey Island
@@ -46,7 +62,7 @@ else ifeq ($(GAME), MONKEY)
 else ifeq ($(GAME), MONKEY2)
 	APP_TITLE       := Monkey Island II: Le Chuck's Revenge
 	APP_UNIQUE_ID   := 0xFF329
-	
+
 else ifeq ($(GAME), MYST)
 	APP_TITLE       := Myst
 	APP_UNIQUE_ID   := 0xFF32A
@@ -55,6 +71,14 @@ else ifeq ($(GAME), NEVERHOOD)
 	APP_TITLE       := The Neverhood Chronicles
 	APP_UNIQUE_ID   := 0xFF32B
 	CXXFLAGS		+= -D_NEVERHOOD_MENU
+
+else ifeq ($(GAME), PHANTASMAGORIA)
+	APP_TITLE       := Phantasmagoria
+	APP_UNIQUE_ID   := 0x1F332
+
+else ifeq ($(GAME), QFG4)
+	APP_TITLE       := Quest for Glory 4 - Shadows Of Darkness
+	APP_UNIQUE_ID   := 0xFF331
 
 else ifeq ($(GAME), QUEEN)
 	APP_TITLE       := Flight of the Amazon Queen
@@ -67,7 +91,7 @@ else ifeq ($(GAME), RIVEN)
 else ifeq ($(GAME), SAMNMAX)
 	APP_TITLE       := Sam & Max Hit the Road
 	APP_UNIQUE_ID   := 0xFF32E
-	
+
 else ifeq ($(GAME), TENTACLE)
 	APP_TITLE       := Day of the Tentacle
 	APP_UNIQUE_ID   := 0xFF32F
@@ -75,25 +99,5 @@ else ifeq ($(GAME), TENTACLE)
 else ifeq ($(GAME), TOON)
 	APP_TITLE       := Toonstruck
 	APP_UNIQUE_ID   := 0xFF330
-
-else ifeq ($(GAME), QFG4)
-	APP_TITLE       := Quest for Glory 4 - Shadows Of Darkness
-	APP_UNIQUE_ID   := 0xFF331
-
-else ifeq ($(GAME), PHANTASMAGORIA)
-	APP_TITLE       := Phantasmagoria
-	APP_UNIQUE_ID   := 0x1F332
-
-else ifeq ($(GAME), MANIAC)
-	APP_TITLE       := Maniac Mansion
-	APP_UNIQUE_ID   := 0x1F333
-
-else ifeq ($(GAME), LSL1)
-	APP_TITLE       := Leisure Suit Larry in the Land of the Lounge Lizards
-	APP_UNIQUE_ID   := 0x1F334
-
-else ifeq ($(GAME), BBDOU)
-	APP_TITLE       := Beavis & Butt-Head: Do U.
-	APP_UNIQUE_ID   := 0x1F335
 
 endif
