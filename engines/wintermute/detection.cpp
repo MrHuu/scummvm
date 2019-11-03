@@ -88,11 +88,15 @@ static const char *directoryGlobs[] = {
 class WintermuteMetaEngine : public AdvancedMetaEngine {
 public:
 	WintermuteMetaEngine() : AdvancedMetaEngine(Wintermute::gameDescriptions, sizeof(WMEGameDescription), Wintermute::wintermuteGames, gameGuiOptions) {
-		_singleId = "wintermute";
 		_guiOptions = GUIO3(GUIO_NOMIDI, GAMEOPTION_SHOW_FPS, GAMEOPTION_BILINEAR);
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;
 	}
+
+	const char *getEngineId() const {
+		return "wintermute";
+	}
+
 	virtual const char *getName() const {
 		return "Wintermute";
 	}

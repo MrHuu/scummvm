@@ -148,14 +148,17 @@ const static char *directoryGlobs[] = {
 class PrinceMetaEngine : public AdvancedMetaEngine {
 public:
 	PrinceMetaEngine() : AdvancedMetaEngine(Prince::gameDescriptions, sizeof(Prince::PrinceGameDescription), princeGames) {
-		_singleId = "prince";
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;
 	}
 
-        virtual const char *getName() const {
-                return "The Prince and the Coward";
+        const char *getEngineId() const {
+                return "prince";
         }
+
+	virtual const char *getName() const {
+                return "The Prince and the Coward";
+	}
 
 	virtual const char *getOriginalCopyright() const {
 		return "The Prince and the Coward (C) 1996-97 Metropolis";

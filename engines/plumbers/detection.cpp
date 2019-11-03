@@ -73,7 +73,10 @@ static const ADGameDescription gameDescriptions[] = {
 class PlumbersMetaEngine : public AdvancedMetaEngine {
 public:
 	PlumbersMetaEngine() : AdvancedMetaEngine(Plumbers::gameDescriptions, sizeof(ADGameDescription), plumbersGames) {
-		_singleId = "plumbers";
+	}
+
+	const char *getEngineId() const {
+		return "plumbers";
 	}
 
 	virtual const char *getName() const {

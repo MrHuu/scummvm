@@ -75,7 +75,6 @@ Common::Platform AccessEngine::getPlatform() const {
 } // End of namespace Access
 
 static const PlainGameDescriptor AccessGames[] = {
-	{"Access", "Access"},
 	{"amazon", "Amazon: Guardians of Eden"},
 	{"martian", "Martian Memorandum"},
 	{0, 0}
@@ -87,6 +86,10 @@ class AccessMetaEngine : public AdvancedMetaEngine {
 public:
 	AccessMetaEngine() : AdvancedMetaEngine(Access::gameDescriptions, sizeof(Access::AccessGameDescription), AccessGames) {
 		_maxScanDepth = 3;
+	}
+
+	virtual const char *getEngineId() const {
+		return "access";
 	}
 
 	virtual const char *getName() const {

@@ -198,8 +198,11 @@ static const ExtraGuiOption neverhoodExtraGuiOption3 = {
 class NeverhoodMetaEngine : public AdvancedMetaEngine {
 public:
 	NeverhoodMetaEngine() : AdvancedMetaEngine(Neverhood::gameDescriptions, sizeof(Neverhood::NeverhoodGameDescription), neverhoodGames) {
-		_singleId = "neverhood";
 		_guiOptions = GUIO2(GUIO_NOSUBTITLES, GUIO_NOMIDI);
+	}
+
+	const char *getEngineId() const {
+		return "neverhood";
 	}
 
 	virtual const char *getName() const {

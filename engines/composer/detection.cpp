@@ -55,7 +55,6 @@ Common::Language ComposerEngine::getLanguage() const {
 }
 
 static const PlainGameDescriptor composerGames[] = {
-	{"composer", "Composer Game"},
 	{"babayaga", "Magic Tales: Baba Yaga and the Magic Geese"},
 	{"darby", "Darby the Dragon"},
 	{"gregory", "Gregory and the Hot Air Balloon"},
@@ -480,9 +479,12 @@ static const char *directoryGlobs[] = {
 class ComposerMetaEngine : public AdvancedMetaEngine {
 public:
 	ComposerMetaEngine() : AdvancedMetaEngine(Composer::gameDescriptions, sizeof(Composer::ComposerGameDescription), composerGames) {
-		_singleId = "composer";
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;
+	}
+
+	const char *getEngineId() const {
+		return "composer";
 	}
 
 	virtual const char *getName() const {

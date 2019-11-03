@@ -115,7 +115,10 @@ public:
 	ChewyMetaEngine() : AdvancedMetaEngine(Chewy::gameDescriptions, sizeof(Chewy::ChewyGameDescription), chewyGames) {
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;
-		_singleId = "chewy";
+	}
+
+	const char *getEngineId() const {
+		return "chewy";
 	}
 
 	virtual const char *getName() const {

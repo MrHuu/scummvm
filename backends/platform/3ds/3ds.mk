@@ -22,7 +22,7 @@ clean_3ds:
 	$(RM) $(TARGET).cia
 	$(RM) -rf romfs
 
-romfs: $(DIST_FILES_THEMES) $(DIST_FILES_ENGINEDATA) $(DIST_FILES_NETWORKING) $(DIST_FILES_VKEYBD)
+romfs: $(DIST_FILES_THEMES) $(DIST_FILES_ENGINEDATA) $(DIST_FILES_NETWORKING) $(DIST_FILES_VKEYBD) $(DIST_3DS_EXTRA_FILES)
 	@rm -rf romfs
 	@mkdir -p romfs
 	@cp $(DIST_FILES_THEMES) romfs/
@@ -34,6 +34,9 @@ ifdef DIST_FILES_NETWORKING
 endif
 ifdef DIST_FILES_VKEYBD
 	@cp $(DIST_FILES_VKEYBD) romfs/
+endif
+ifdef DIST_3DS_EXTRA_FILES
+	@cp -a $(DIST_3DS_EXTRA_FILES) romfs/
 endif
 ifdef GAME
 	@cp -R ./backends/platform/3ds/app/$(GAME)/game romfs/

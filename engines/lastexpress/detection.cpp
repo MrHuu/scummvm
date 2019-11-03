@@ -227,8 +227,11 @@ static const ADGameDescription gameDescriptions[] = {
 class LastExpressMetaEngine : public AdvancedMetaEngine {
 public:
 	LastExpressMetaEngine() : AdvancedMetaEngine(gameDescriptions, sizeof(ADGameDescription), lastExpressGames) {
-		_singleId = "lastexpress";
 		_guiOptions = GUIO2(GUIO_NOSUBTITLES, GUIO_NOSFX);
+	}
+
+	const char *getEngineId() const {
+		return "lastexpress";
 	}
 
 	const char *getName() const {

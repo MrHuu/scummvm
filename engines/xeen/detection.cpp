@@ -76,7 +76,6 @@ bool XeenEngine::getIsCD() const {
 } // End of namespace Xeen
 
 static const PlainGameDescriptor XeenGames[] = {
-	{ "xeen", "Xeen" },
 	{ "cloudsofxeen", "Might and Magic IV: Clouds of Xeen" },
 	{ "darksideofxeen", "Might and Magic V: Dark Side of Xeen" },
 	{ "worldofxeen", "Might and Magic: World of Xeen" },
@@ -119,6 +118,10 @@ public:
 	XeenMetaEngine() : AdvancedMetaEngine(Xeen::gameDescriptions, sizeof(Xeen::XeenGameDescription),
 			XeenGames, optionsList) {
 		_maxScanDepth = 3;
+	}
+
+	virtual const char *getEngineId() const {
+		return "xeen";
 	}
 
 	virtual const char *getName() const {

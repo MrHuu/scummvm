@@ -79,6 +79,10 @@ static const char *const g_filesToCheck[NUM_FILES_TO_CHECK] = { // these files h
 
 class SwordMetaEngine : public MetaEngine {
 public:
+	virtual const char *getEngineId() const {
+		return "sword1";
+	}
+
 	virtual const char *getName() const {
 		return "Broken Sword: The Shadow of the Templars";
 	}
@@ -214,17 +218,17 @@ DetectedGames SwordMetaEngine::detectGames(const Common::FSList &fslist) const {
 
 	DetectedGame game;
 	if (mainFilesFound && pcFilesFound && demoFilesFound)
-		game = DetectedGame(sword1DemoSettings);
+		game = DetectedGame(getEngineId(), sword1DemoSettings);
 	else if (mainFilesFound && pcFilesFound && psxFilesFound)
-		game = DetectedGame(sword1PSXSettings);
+		game = DetectedGame(getEngineId(), sword1PSXSettings);
 	else if (mainFilesFound && pcFilesFound && psxDemoFilesFound)
-		game = DetectedGame(sword1PSXDemoSettings);
+		game = DetectedGame(getEngineId(), sword1PSXDemoSettings);
 	else if (mainFilesFound && pcFilesFound && !psxFilesFound)
-		game = DetectedGame(sword1FullSettings);
+		game = DetectedGame(getEngineId(), sword1FullSettings);
 	else if (mainFilesFound && macFilesFound)
-		game = DetectedGame(sword1MacFullSettings);
+		game = DetectedGame(getEngineId(), sword1MacFullSettings);
 	else if (mainFilesFound && macDemoFilesFound)
-		game = DetectedGame(sword1MacDemoSettings);
+		game = DetectedGame(getEngineId(), sword1MacDemoSettings);
 	else
 		return detectedGames;
 

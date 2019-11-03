@@ -99,9 +99,12 @@ static const char *directoryGlobs[] = {
 class DirectorMetaEngine : public AdvancedMetaEngine {
 public:
 	DirectorMetaEngine() : AdvancedMetaEngine(Director::gameDescriptions, sizeof(Director::DirectorGameDescription), directorGames) {
-		_singleId = "director";
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;
+	}
+
+	virtual const char *getEngineId() const {
+		return "director";
 	}
 
 	virtual const char *getName() const {

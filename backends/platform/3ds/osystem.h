@@ -133,6 +133,7 @@ public:
 	virtual int16 getOverlayHeight();
 	virtual int16 getOverlayWidth();
 	virtual void displayMessageOnOSD(const char *msg);
+	void displayActivityIconOnOSD(const Graphics::Surface *icon) override;
 
 	bool showMouse(bool visible);
 	void warpMouse(int x, int y);
@@ -183,6 +184,7 @@ private:
 	Sprite _gameTopTexture;
 	Sprite _gameBottomTexture;
 	Sprite _overlay;
+	Sprite _activityIcon;
 
 	int _screenShakeOffset;
 	bool _overlayVisible;

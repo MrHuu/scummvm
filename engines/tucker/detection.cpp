@@ -125,7 +125,10 @@ class TuckerMetaEngine : public AdvancedMetaEngine {
 public:
 	TuckerMetaEngine() : AdvancedMetaEngine(tuckerGameDescriptions, sizeof(ADGameDescription), tuckerGames) {
 		_md5Bytes = 512;
-		_singleId = "tucker";
+	}
+
+	const char *getEngineId() const {
+		return "tucker";
 	}
 
 	virtual const char *getName() const {

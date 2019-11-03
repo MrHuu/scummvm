@@ -32,7 +32,6 @@
 #include "graphics/thumbnail.h"
 
 static const PlainGameDescriptor illusionsGames[] = {
-	{ "illusions", "Illusions engine game" },
 	{ "bbdou", "Beavis and Butt-head Do U" },
 	{ "duckman", "Duckman" },
 	{ 0, 0 }
@@ -115,9 +114,12 @@ static const char * const directoryGlobs[] = {
 class IllusionsMetaEngine : public AdvancedMetaEngine {
 public:
 	IllusionsMetaEngine() : AdvancedMetaEngine(Illusions::gameDescriptions, sizeof(Illusions::IllusionsGameDescription), illusionsGames) {
-		_singleId = "illusions";
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;
+	}
+
+	const char *getEngineId() const {
+		return "illusions";
 	}
 
 	virtual const char *getName() const {

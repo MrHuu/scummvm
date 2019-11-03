@@ -130,7 +130,10 @@ static const ADGameDescription gameDescriptions[] = {
 class FullpipeMetaEngine : public AdvancedMetaEngine {
 public:
 	FullpipeMetaEngine() : AdvancedMetaEngine(Fullpipe::gameDescriptions, sizeof(ADGameDescription), fullpipeGames) {
-		_singleId = "fullpipe";
+	}
+
+	const char *getEngineId() const {
+		return "fullpipe";
 	}
 
 	virtual const char *getName() const {

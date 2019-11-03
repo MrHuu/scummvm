@@ -75,6 +75,10 @@ public:
 	virtual const char *getName() const;
 	virtual const char *getOriginalCopyright() const;
 
+	const char *getEngineId() const {
+		return "sky";
+	}
+
 	virtual bool hasFeature(MetaEngineFeature f) const;
 	PlainGameList getSupportedGames() const override;
 	virtual const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const;
@@ -185,12 +189,12 @@ DetectedGames SkyMetaEngine::detectGames(const Common::FSList &fslist) const {
 		if (sv->dinnerTableEntries) {
 			Common::String extra = Common::String::format("v0.0%d %s", sv->version, sv->extraDesc);
 
-			DetectedGame game = DetectedGame(skySetting.gameId, skySetting.description, Common::UNK_LANG, Common::kPlatformUnknown, extra);
+			DetectedGame game = DetectedGame(getEngineId(), skySetting.gameId, skySetting.description, Common::UNK_LANG, Common::kPlatformUnknown, extra);
 			game.setGUIOptions(sv->guioptions);
 
 			detectedGames.push_back(game);
 		} else {
-			detectedGames.push_back(DetectedGame(skySetting.gameId, skySetting.description));
+			detectedGames.push_back(DetectedGame(getEngineId(), skySetting.gameId, skySetting.description));
 		}
 	}
 

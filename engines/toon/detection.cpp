@@ -137,13 +137,16 @@ static const char * const directoryGlobs[] = {
 class ToonMetaEngine : public AdvancedMetaEngine {
 public:
 	ToonMetaEngine() : AdvancedMetaEngine(Toon::gameDescriptions, sizeof(ADGameDescription), toonGames) {
-		_singleId = "toon";
 		_maxScanDepth = 3;
 		_directoryGlobs = directoryGlobs;
 	}
 
 	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const override {
 		return detectGameFilebased(allFiles, fslist, Toon::fileBasedFallback);
+	}
+
+	const char *getEngineId() const {
+		return "toon";
 	}
 
 	virtual const char *getName() const {

@@ -115,7 +115,10 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 class CGEMetaEngine : public AdvancedMetaEngine {
 public:
 	CGEMetaEngine() : AdvancedMetaEngine(CGE::gameDescriptions, sizeof(ADGameDescription), CGEGames, optionsList) {
-		_singleId = "soltys";
+	}
+
+	const char *getEngineId() const {
+		return "cge";
 	}
 
 	virtual const char *getName() const {

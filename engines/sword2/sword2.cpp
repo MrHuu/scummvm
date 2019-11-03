@@ -84,6 +84,10 @@ static const ExtraGuiOption sword2ExtraGuiOption = {
 
 class Sword2MetaEngine : public MetaEngine {
 public:
+	virtual const char *getEngineId() const {
+		return "sword2";
+	}
+
 	virtual const char *getName() const {
 		return "Broken Sword II: The Smoking Mirror";
 	}
@@ -192,7 +196,7 @@ DetectedGames detectGamesImpl(const Common::FSList &fslist, bool recursion = fal
 						continue;
 
 					// Match found, add to list of candidates, then abort inner loop.
-					DetectedGame game = DetectedGame(g->gameid, g->description);
+					DetectedGame game = DetectedGame("sword2", g->gameid, g->description);
 					game.setGUIOptions(GUIO2(GUIO_NOMIDI, GUIO_NOASPECT));
 
 					detectedGames.push_back(game);

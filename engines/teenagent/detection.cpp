@@ -88,7 +88,10 @@ enum {
 class TeenAgentMetaEngine : public AdvancedMetaEngine {
 public:
 	TeenAgentMetaEngine() : AdvancedMetaEngine(teenAgentGameDescriptions, sizeof(ADGameDescription), teenAgentGames) {
-		_singleId = "teenagent";
+	}
+
+	const char *getEngineId() const {
+		return "teenagent";
 	}
 
 	virtual const char *getName() const {

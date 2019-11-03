@@ -45,7 +45,6 @@ Common::Platform Parallaction::getPlatform() const { return _gameDescription->de
 }
 
 static const PlainGameDescriptor parallactionGames[] = {
-	{"parallaction", "Parallaction engine game"},
 	{"nippon", "Nippon Safes Inc."},
 	{"bra", "The Big Red Adventure"},
 	{0, 0}
@@ -221,6 +220,10 @@ class ParallactionMetaEngine : public AdvancedMetaEngine {
 public:
 	ParallactionMetaEngine() : AdvancedMetaEngine(Parallaction::gameDescriptions, sizeof(Parallaction::PARALLACTIONGameDescription), parallactionGames) {
 		_guiOptions = GUIO1(GUIO_NOLAUNCHLOAD);
+	}
+
+	virtual const char *getEngineId() const {
+		return "parallaction";
 	}
 
 	virtual const char *getName() const {

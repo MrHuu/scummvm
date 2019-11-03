@@ -69,9 +69,12 @@ static const char * const directoryGlobs[] = {
 class BbvsMetaEngine : public AdvancedMetaEngine {
 public:
 	BbvsMetaEngine() : AdvancedMetaEngine(Bbvs::gameDescriptions, sizeof(ADGameDescription), bbvsGames) {
-		_singleId = "bbvs";
 		_maxScanDepth = 3;
 		_directoryGlobs = directoryGlobs;
+	}
+
+	const char *getEngineId() const {
+		return "bbvs";
 	}
 
 	virtual const char *getName() const {

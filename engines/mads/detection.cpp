@@ -69,7 +69,6 @@ Common::Platform MADSEngine::getPlatform() const {
 } // End of namespace MADS
 
 static const PlainGameDescriptor MADSGames[] = {
-	{"MADS", "MADS"},
 	{"dragonsphere", "Dragonsphere"},
 	{"nebular", "Rex Nebular and the Cosmic Gender Bender"},
 	{"phantom", "Return of the Phantom"},
@@ -142,6 +141,10 @@ class MADSMetaEngine : public AdvancedMetaEngine {
 public:
 	MADSMetaEngine() : AdvancedMetaEngine(MADS::gameDescriptions, sizeof(MADS::MADSGameDescription), MADSGames, optionsList) {
 		_maxScanDepth = 3;
+	}
+
+	virtual const char *getEngineId() const {
+		return "mads";
 	}
 
 	virtual const char *getName() const {

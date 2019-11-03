@@ -167,7 +167,10 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 class HDBMetaEngine : public AdvancedMetaEngine {
 public:
 	HDBMetaEngine() : AdvancedMetaEngine(HDB::gameDescriptions, sizeof(ADGameDescription), hdbGames, optionsList) {
-		_singleId = "hdb";
+	}
+
+	const char *getEngineId() const {
+		return "hdb";
 	}
 
 	virtual const char *getName() const {
