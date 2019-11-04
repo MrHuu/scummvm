@@ -11,6 +11,19 @@ export PATH=$DEVKITARM/bin:$PATH
 export PATH=$DEVKITPRO/tools/bin:$PATH
 export PORTLIBS=$DEVKITPRO/portlibs/3ds
 
+
+## ScummVM doesn't provide the CA certificates bundle required by the cloud synchronization features.
+## https://github.com/scummvm/scummvm/blob/036d61cbd62dc7907f4eeb36764bef9f794588f4/backends/platform/3ds/README.md#42-compiling-scummvm
+## ---------------------
+FILE=./backends/platform/3ds/app/cacert.pem
+if [ ! -f "$FILE" ]; then
+	echo "$FILE does not exist"
+	wget -O "./backends/platform/3ds/app/cacert.pem" https://curl.haxx.se/ca/cacert.pem
+fi
+export DIST_3DS_EXTRA_FILES=./backends/platform/3ds/app/cacert.pem
+## ---------------------
+
+
 GAMEID=$1
 GAMEDAT=NONE
 
