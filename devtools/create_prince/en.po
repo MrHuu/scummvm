@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Prince\n"
 "Report-Msgid-Bugs-To: scummvm-devel@lists.scummvm.org\n"
 "POT-Creation-Date: 2018-04-17 19:53+0100\n"
-"PO-Revision-Date: 2019-11-02 11:55+0000\n"
+"PO-Revision-Date: 2019-12-15 06:26+0000\n"
 "Last-Translator: Eugene Sandulenko <sev@scummvm.org>\n"
 "Language-Team: English <https://translations.scummvm.org/projects/prince/"
 "prince/en/>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 3.7.1\n"
+"X-Generator: Weblate 3.9.1\n"
 
 #: dialog0001.txt:1
 msgid "HERO: Przeppp... raszam..."
@@ -204,7 +204,7 @@ msgstr "OTHER: Sorry, little human, but I told you, I can't help you..."
 
 #: dialog0006.txt:101
 msgid "$0: Może trzeba z nimi inaczej porozmawiać?"
-msgstr "$0: That's no way to conduct a dialogue! How about|you change your tone?"
+msgstr "$0: Maybe you should talk to them in a different tone?"
 
 #: dialog0006.txt:102
 msgid "$1: Czy one się przypadkiem pana nie boją?"
@@ -330,7 +330,7 @@ msgstr "OTHER: Alright then!#X1"
 
 #: dialog0007.txt:1
 msgid "OTHER: A może tak: Saippuakivikauppias!"
-msgstr "OTHER: Didn't work... Maybe it's Saippuakivikauppias!"
+msgstr "OTHER: Didn't work... Maybe it's Wasitacaroracatisaw!"
 
 #: dialog0008.txt:1
 msgid "OTHER: ...Cholera!"
@@ -430,14 +430,14 @@ msgstr ""
 #: dialog0010.txt:20
 msgid "OTHER: Podawali piwo, krasnoludzki spirytus z piwem|i pyszną golonkę z chrzanem gotowaną w piwie."
 msgstr ""
-"OTHER: They used to serve beer and dwarf|mead with beer and pork cutlets "
+"OTHER: They used to serve beer and dwarven|spirit with beer and pork cutlets "
 "boiled|in beer with horseradish at the side."
 
 #: dialog0010.txt:21
 msgid "OTHER: Pod ścianą siedziało piwo, to znaczy|bard i pisał poemat."
 msgstr ""
-"OTHER: And at the back of the inn|there were bards, sitting around|and "
-"writing their poems."
+"OTHER: And at the back of the inn there was beer,|I mean there was a bard "
+"sitting around|and writing his poems."
 
 #: dialog0010.txt:22
 msgid "OTHER: Najczęściej o mnie."
@@ -466,12 +466,13 @@ msgstr ""
 #: dialog0010.txt:27
 msgid "OTHER: Sam Adanor Wszobrody odmówił mi trzydziestego|siódmego kubeczka krasnoludzkiego spirytusu."
 msgstr ""
-"OTHER: The Adanor Everbearded himself pulled me away from my thirty|sevenths "
-"pint of Grog XD."
+"OTHER: The Adanor Lousebearded himself gave up after drinking his|thirty "
+"seventh pint of dwarven spirit with me."
 
 #: dialog0010.txt:28
 msgid "OTHER: Następnego dnia zresztą uroczyście ślubował|abstynencję do końca życia."
-msgstr "OTHER: Then, the next day, I vowed abstinence|for the rest of my life."
+msgstr ""
+"OTHER: Then, the next day, he vowed abstinence|for the rest of his life."
 
 #: dialog0010.txt:29
 msgid "HERO: Moglibyśmy razem sprawdzić, czy ta karczma|jeszcze stoi."
@@ -495,7 +496,9 @@ msgstr "OTHER: In the meantime you can search|the graves around here."
 
 #: dialog0011.txt:3
 msgid "OTHER: Skoro w moim było coś tak ciekawego jak|ja, może i w innych coś się znajdzie."
-msgstr "OTHER: You found ME in one of them,|so you knows, maybe you find|something intersting in the|others too."
+msgstr ""
+"OTHER: You found ME in one of them,|so who knows, maybe you'll find|"
+"something interesting in the|others too."
 
 #: dialog0011.txt:4
 msgid "HERO: Co?!..."
@@ -563,7 +566,7 @@ msgstr "$3: <sob, sob>"
 
 #: dialog0013.txt:100001
 msgid "OTHER: Nie ma mowy, to grób czarodzieja Arivalda."
-msgstr "OTHER: No question, that is the grave of Arivald the wizard."
+msgstr "OTHER: No way, that is the grave of Arivald the wizard."
 
 #: dialog0013.txt:100002
 msgid "OTHER: Mówiono o nim, że ma niemiły zwyczaj|zamieniania w stonogi tych, którzy|przeszkadzają mu we śnie."
@@ -719,19 +722,19 @@ msgstr "$2: I have to go now, but I'll come back."
 
 #: dialog0016.txt:206
 msgid "$4: Pustelnikuje?"
-msgstr "$4: He likes the life?"
+msgstr "$4: Hermitizing?"
 
 #: dialog0016.txt:207
 msgid "$5: Wariuje?"
-msgstr "$5: He is mad?"
+msgstr "$5: Going insane?"
 
 #: dialog0016.txt:208
 msgid "$6: Ucieka przed prawem?"
-msgstr "$6: He's running away from the law?"
+msgstr "$6: Hiding from the law?"
 
 #: dialog0016.txt:209
 msgid "$7: Pokutuje?"
-msgstr "$7: He's doing penance?"
+msgstr "$7: Repenting?"
 
 #: dialog0016.txt:310
 msgid "$8: Nie, skąd ten pomysł?"
@@ -835,7 +838,9 @@ msgstr "OTHER: Did he not know that there is such a thing as \"luck\"?"
 
 #: dialog0016.txt:100607
 msgid "OTHER: No, ale odeszliśmy od pytania. Więc|czym się zajmuje pustelnik?#B1"
-msgstr "OTHER: Anyway, it seems we strayed off topic again.|So, why would anyone become a hermit?#B1"
+msgstr ""
+"OTHER: Anyway, it seems we strayed off topic again.|So what does a hermit "
+"do?#B1"
 
 #: dialog0016.txt:100701
 msgid "OTHER: Tak jest, mój panie!"
@@ -843,7 +848,7 @@ msgstr "OTHER: Exactly, my Lord!"
 
 #: dialog0016.txt:100702
 msgid "OTHER: Pokutuje!"
-msgstr "OTHER: Atonement!"
+msgstr "OTHER: Repenting!"
 
 #: dialog0016.txt:100703
 msgid "OTHER: Jestem tu, by zdławić wszelkie grzeszne|myśli, które palą me ciało niby żywy|ogień!"
@@ -949,7 +954,7 @@ msgstr "OTHER: In fact, I've done it a|thousand times already."
 
 #: dialog0016.txt:101204
 msgid "OTHER: A więc pustelnik?...#B1"
-msgstr "OTHER: Now, why would anyone become a hermit?#B1"
+msgstr "OTHER: Now, what does a hermit do?#B1"
 
 #: dialog0017.txt:1
 msgid "OTHER: \"Z przyczyn znanych tylko Naszemu Królewskiemu|Majestatowi, a które publicznie ujawnione|zostać nie mogą...\""
@@ -997,7 +1002,7 @@ msgstr "OTHER: Sure is..."
 
 #: dialog0019.txt:5
 msgid "HERO: Znaleźć pracę."
-msgstr "HERO: Then go find a job."
+msgstr "HERO: To find a job."
 
 #: dialog0019.txt:6
 msgid "OTHER: Taaa..."
@@ -1005,7 +1010,7 @@ msgstr "OTHER: Sure..."
 
 #: dialog0019.txt:7
 msgid "P#HERO: P-r-a-c-ę."
-msgstr "P#HERO: GET. A. JOB."
+msgstr "P#HERO: A J-O-B."
 
 #: dialog0019.txt:8
 msgid "OTHER: Tak tak..."
@@ -1077,7 +1082,9 @@ msgstr "OTHER: It's not that difficult, you know."
 
 #: dialog0019.txt:100102
 msgid "OTHER: Trzeba dużo pić, nie przychodzić do pracy,|nie szanować szefa i klientów, napastować|żony notabli..."
-msgstr "OTHER: You just have to drink a lot,|stop going to work, insult your|boss and your customers, then|take their wives ..."
+msgstr ""
+"OTHER: You just have to drink a lot,|stop going to work, disrespect your|"
+"boss and your customers,|harass wives of others…"
 
 #: dialog0019.txt:100103
 msgid "HERO: Eee..."
@@ -1197,7 +1204,7 @@ msgstr "$14: Frankly, the evidence is all against you."
 
 #: dialog0020.txt:416
 msgid "$15: Faktycznie, to żaden dowód."
-msgstr "$15: Actually, that's not the evidence."
+msgstr "$15: Actually, that's not an evidence."
 
 #: dialog0020.txt:417
 msgid "$16: Czyli zostałeś kozłem ofiarnym?"
@@ -1789,7 +1796,7 @@ msgstr ""
 
 #: dialog0023.txt:100607
 msgid "OTHER2: Myślałem, że nigdy go nie docucimy."
-msgstr "OTHER2: I thought I will never|quit him."
+msgstr "OTHER2: I thought we will never|resuscitate him."
 
 #: dialog0023.txt:100608
 msgid "OTHER: Oddech żebraka postawi na nogi nawet|umarłego."
@@ -1965,7 +1972,7 @@ msgstr "$1: What goods do you have for trade?"
 
 #: dialog0025.txt:105
 msgid "$2: Czy słyszałeś, a może widziałeś kiedyś... demony?"
-msgstr "$2: Did you hear or see any... demons?"
+msgstr "$2: Have you ever heard about demons… or maybe even seen them?"
 
 #: dialog0025.txt:106
 msgid "$3: Grajcie dalej."
@@ -2283,7 +2290,7 @@ msgstr ""
 msgid "OTHER: Jednym słowem, wszystko co może zainteresować|nowobogackich lub pretensjonalnych szlachetków|czy królewiczów."
 msgstr ""
 "OTHER: In a word, everything that could be|of interest to nouveau riches,|"
-"discriminating noblemen and princes."
+"pretentious noblemen and royals."
 
 #: dialog0027.txt:100208
 msgid "P#OTHER: Oczywiście, ty książę jesteś|wyjątkiem."
@@ -4637,19 +4644,21 @@ msgstr "HERO: What is that? I agree in advance on everything!"
 
 #: dialog0125.txt:100011
 msgid "OTHER: Musiałoby mi się chcieć."
-msgstr ""
+msgstr "OTHER: I'd need a desire for that."
 
 #: dialog0125.txt:100012
 msgid "P#HERO: A konkretnie?"
-msgstr "P#HERO: And specifically?"
+msgstr "P#HERO: What specifically?"
 
 #: dialog0125.txt:100013
 msgid "OTHER: Szczerze mówiąc, nawet mi się nie chce|mówić o tym, dlaczego mi się nic nie chce."
 msgstr ""
+"OTHER: To be honest, I don't even want to talk|about why I don't have any "
+"desires."
 
 #: dialog0125.txt:100014
 msgid "OTHER: Więc pozwól mi drzemać dalej.#E4#B0"
-msgstr ""
+msgstr "OTHER: So let me continue taking my nap.#E4#B0"
 
 #: dialog0125.txt:100101
 msgid "OTHER: Był taki jeden wielki czarodziej, który chciał|znaleźć legendarne źródło spirytusu|w opuszczonej kopalni krasnoludzkiej."
@@ -4660,10 +4669,15 @@ msgstr ""
 #: dialog0125.txt:100102
 msgid "OTHER: Zrobili z kumplami wyprawę, ale jak jeden|wszedł do środka z pochodnią, to od oparów był|wybuch i zostały z niego sznurówki."
 msgstr ""
+"OTHER: They did an expedition with their buddies, but as one of them|entered "
+"inside with a torch, the fumes caused|an explosion and only his laces "
+"remained."
 
 #: dialog0125.txt:100103
 msgid "OTHER: Więc wymarudził u mnie oświetlenie jaskiń,|a że miał argumenty, to się zgodziłem."
 msgstr ""
+"OTHER: He dreamed of bringing light to the caves,|and because he had "
+"arguments, I agreed."
 
 #: dialog0125.txt:100104
 msgid "HERO: Jakie argumenty?"
@@ -4671,43 +4685,43 @@ msgstr "HERO: What arguments?"
 
 #: dialog0125.txt:100105
 msgid "OTHER: Podzielił się ze mną tym szlachetnym|trunkiem, i jeszcze dołożył magiczny|most."
-msgstr ""
+msgstr "OTHER: He shared this noble drink|with me, and added a magic|bridge."
 
 #: dialog0125.txt:100106
 msgid "OTHER: Tak, tak, Awiwat to specjalista od|zabezpieczeń."
-msgstr ""
+msgstr "OTHER: Yes, yes, Awiwat is a security|specialist."
 
 #: dialog0125.txt:100107
 msgid "HERO: Awiwat? Może Arivald?"
-msgstr ""
+msgstr "HERO: Awiwat? Maybe Arivald?"
 
 #: dialog0125.txt:100108
 msgid "OTHER: Może i Aribalt, nie pamiętam.#B0"
-msgstr ""
+msgstr "OTHER: Maybe Aribalt, I don't remember.#B0"
 
 #: dialog0125.txt:100201
 msgid "OTHER: Wszystko może się znudzić, mój|chłopcze."
-msgstr ""
+msgstr "OTHER: Everything can get boring,|my boy."
 
 #: dialog0125.txt:100202
 msgid "OTHER: Nawet szemrzący strumyk, zielone|drzewa i soczyste owoce."
-msgstr ""
+msgstr "OTHER: Even the murmuring stream, green trees and juicy fruits."
 
 #: dialog0125.txt:100203
 msgid "HERO: Ale te dwie piękne istoty|z wachlarzami..."
-msgstr ""
+msgstr "HERO: But these two beautiful beings with the fans..."
 
 #: dialog0125.txt:100204
 msgid "OTHER: Nawet i one. Nawet i one..."
-msgstr ""
+msgstr "OTHER: Even them. Even them..."
 
 #: dialog0125.txt:100205
 msgid "P#HERO: Mam to jeszcze przed sobą.#B0"
-msgstr ""
+msgstr "P#HERO: I have it in front of me.#B0"
 
 #: dialog0125.txt:100301
 msgid "OTHER: Tu na górę dochodzi niewiele dźwięków.|Jestem spragniony muzyki."
-msgstr ""
+msgstr "OTHER: Very few sounds reach up here.|I am thirsty for music."
 
 #: dialog0125.txt:100302
 msgid "OTHER: Tak, muuuzyka."
@@ -4715,19 +4729,21 @@ msgstr "OTHER: Yes, muuuusic."
 
 #: dialog0125.txt:100303
 msgid "OTHER: Ale ludzka mowa to nie jest to, co|tygrysy lubią najbardziej."
-msgstr ""
+msgstr "OTHER: But human speech is not|what the tigers like the most."
 
 #: dialog0125.txt:100304
 msgid "OTHER: Więc nie musisz szybko wracać.#E3"
-msgstr ""
+msgstr "OTHER: So you don't have to come back quickly.#E3"
 
 #: dialog0125.txt:100401
 msgid "OTHER: Ja nic nie muszę."
-msgstr ""
+msgstr "OTHER: I don't owe anything anybody."
 
 #: dialog0125.txt:100402
 msgid "OTHER: A jak jeszcze raz wrzaśniesz, to|spopielę cię i rzucę jako nawóz|dla trolli.#B0"
 msgstr ""
+"OTHER: And if you scream again, I will|burn you and throw you as a dung|for "
+"trolls.#B0"
 
 #: dialog0126.txt:1
 msgid "HERO: Hi babe..."
@@ -4735,7 +4751,7 @@ msgstr "HERO: Hi babe.."
 
 #: dialog0127.txt:1
 msgid "HERO: Gdybym powiedział ci o czym myślę pewnie|byś się obraziła."
-msgstr ""
+msgstr "HERO: If I told you what I was thinking|you would get offended."
 
 #: dialog0128.txt:1
 msgid "OTHER: Czego?"
@@ -4812,146 +4828,155 @@ msgstr "#E3"
 #: dialog0132.txt:1
 msgid "OTHER: \"Dłoń ma, co jeszcze dotyku twego nie znała| Nieśmiała, lecz ogniem dzikim płonąca| Sunie po aksamicie cudnego ciała| Ja modlę się, by pieściła cię bez końca!\""
 msgstr ""
+"OTHER: \"My hand, which didn't know your touch before|Shy but glowing with "
+"wild fire|gliding over satin skin so beautiful|I pray she would be able to "
+"touch you forever!\""
 
 #: dialog0132.txt:2
 msgid "OTHER: Zatłukę tego małego gnojka!"
-msgstr ""
+msgstr "OTHER: I'll beat this little bastard!"
 
 #: dialog0133.txt:1
 msgid "OTHER: Koniec z wysłuchiwaniem rzępolenia!"
-msgstr ""
+msgstr "OTHER: No more listening to fiddling!"
 
 #: dialog0133.txt:2
 msgid "OTHER: Koniec z lutnią-samograjką!"
-msgstr ""
+msgstr "OTHER: No more self-playing lute!"
 
 #: dialog0133.txt:3
 msgid "OTHER: Koniec z praniem skarpetek!"
-msgstr ""
+msgstr "OTHER: No more socks washing!"
 
 #: dialog0133.txt:4
 msgid "OTHER: Koniec z gotowaniem rosołu na kaca!"
-msgstr ""
+msgstr "OTHER: No more preparing a hangover broth!"
 
 #: dialog0133.txt:5
 msgid "OTHER: Żeby tu więcej jego brudna stopa|nie postała!"
-msgstr ""
+msgstr "OTHER: Let his dirty feet stand here|no more!"
 
 #: dialog0134.txt:1
 msgid "HERO: Na razie nie muszę mu o niczym mówić."
-msgstr ""
+msgstr "HERO: I don't have to tell him anything yet."
 
 #: dialog0134.txt:2
 msgid "HERO: Trzeba jakoś wykorzystać tę sytuację|dla siebie."
-msgstr ""
+msgstr "HERO: I'd rather somehow use this situation|to my advantage."
 
 #: dialog0135.txt:1
 msgid "HERO: Mój drogi, mam dla ciebie dwie wiadomości.|Jedną dobrą, a drugą złą."
-msgstr ""
+msgstr "HERO: My dear, i have 2 messages to you.| One good and one bad."
 
 #: dialog0135.txt:2
 msgid "HERO: Dobra jest taka, że twoja urocza żona|jest teraz w domu."
-msgstr ""
+msgstr "HERO: Good news is that your lovely wife|is now at home."
 
 #: dialog0135.txt:3
 msgid "HERO: Zła, iż wszystkie twoje rzeczy są na|zewnątrz twojego domu."
-msgstr ""
+msgstr "HERO: Bad news is: all your clothes|are thrown outside the house."
 
 #: dialog0135.txt:4
 msgid "OTHER: To twój kolejny dowcip, panie?"
-msgstr ""
+msgstr "OTHER: Is that yours another joke, mister?"
 
 #: dialog0135.txt:5
 msgid "OTHER: Zemsta za ten żartobliwy poemat|o tobie i Kornelii?"
-msgstr ""
+msgstr "OTHER: Revenge for my funny song|about you and Cornelia?"
 
 #: dialog0135.txt:6
 msgid "HERO: Nie, nie, to poważna sprawa."
-msgstr ""
+msgstr "HERO: No, this is serious."
 
 #: dialog0135.txt:7
 msgid "HERO: Ponoć wpadł jej w ręce jakiś twój|miłosny poemat."
-msgstr ""
+msgstr "HERO: It's told that one of your poems|fell into her hands."
 
 #: dialog0135.txt:8
 msgid "HERO: Coś o dzikim ogniu i pieszczeniu ciała."
-msgstr ""
+msgstr "HERO: Something about... wild fire... and the touch on skin."
 
 #: dialog0135.txt:9
 msgid "OTHER: Och nie!"
-msgstr ""
+msgstr "OTHER: Oh no!"
 
 #: dialog0135.txt:10
 msgid "OTHER: Jestem poetą."
-msgstr ""
+msgstr "OTHER: But I am a poet."
 
 #: dialog0135.txt:11
 msgid "OTHER: Poeta nie musi zwracać się do konkretnej osoby,|lecz może przemawiać do wyimaginowanej kochanki,|która jest jedynie wytworem jego wyobraźni."
 msgstr ""
+"OTHER: A poet has no need to name a specific|person. He can write for an "
+"imaginary|beloved one, which exists only|in his phantasy."
 
 #: dialog0136.txt:1
 msgid "OTHER: Więc jednak to nie żart, ale smutna|rzeczywistość."
-msgstr ""
+msgstr "OTHER: This is not a joke|but a sad reality."
 
 #: dialog0136.txt:2
 msgid "OTHER: Mam niejasne wrażenie, że chyba|książę maczał w tym palce."
 msgstr ""
+"OTHER: I have the strange feeling that|the prince has something to do with "
+"this."
 
 #: dialog0137.txt:1
 msgid "OTHER: Wiedziałam, że przypełzniesz, ty|mały piszczący robaczku!"
-msgstr ""
+msgstr "OTHER: I knew you would come crawling|you dirty maggot!"
 
 #: dialog0137.txt:2
 msgid "OTHER: Zabieraj swoje łachy i won!"
-msgstr ""
+msgstr "OTHER: Take your clothes and GO!"
 
 #: dialog0138.txt:1
 msgid "OTHER: Ależ kochanie, nastąpiła horrendalna|pomył..."
-msgstr ""
+msgstr "OTHER: Oh honey, this is a horrible|misunder..."
 
 #: dialog0138.txt:2
 msgid "OTHER2: Zawsze wiedziałam, że zadajesz się|z ladacznicami!"
-msgstr ""
+msgstr "OTHER2: I always knew that|you're hanging with the harassers!"
 
 #: dialog0138.txt:3
 msgid "OTHER: Ależ kruszynko..."
-msgstr ""
+msgstr "OTHER: Oh baby..."
 
 #: dialog0138.txt:4
 msgid "OTHER2: Morda!..."
-msgstr ""
+msgstr "OTHER2: Shut up!..."
 
 #: dialog0138.txt:5
 msgid "OTHER2: Ja mówię."
-msgstr ""
+msgstr "OTHER2: I'm talking now."
 
 #: dialog0138.txt:6
 msgid "OTHER2: Jak śmiesz mi się sprzeciwiać!"
-msgstr ""
+msgstr "OTHER2: Dare not to speak against me!"
 
 #: dialog0138.txt:7
 msgid "OTHER: To był poemat o tobie, cukiereczku!"
-msgstr ""
+msgstr "OTHER: The poem was about you, sugar!"
 
 #: dialog0138.txt:8
 msgid "OTHER: Tylko o tobie..."
-msgstr ""
+msgstr "OTHER: Only about you..."
 
 #: dialog0139.txt:1
 msgid "OTHER: Wymówka już gotowa, cwaniaku!"
-msgstr ""
+msgstr "OTHER: That's a cheap excuse you poor wannabe writer!"
 
 #: dialog0139.txt:2
 msgid "OTHER: Chono tutaj, nie będę cię prała|na ulicy!"
-msgstr ""
+msgstr "OTHER: Come inside, I don't want to|beat you up on the streets!"
 
 #: dialog0140.txt:1
 msgid "OTHER: Po kilku głośnych wyzwiskach i jeszcze|głośniejszych klapsach słychać długi monolog|barda i odgłosy cmokania w policzek."
 msgstr ""
+"OTHER: After some loud insults and even louder|bumps, after a long monologue "
+"of the bard,|you heard a loud smack on the cheek."
 
 #: dialog0141.txt:1
 msgid "OTHER: Wynagrodzę ci to, misiaczku."
-msgstr ""
+msgstr "OTHER: I'll make it up to you, baby."
 
 #: dialog0141.txt:2
 msgid "OTHER: Idziemy na spacerek."
@@ -5039,43 +5064,47 @@ msgstr "#B1"
 
 #: dialog0147.txt:1
 msgid "OTHER: To było przepiękne."
-msgstr ""
+msgstr "OTHER: This was wonderful."
 
 #: dialog0147.txt:2
 msgid "OTHER: Przepiękne..."
-msgstr ""
+msgstr "OTHER: Wonderful..."
 
 #: dialog0147.txt:3
 msgid "OTHER: Dawno nie słyszałem muzyki, i zapomniałem,|jak może być cudowna..."
 msgstr ""
+"OTHER: I didn't hear music for a long time and nearly forgot|how wonderful "
+"it can be..."
 
 #: dialog0147.txt:4
 msgid "P#OTHER: Co to było, czego chciałeś, młodzieńcze?"
-msgstr ""
+msgstr "P#OTHER: What were you asking for again, young friend?"
 
 #: dialog0147.txt:5
 msgid "HERO: Chodzi o zamek Fjord, który..."
-msgstr ""
+msgstr "HERO: It's about castle Fjord, which..."
 
 #: dialog0147.txt:6
 msgid "OTHER: Ach tak, zalane mrokiem siedlisko zła."
-msgstr ""
+msgstr "OTHER: Oh yes, the evil throne covered in darkness."
 
 #: dialog0147.txt:7
 msgid "OTHER: Zrobię, co trzeba, nie martw się."
-msgstr ""
+msgstr "OTHER: I will care for everything necessary, don't worry."
 
 #: dialog0147.txt:8
 msgid "OTHER: Ale teraz naprawdę zostaw mnie już|samego, chcę sycić się wspomnieniami|dźwięków."
-msgstr ""
+msgstr "OTHER: But leave me alone for now, I want to|remember the sounds."
 
 #: dialog0147.txt:9
 msgid "OTHER: Powodzenia, chłopcze. A jak byś zobaczył|czarodzieja Arybałta, to pozdrów go ode|mnie."
 msgstr ""
+"OTHER: Good luck young friend. If you|should meet the magician Arivald tell "
+"him|I'm sending greetings."
 
 #: dialog0147.txt:10
 msgid "OTHER: Niech tu wpadnie kiedyś. Porozmawiamy o|dawnych, dobrych czasach."
-msgstr ""
+msgstr "OTHER: He should visit once in a while|to talk about good old times..."
 
 #: dialog0148.txt:1
 msgid "OTHER: Halo?"
@@ -5107,11 +5136,11 @@ msgstr "OTHER: Finally!"
 
 #: dialog0150.txt:6
 msgid "OTHER: Wydostań mnie stąd!"
-msgstr ""
+msgstr "OTHER: Please rescue me!"
 
 #: dialog0150.txt:107
 msgid "$0: Chętnie, ale jak?"
-msgstr ""
+msgstr "$0: I'd like to, but how?"
 
 #: dialog0150.txt:108
 msgid "$1: Dobrze, ale kim jesteś?"
@@ -5128,14 +5157,16 @@ msgstr "$3: I'll be back."
 #: dialog0150.txt:100001
 msgid "OTHER: Jestem więziona za magiczną ścianą stworzoną|siłą woli Księcia Wampirów."
 msgstr ""
+"OTHER: I'm trapped behind this magic wall|created by the willpower of the "
+"Vampire Lord."
 
 #: dialog0150.txt:100002
 msgid "OTHER: Musisz go odnaleźć i zabić."
-msgstr ""
+msgstr "OTHER: You have to find him and kill him."
 
 #: dialog0150.txt:100003
 msgid "OTHER: Gdy on zginie, zginie i ściana."
-msgstr ""
+msgstr "OTHER: When he vanishes|the wall will vanish as well."
 
 #: dialog0150.txt:100004
 msgid "OTHER: Banalne."
@@ -5180,14 +5211,16 @@ msgstr "HERO: I think he's lying here and sleeping."
 #: dialog0150.txt:100014
 msgid "HERO: Pan Słońce zaświecił nad Fjord,|więc pewnie postanowił przeczekać|dzień."
 msgstr ""
+"HERO: As the Mr.Sun is lighting the fjord now,|he considered it will be "
+"better to wait another day."
 
 #: dialog0150.txt:100015
 msgid "OTHER: No to najtrudniejsze za tobą."
-msgstr ""
+msgstr "OTHER: Well, the hardest part is behind you."
 
 #: dialog0150.txt:100016
 msgid "OTHER: Teraz tylko wbij mu kołek w pierś|i po krzyku.#B0"
-msgstr ""
+msgstr "OTHER: Now just stab him with a stake|and we're done here.#B0"
 
 #: dialog0150.txt:100101
 msgid "OTHER: Och to nieważne!..."
@@ -5196,6 +5229,8 @@ msgstr "OTHER: Oh, nevermind!..."
 #: dialog0150.txt:100102
 msgid "OTHER: Pospiesz się tylko z ratowaniem, bo|nudzę się tu już od ponad roku."
 msgstr ""
+"OTHER: Just hurry up with the saving,|'cause I've been waiting here for over "
+"a year."
 
 #: dialog0150.txt:100103
 msgid "HERO: Roku?!"
@@ -5211,15 +5246,15 @@ msgstr "OTHER: No kidding?"
 
 #: dialog0150.txt:100106
 msgid "P#OTHER: Jesteś tu jeszcze czy już poszedłeś|mnie ratować?#B0"
-msgstr ""
+msgstr "P#OTHER: You still here?|Or have you gone saving me?#B0"
 
 #: dialog0150.txt:100201
 msgid "OTHER: Słuchaj, później będziemy mieli|mnóstwo czasu na pogawędki."
-msgstr ""
+msgstr "OTHER: Look, we're gonna have|lots of time to talk later."
 
 #: dialog0150.txt:100202
 msgid "OTHER: Ale teraz proszę, pospiesz się,|bo już tutaj nie wytrzymam!"
-msgstr ""
+msgstr "OTHER: Now please hurry up.|I can't stand it any longer!"
 
 #: dialog0150.txt:100203
 msgid "HERO: Dobrze, już dobrze.#B0"
@@ -5343,7 +5378,7 @@ msgstr ""
 
 #: dialog0158.txt:4
 msgid "OTHER: Lepiej powiedz, jak było?"
-msgstr ""
+msgstr "OTHER: Better tell, how was it?"
 
 #: dialog0158.txt:5
 msgid "HERO: Jak tylko to sobie poukładam w głowie."
@@ -5359,19 +5394,19 @@ msgstr ""
 
 #: dialog0158.txt:8
 msgid "HERO: Nie mogę, muszę ratować nieznajomą."
-msgstr ""
+msgstr "HERO: I can't, I have to save somebody."
 
 #: dialog0158.txt:9
 msgid "P#HERO: Ha! Ratuję kogoś!"
-msgstr ""
+msgstr "P#HERO: Ha! I'll save somebody!"
 
 #: dialog0158.txt:10
 msgid "HERO: Właśnie to sobie uświadomiłem!"
-msgstr ""
+msgstr "HERO: Just realized that!"
 
 #: dialog0158.txt:11
 msgid "HERO: Zostanę bohaterem!"
-msgstr ""
+msgstr "HERO: I'll become a hero!"
 
 #: dialog0158.txt:12
 msgid "HERO: Będą o mnie śpiewać pieśni i układać poematy."
@@ -5395,7 +5430,7 @@ msgstr "OTHER: Wow!"
 
 #: dialog0159.txt:3
 msgid "OTHER: Znowu mamy problem."
-msgstr ""
+msgstr "OTHER: Again we've got a problem."
 
 #: dialog0159.txt:4
 msgid "OTHER: Chętnie posłucham, tylko mów|szybko i krótko."
@@ -5407,19 +5442,19 @@ msgstr "HERO: Dragon."
 
 #: dialog0159.txt:6
 msgid "HERO: Pokonać."
-msgstr ""
+msgstr "HERO: Defeat."
 
 #: dialog0159.txt:7
 msgid "HERO: Pomoc."
-msgstr ""
+msgstr "HERO: Help."
 
 #: dialog0159.txt:8
 msgid "HERO: Teraz."
-msgstr ""
+msgstr "HERO: Now."
 
 #: dialog0159.txt:9
 msgid "P#HERO: Koniec."
-msgstr ""
+msgstr "P#HERO: End."
 
 #: dialog0159.txt:10
 msgid "OTHER: Hmmm..."
@@ -5427,31 +5462,31 @@ msgstr ""
 
 #: dialog0159.txt:11
 msgid "P#OTHER: No dobra."
-msgstr ""
+msgstr "P#OTHER: All right."
 
 #: dialog0159.txt:12
 msgid "OTHER: Koniec lenistwa."
-msgstr ""
+msgstr "OTHER: End of laziness."
 
 #: dialog0159.txt:13
 msgid "OTHER: Czas ruszać w drogę!"
-msgstr ""
+msgstr "OTHER: Time to hit the road!"
 
 #: dialog0159.txt:14
 msgid "HERO: Naprawdę?"
-msgstr ""
+msgstr "HERO: Really?"
 
 #: dialog0159.txt:15
 msgid "HERO: Zabijesz za mnie smoka?"
-msgstr ""
+msgstr "HERO: You will kill the dragon for me?"
 
 #: dialog0159.txt:16
 msgid "HERO: To cudo..."
-msgstr ""
+msgstr "HERO: That's a miracle..."
 
 #: dialog0159.txt:17
 msgid "OTHER: Spokojnie, spokojnie."
-msgstr ""
+msgstr "OTHER: Easy, easy."
 
 #: dialog0159.txt:18
 msgid "OTHER: Zaraz znajdziemy się w najcudowniejszym|miejscu na świecie."

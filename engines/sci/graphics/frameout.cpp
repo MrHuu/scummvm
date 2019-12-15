@@ -285,7 +285,7 @@ void GfxFrameout::kernelAddPlane(const reg_t object) {
 		// kAddPlane is called several times, this detects the second call
 		//  which is for the import character dialog. If changeButton:value
 		//  is non-zero then the dialog is initializing. If the button isn't
-		//  disabled then we havent't displayed the message box yet. There
+		//  disabled then we haven't displayed the message box yet. There
 		//  are multiple changeButtons because the script clones the object.
 		SegManager *segMan = g_sci->getEngineState()->_segMan;
 		Common::Array<reg_t> changeDirButtons = _segMan->findObjectsByName("changeButton");
@@ -1189,27 +1189,27 @@ void GfxFrameout::throttle() {
 }
 
 void GfxFrameout::shakeScreen(int16 numShakes, const ShakeDirection direction) {
-	if (direction & kShakeHorizontal) {
-		// Used by QFG4 room 750
-		warning("TODO: Horizontal shake not implemented");
-		return;
-	}
-
 	while (numShakes--) {
 		if (g_engine->shouldQuit()) {
 			break;
 		}
 
-		if (direction & kShakeVertical) {
-			g_system->setShakePos(_isHiRes ? 8 : 4);
+		int shakeXOffset = 0;
+		if (direction & kShakeHorizontal) {
+			shakeXOffset = _isHiRes ? 8 : 4;
 		}
+
+		int shakeYOffset = 0;
+		if (direction & kShakeVertical) {
+			shakeYOffset = _isHiRes ? 8 : 4;
+		}
+
+		g_system->setShakePos(shakeXOffset, shakeYOffset);
 
 		updateScreen();
 		g_sci->getEngineState()->sleep(3);
 
-		if (direction & kShakeVertical) {
-			g_system->setShakePos(0);
-		}
+		g_system->setShakePos(0, 0);
 
 		updateScreen();
 		g_sci->getEngineState()->sleep(3);

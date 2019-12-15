@@ -534,6 +534,8 @@ void MystGraphics::transitionDissolve(Common::Rect rect, uint step) {
 				case 4:
 					*((uint32 *)screen->getBasePtr(x, y)) = *((const uint32 *)_backBuffer->getBasePtr(x, y));
 					break;
+				default:
+					break;
 				}
 			}
 		}
@@ -892,15 +894,7 @@ void MystGraphics::replaceImageWithRect(uint16 destImage, uint16 sourceImage, co
 }
 
 void MystGraphics::clearScreen() {
-	Graphics::Surface *screen = _vm->_system->lockScreen();
-	if (screen) {
-		if (_vm->getFeatures() & GF_ME)
-			screen->fillRect(_viewport, _pixelFormat.RGBToColor(0, 0, 0));
-		else
-			screen->fillRect(_viewport, 0);
-
-		_vm->_system->unlockScreen();
-	}
+	_vm->_system->fillScreen(_pixelFormat.RGBToColor(0, 0, 0));
 }
 
 } // End of namespace Mohawk

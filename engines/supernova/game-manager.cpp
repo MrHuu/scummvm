@@ -417,6 +417,7 @@ void GameManager::processInput() {
 				_inventoryScroll += 2;
 			break;
 		case onNone:
+		default:
 			break;
 		}
 
@@ -502,6 +503,7 @@ void GameManager::processInput() {
 				break;
 			case onObject:
 			case onNone:
+			default:
 				// Fallthrough
 				break;
 			}
@@ -539,6 +541,7 @@ void GameManager::processInput() {
 				_currentInputObject = _currentRoom->getObject(_mouseField);
 				break;
 			case onNone:
+			default:
 				break;
 			}
 		}
@@ -804,9 +807,9 @@ void GameManager::saveTime() {
 
 void GameManager::screenShake() {
 	for (int i = 0; i < 12; ++i) {
-		_vm->_system->setShakePos(8);
+		_vm->_system->setShakePos(0, 8);
 		wait(1);
-		_vm->_system->setShakePos(0);
+		_vm->_system->setShakePos(0, 0);
 		wait(1);
 	}
 }

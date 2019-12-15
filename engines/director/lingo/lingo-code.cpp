@@ -57,13 +57,16 @@ static struct FuncDescr {
 } funcDescr[] = {
 	{ 0,					"STOP",			"" },
 	{ Lingo::c_xpop,		"c_xpop",		"" },
-	{ Lingo::c_arraypush,	"c_arraypush",		"i" },
+	{ Lingo::c_argcpush,	"c_argcpush",	"i" },
+	{ Lingo::c_argcnoretpush,	"c_argcnoretpush",	"i" },
+	{ Lingo::c_arraypush,	"c_arraypush",	"i" },
 	{ Lingo::c_printtop,	"c_printtop",	"" },
-	{ Lingo::c_constpush,	"c_constpush",	"i" },
+	{ Lingo::c_intpush,		"c_intpush",	"i" },
 	{ Lingo::c_voidpush,	"c_voidpush",	"" },
-	{ Lingo::c_fconstpush,	"c_fconstpush",	"f" },
+	{ Lingo::c_floatpush,	"c_floatpush",	"f" },
 	{ Lingo::c_stringpush,	"c_stringpush",	"s" },
 	{ Lingo::c_symbolpush,	"c_symbolpush",	"s" },	// D3
+	{ Lingo::c_constpush,	"c_constpush",	"i" },
 	{ Lingo::c_varpush,		"c_varpush",	"s" },
 	{ Lingo::c_setImmediate,"c_setImmediate","i" },
 	{ Lingo::c_assign,		"c_assign",		"" },
@@ -85,6 +88,8 @@ static struct FuncDescr {
 	{ Lingo::c_starts,		"c_starts",		"" },
 	{ Lingo::c_intersects,	"c_intersects",	"" },
 	{ Lingo::c_within,		"c_within",		"" },
+	{ Lingo::c_field,       "c_field",      "" },
+	{ Lingo::c_of,		    "c_of",		    "" },
 	{ Lingo::c_charOf,		"c_charOf",		"" },	// D3
 	{ Lingo::c_charToOf,	"c_charToOf",	"" },	// D3
 	{ Lingo::c_itemOf,		"c_itemOf",		"" },	// D3
@@ -102,11 +107,15 @@ static struct FuncDescr {
 	{ Lingo::c_lt,			"c_lt",			"" },
 	{ Lingo::c_ge,			"c_ge",			"" },
 	{ Lingo::c_le,			"c_le",			"" },
+	{ Lingo::c_jump,		"c_jump",		"i" },
+	{ Lingo::c_jumpifz,		"c_jumpifz",	"i" },
 	{ Lingo::c_repeatwhilecode,"c_repeatwhilecode","oo" },
 	{ Lingo::c_repeatwithcode,"c_repeatwithcode","ooooos" },
 	{ Lingo::c_exitRepeat,	"c_exitRepeat",	"" },
 	{ Lingo::c_ifcode,		"c_ifcode",		"oooi" },
 	{ Lingo::c_tellcode,	"c_tellcode",	"o" },
+	{ Lingo::c_tell,        "c_tell",       "" },
+	{ Lingo::c_telldone,    "c_telldone",   "" },
 	{ Lingo::c_whencode,	"c_whencode",	"os" },
 	{ Lingo::c_goto,		"c_goto",		"" },
 	{ Lingo::c_gotoloop,	"c_gotoloop",	"" },
@@ -120,6 +129,15 @@ static struct FuncDescr {
 	{ Lingo::c_property,	"c_property",	"s" },
 	{ Lingo::c_instance,	"c_instance",	"s" },
 	{ Lingo::c_open,		"c_open",		"" },
+	{ Lingo::c_hilite,      "c_hilite",     "" },
+	{ Lingo::c_unk,         "c_unk",        "i" },
+	{ Lingo::c_unk1,        "c_unk1",       "ii" },
+	{ Lingo::c_unk2,        "c_unk2",       "iii" },
+	{ Lingo::cb_call,		"cb_call",		"i" },
+	{ Lingo::cb_localcall,	"cb_localcall",	"i" },
+	{ Lingo::cb_v4theentitypush,"c_v4theentitypush","i" },
+	{ Lingo::cb_v4theentitynamepush,"c_v4theentitynamepush","i" },
+	{ Lingo::cb_v4theentityassign,"c_v4theentityassign","i" },
 	{ 0, 0, 0 }
 };
 
@@ -143,8 +161,7 @@ void Lingo::pushVoid() {
 }
 
 Datum Lingo::pop(void) {
-	if (_stack.size() == 0)
-		assert(0);
+	assert (_stack.size() != 0);
 
 	Datum ret = _stack.back();
 	_stack.pop_back();
@@ -183,7 +200,7 @@ void Lingo::c_printtop(void) {
 		warning("%s", d.u.s->c_str());
 		break;
 	case POINT:
-		warning("point(%d, %d)", (int)((*d.u.arr)[0]), (int)((*d.u.arr)[1]));
+		warning("point(%d, %d)", (int)((*d.u.farr)[0]), (int)((*d.u.farr)[1]));
 		break;
 	case SYMBOL:
 		warning("%s", d.type2str(true));
@@ -196,10 +213,9 @@ void Lingo::c_printtop(void) {
 	}
 }
 
-void Lingo::c_constpush() {
+void Lingo::c_intpush() {
 	Datum d;
-	inst i = (*g_lingo->_currentScript)[g_lingo->_pc++];
-	d.u.i = READ_UINT32(&i);
+	d.u.i = g_lingo->readInt();
 	d.type = INT;
 	g_lingo->push(d);
 }
@@ -211,27 +227,21 @@ void Lingo::c_voidpush() {
 	g_lingo->push(d);
 }
 
-void Lingo::c_fconstpush() {
+void Lingo::c_floatpush() {
 	Datum d;
-	inst i = (*g_lingo->_currentScript)[g_lingo->_pc];
-	d.u.f = *(double *)(&i);
+	d.u.f = g_lingo->readFloat();
 	d.type = FLOAT;
-
-	g_lingo->_pc += g_lingo->calcCodeAlignment(sizeof(double));
-
 	g_lingo->push(d);
 }
 
 void Lingo::c_stringpush() {
-	char *s = (char *)&(*g_lingo->_currentScript)[g_lingo->_pc];
-	g_lingo->_pc += g_lingo->calcStringAlignment(s);
+	char *s = g_lingo->readString();
 
 	g_lingo->push(Datum(new Common::String(s)));
 }
 
 void Lingo::c_symbolpush() {
-	char *s = (char *)&(*g_lingo->_currentScript)[g_lingo->_pc];
-	g_lingo->_pc += g_lingo->calcStringAlignment(s);
+	char *s = g_lingo->readString();
 
 	warning("STUB: c_symbolpush()");
 
@@ -239,10 +249,34 @@ void Lingo::c_symbolpush() {
 	g_lingo->push(Datum(new Common::String(s)));
 }
 
+void Lingo::c_constpush() {
+	Datum d;
+	int i = g_lingo->readInt();
+	d = g_lingo->_currentScriptContext->constants[i];
+	g_lingo->push(d);
+}
+
+void Lingo::c_argcpush() {
+	Datum d;
+	int argsSize = g_lingo->readInt();
+
+	d.u.i = argsSize;
+	d.type = ARGC;
+	g_lingo->push(d);
+}
+
+void Lingo::c_argcnoretpush() {
+	Datum d;
+	int argsSize = g_lingo->readInt();
+
+	d.u.i = argsSize;
+	d.type = ARGCNORET;
+	g_lingo->push(d);
+}
+
 void Lingo::c_arraypush() {
 	Datum d;
-	inst v = (*g_lingo->_currentScript)[g_lingo->_pc++];
-	int arraySize = READ_UINT32(&v);
+	int arraySize = g_lingo->readInt();
 
 	warning("STUB: c_arraypush()");
 
@@ -255,10 +289,8 @@ void Lingo::c_arraypush() {
 }
 
 void Lingo::c_varpush() {
-	Common::String name((char *)&(*g_lingo->_currentScript)[g_lingo->_pc]);
+	Common::String name(g_lingo->readString());
 	Datum d;
-
-	g_lingo->_pc += g_lingo->calcStringAlignment(name.c_str());
 
 	// In immediate mode we will push variables as strings
 	// This is used for playAccel
@@ -291,9 +323,7 @@ void Lingo::c_varpush() {
 }
 
 void Lingo::c_setImmediate() {
-	inst i = (*g_lingo->_currentScript)[g_lingo->_pc++];
-
-	g_lingo->_immediateMode = READ_UINT32(&i);
+	g_lingo->_immediateMode = g_lingo->readInt();
 }
 
 void Lingo::c_assign() {
@@ -317,7 +347,9 @@ void Lingo::c_assign() {
 			}
 		}
 
-		warning("STUB: c_assing REFERENCE");
+		d2.toString();
+
+		g_director->getCurrentScore()->_loadedText->getVal(d1.u.i)->setText(d2.u.s->c_str());
 
 		return;
 	}
@@ -332,7 +364,7 @@ void Lingo::c_assign() {
 		delete d1.u.sym->u.s;
 
 	if (d1.u.sym->type == POINT || d1.u.sym->type == RECT || d1.u.sym->type == ARRAY)
-		delete d1.u.sym->u.arr;
+		delete d1.u.sym->u.farr;
 
 	if (d2.type == INT) {
 		d1.u.sym->u.i = d2.u.i;
@@ -342,8 +374,8 @@ void Lingo::c_assign() {
 		d1.u.sym->u.s = new Common::String(*d2.u.s);
 		delete d2.u.s;
 	} else if (d2.type == POINT) {
-		d1.u.sym->u.arr = new FloatArray(*d2.u.arr);
-		delete d2.u.arr;
+		d1.u.sym->u.farr = new FloatArray(*d2.u.farr);
+		delete d2.u.farr;
 	} else if (d2.type == SYMBOL) {
 		d1.u.sym->u.i = d2.u.i;
 	} else if (d2.type == OBJECT) {
@@ -398,7 +430,7 @@ void Lingo::c_eval() {
 	else if (d.u.sym->type == STRING)
 		d.u.s = new Common::String(*d.u.sym->u.s);
 	else if (d.u.sym->type == POINT)
-		d.u.arr = d.u.sym->u.arr;
+		d.u.farr = d.u.sym->u.farr;
 	else if (d.u.sym->type == SYMBOL)
 		d.u.i = d.u.sym->u.i;
 	else if (d.u.sym->type == VOID)
@@ -410,24 +442,20 @@ void Lingo::c_eval() {
 }
 
 void Lingo::c_theentitypush() {
-	inst e = (*g_lingo->_currentScript)[g_lingo->_pc++];
-	inst f = (*g_lingo->_currentScript)[g_lingo->_pc++];
 	Datum id = g_lingo->pop();
 
-	int entity = READ_UINT32(&e);
-	int field  = READ_UINT32(&f);
+	int entity = g_lingo->readInt();
+	int field  = g_lingo->readInt();
 
 	Datum d = g_lingo->getTheEntity(entity, id, field);
 	g_lingo->push(d);
 }
 
 void Lingo::c_theentityassign() {
-	inst e = (*g_lingo->_currentScript)[g_lingo->_pc++];
-	inst f = (*g_lingo->_currentScript)[g_lingo->_pc++];
 	Datum id = g_lingo->pop();
 
-	int entity = READ_UINT32(&e);
-	int field  = READ_UINT32(&f);
+	int entity = g_lingo->readInt();
+	int field  = g_lingo->readInt();
 
 	Datum d = g_lingo->pop();
 	g_lingo->setTheEntity(entity, id, field, d);
@@ -640,6 +668,34 @@ void Lingo::c_within() {
 	g_lingo->push(d1);
 }
 
+void Lingo::c_field() {
+	Datum d1 = g_lingo->pop();
+
+	warning("STUB: c_field: %d", d1.u.i);
+
+	g_lingo->push(d1);
+}
+
+void Lingo::c_of() {
+	Datum first_char = g_lingo->pop();
+	Datum last_char = g_lingo->pop();
+	Datum first_word = g_lingo->pop();
+	Datum last_word = g_lingo->pop();
+	Datum first_item = g_lingo->pop();
+	Datum last_item = g_lingo->pop();
+	Datum first_line = g_lingo->pop();
+	Datum last_line = g_lingo->pop();
+	Datum target = g_lingo->pop();
+
+	warning("STUB: c_of: %d %d %d %d %d %d %d %d %s",
+		first_char.u.i, last_char.u.i, first_word.u.i, last_word.u.i,
+		first_item.u.i, last_item.u.i, first_line.u.i, last_line.u.i,
+		target.u.s->c_str());
+
+	g_lingo->push(target);
+
+}
+
 void Lingo::c_charOf() {
 	Datum d2 = g_lingo->pop();
 	Datum d1 = g_lingo->pop();
@@ -828,12 +884,26 @@ void Lingo::c_le() {
 	g_lingo->push(d1);
 }
 
+void Lingo::c_jump() {
+	uint jump = g_lingo->readInt();
+	g_lingo->_pc = jump;
+}
+
+void Lingo::c_jumpifz() {
+	uint jump = g_lingo->readInt();
+	Datum test = g_lingo->pop();
+	test.toInt();
+	if (test.u.i == 0) {
+		g_lingo->_pc = jump;
+	}
+}
+
 void Lingo::c_repeatwhilecode(void) {
 	Datum d;
 	int savepc = g_lingo->_pc;
 
-	uint body = READ_UINT32(&(*g_lingo->_currentScript)[savepc]);
-	uint end =  READ_UINT32(&(*g_lingo->_currentScript)[savepc + 1]);
+	uint body = g_lingo->getInt(savepc);
+	uint end =  g_lingo->getInt(savepc + 1);
 
 	g_lingo->execute(savepc + 2);	/* condition */
 	d = g_lingo->pop();
@@ -862,11 +932,11 @@ void Lingo::c_repeatwithcode(void) {
 	Datum d;
 	int savepc = g_lingo->_pc;
 
-	uint init = READ_UINT32(&(*g_lingo->_currentScript)[savepc]);
-	uint finish =  READ_UINT32(&(*g_lingo->_currentScript)[savepc + 1]);
-	uint body = READ_UINT32(&(*g_lingo->_currentScript)[savepc + 2]);
-	int inc = (int32)READ_UINT32(&(*g_lingo->_currentScript)[savepc + 3]);
-	uint end =  READ_UINT32(&(*g_lingo->_currentScript)[savepc + 4]);
+	uint init = g_lingo->getInt(savepc);
+	uint finish =  g_lingo->getInt(savepc + 1);
+	uint body = g_lingo->getInt(savepc + 2);
+	int inc = (int32)g_lingo->getInt(savepc + 3);
+	uint end = g_lingo->getInt(savepc + 4);
 	Common::String countername((char *)&(*g_lingo->_currentScript)[savepc + 5]);
 	Symbol *counter = g_lingo->lookupVar(countername.c_str());
 
@@ -911,10 +981,10 @@ void Lingo::c_ifcode() {
 	Datum d;
 	int savepc = g_lingo->_pc;	/* then part */
 
-	uint then =    READ_UINT32(&(*g_lingo->_currentScript)[savepc]);
-	uint elsep =   READ_UINT32(&(*g_lingo->_currentScript)[savepc + 1]);
-	uint end =     READ_UINT32(&(*g_lingo->_currentScript)[savepc + 2]);
-	uint skipEnd = READ_UINT32(&(*g_lingo->_currentScript)[savepc + 3]);
+	uint then =    g_lingo->getInt(savepc);
+	uint elsep =   g_lingo->getInt(savepc+1);
+	uint end =     g_lingo->getInt(savepc+2);
+	uint skipEnd = g_lingo->getInt(savepc+3);
 
 	debugC(8, kDebugLingoExec, "executing cond (have to %s end)", skipEnd ? "skip" : "execute");
 	g_lingo->execute(savepc + 4);	/* condition */
@@ -929,44 +999,56 @@ void Lingo::c_ifcode() {
 		g_lingo->execute(elsep + savepc - 1);
 	}
 
+	// Since we do recursive calls, we want to skip behind end of the 'if'
+	// statement only once, and not after every 'end if' call
 	if (!g_lingo->_returning && !skipEnd) {
 		g_lingo->_pc = end + savepc - 1; /* next stmt */
 		debugC(8, kDebugLingoExec, "executing end");
 	} else {
-		debugC(8, kDebugLingoExec, "Skipped end");
+		debugC(8, kDebugLingoExec, "skipped end");
 	}
 }
 
 void Lingo::c_whencode() {
 	Datum d;
 	uint start = g_lingo->_pc;
-	uint end = READ_UINT32(&(*g_lingo->_currentScript)[start]) + start - 1;
-	Common::String eventname((char *)&(*g_lingo->_currentScript)[start + 1]);
+	uint end = g_lingo->readInt() + start - 1;
+	Common::String eventname(g_lingo->readString());
 
-	start += g_lingo->calcStringAlignment(eventname.c_str()) + 1;
+	start = g_lingo->_pc;
 
 	debugC(1, kDebugLingoExec, "c_whencode([%5d][%5d], %s)", start, end, eventname.c_str());
 
 	int entity = g_lingo->_currentEntityId;
 	g_lingo->_currentEntityId = 0;
 
-	g_lingo->define(eventname, start, 0, NULL, end);
+	Symbol *sym = g_lingo->define(eventname, start, 0, NULL, end, false); // Redefine, but not remove code
 
 	g_lingo->_currentEntityId = entity;
 
 	if (debugChannelSet(1, kDebugLingoExec)) {
-		uint pc = start;
-		while (pc <= end) {
-			Common::String instr = g_lingo->decodeInstruction(pc, &pc);
-			debugC(1, kDebugLingoExec, "[%5d] %s", pc, instr.c_str());
+		uint pc = 0;
+		while (pc < sym->u.defn->size()) {
+			uint spc = pc;
+			Common::String instr = g_lingo->decodeInstruction(sym->u.defn, pc, &pc);
+			debugC(1, kDebugLingoExec, "[%5d] %s", spc, instr.c_str());
 		}
 	}
 
-	g_lingo->_pc = end;
+	g_lingo->_pc = end + 1;
 }
 
 void Lingo::c_tellcode() {
 	warning("STUB: c_tellcode");
+}
+
+void Lingo::c_tell() {
+	Datum d1 = g_lingo->pop();
+	warning("STUB: c_tell %d", d1.u.i);
+}
+
+void Lingo::c_telldone() {
+	warning("STUB: c_telldone");
 }
 
 
@@ -1016,10 +1098,9 @@ void Lingo::c_playdone() {
 }
 
 void Lingo::c_call() {
-	Common::String name((char *)&(*g_lingo->_currentScript)[g_lingo->_pc]);
-	g_lingo->_pc += g_lingo->calcStringAlignment(name.c_str());
+	Common::String name(g_lingo->readString());
 
-	int nargs = READ_UINT32(&(*g_lingo->_currentScript)[g_lingo->_pc++]);
+	int nargs = g_lingo->readInt();
 
 	g_lingo->call(name, nargs);
 }
@@ -1148,7 +1229,7 @@ void Lingo::c_procret() {
 }
 
 void Lingo::c_global() {
-	Common::String name((char *)&(*g_lingo->_currentScript)[g_lingo->_pc]);
+	Common::String name(g_lingo->readString());
 
 	Symbol *s = g_lingo->lookupVar(name.c_str(), false);
 	if (s && !s->global) {
@@ -1157,24 +1238,30 @@ void Lingo::c_global() {
 
 	s = g_lingo->lookupVar(name.c_str(), true, true);
 	s->global = true;
-
-	g_lingo->_pc += g_lingo->calcStringAlignment(name.c_str());
 }
 
 void Lingo::c_property() {
-	Common::String name((char *)&(*g_lingo->_currentScript)[g_lingo->_pc]);
-
-	g_lingo->_pc += g_lingo->calcStringAlignment(name.c_str());
+	Common::String name(g_lingo->readString());
 
 	warning("STUB: c_property()");
 }
 
 void Lingo::c_instance() {
-	Common::String name((char *)&(*g_lingo->_currentScript)[g_lingo->_pc]);
+	Common::String name(g_lingo->readString());
 
 	warning("STUB: c_instance(%s)", name.c_str());
+}
 
-	g_lingo->_pc += g_lingo->calcStringAlignment(name.c_str());
+void Lingo::c_factory() {
+	Common::String name(g_lingo->readString());
+	Datum d;
+
+	warning("STUB: c_factory(%s)", name.c_str());
+
+	d.type = OBJECT;
+	d.u.s = new Common::String(name);
+
+	g_lingo->push(d);
 }
 
 void Lingo::c_open() {
@@ -1186,5 +1273,41 @@ void Lingo::c_open() {
 
 	warning("STUB: c_open(%s, %s)", d1.u.s->c_str(), d2.u.s->c_str());
 }
+
+void Lingo::c_hilite() {
+	Datum first_char = g_lingo->pop();
+	Datum last_char = g_lingo->pop();
+	Datum first_word = g_lingo->pop();
+	Datum last_word = g_lingo->pop();
+	Datum first_item = g_lingo->pop();
+	Datum last_item = g_lingo->pop();
+	Datum first_line = g_lingo->pop();
+	Datum last_line = g_lingo->pop();
+	Datum cast_id = g_lingo->pop();
+
+	warning("STUB: c_hilite: %d %d %d %d %d %d %d %d %d",
+		first_char.u.i, last_char.u.i, first_word.u.i, last_word.u.i,
+		first_item.u.i, last_item.u.i, first_line.u.i, last_line.u.i,
+		cast_id.u.i);
+}
+
+void Lingo::c_unk() {
+	uint opcode = g_lingo->readInt();
+	warning("STUB: opcode 0x%02x", opcode);
+}
+
+void Lingo::c_unk1() {
+	uint opcode = g_lingo->readInt();
+	uint arg1 = g_lingo->readInt();
+	warning("STUB: opcode 0x%02x (%d)", opcode, arg1);
+}
+
+void Lingo::c_unk2() {
+	uint opcode = g_lingo->readInt();
+	uint arg1 = g_lingo->readInt();
+	uint arg2 = g_lingo->readInt();
+	warning("STUB: opcode 0x%02x (%d, %d)", opcode, arg1, arg2);
+}
+
 
 }

@@ -66,6 +66,7 @@ MODULE_OBJS += \
 	networking/curl/curlrequest.o \
 	networking/curl/curljsonrequest.o \
 	networking/curl/postrequest.o \
+	networking/curl/sessionrequest.o \
 	networking/curl/request.o
 endif
 
@@ -162,6 +163,7 @@ ifdef POSIX
 MODULE_OBJS += \
 	fs/posix/posix-fs.o \
 	fs/posix/posix-fs-factory.o \
+	fs/posix/posix-iostream.o \
 	fs/posix-drives/posix-drives-fs.o \
 	fs/posix-drives/posix-drives-fs-factory.o \
 	fs/chroot/chroot-fs-factory.o \
@@ -221,8 +223,7 @@ endif
 
 ifeq ($(BACKEND),androidsdl)
 MODULE_OBJS += \
-	events/androidsdl/androidsdl-events.o \
-	graphics/androidsdl/androidsdl-graphics.o
+	events/androidsdl/androidsdl-events.o
 endif
 
 ifdef AMIGAOS
@@ -244,6 +245,7 @@ ifdef PLAYSTATION3
 MODULE_OBJS += \
 	fs/posix/posix-fs.o \
 	fs/posix/posix-fs-factory.o \
+	fs/posix/posix-iostream.o \
 	fs/ps3/ps3-fs-factory.o \
 	events/ps3sdl/ps3sdl-events.o
 endif
@@ -256,6 +258,11 @@ endif
 ifeq ($(BACKEND),tizen)
 MODULE_OBJS += \
 	timer/tizen/timer.o
+endif
+
+ifeq ($(BACKEND),3ds)
+MODULE_OBJS += \
+	plugins/3ds/3ds-provider.o
 endif
 
 ifeq ($(BACKEND),ds)
@@ -321,6 +328,7 @@ endif
 ifeq ($(BACKEND),psp2)
 MODULE_OBJS += \
 	fs/posix/posix-fs.o \
+	fs/posix/posix-iostream.o \
 	fs/psp2/psp2-fs-factory.o \
 	fs/psp2/psp2-dirent.o \
 	events/psp2sdl/psp2sdl-events.o \
@@ -336,16 +344,6 @@ endif
 ifeq ($(BACKEND),webos)
 MODULE_OBJS += \
 	events/webossdl/webossdl-events.o
-endif
-
-ifeq ($(BACKEND),wince)
-MODULE_OBJS += \
-	events/wincesdl/wincesdl-events.o \
-	fs/windows/windows-fs.o \
-	fs/windows/windows-fs-factory.o \
-	graphics/wincesdl/wincesdl-graphics.o \
-	mixer/wincesdl/wincesdl-mixer.o \
-	plugins/win32/win32-provider.o
 endif
 
 ifeq ($(BACKEND),wii)

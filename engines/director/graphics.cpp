@@ -220,6 +220,8 @@ Graphics::MacPatterns &DirectorEngine::getPatterns() {
 void DirectorEngine::setPalette(byte *palette, uint16 count) {
 	_currentPalette = palette;
 	_currentPaletteLength = count;
+
+	_wm->passPalette(palette, count);
 }
 
 void DirectorEngine::testFontScaling() {
@@ -265,7 +267,7 @@ void DirectorEngine::testFontScaling() {
 		x += width + 1;
 	}
 
-	g_system->copyRectToScreen(surface.getPixels(), surface.pitch, 0, 0, w, h);
+	g_system->copyRectToScreen(surface.getPixels(), surface.pitch, 0, 0, w, h); // testing fonts
 
 	Common::Event event;
 

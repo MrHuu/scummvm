@@ -23,6 +23,8 @@
 #include "common/system.h"
 #include "common/events.h"
 
+#include "graphics/macgui/macwindowmanager.h"
+
 #include "director/director.h"
 #include "director/frame.h"
 #include "director/score.h"
@@ -43,7 +45,7 @@ void processQuitEvent() {
 void DirectorEngine::processEvents() {
 	Common::Event event;
 
-	uint endTime = g_system->getMillis() + 200;
+	uint endTime = g_system->getMillis() + 10;
 
 	Score *sc = getCurrentScore();
 	if (sc->getCurrentFrame() >= sc->_frames.size()) {
@@ -57,6 +59,9 @@ void DirectorEngine::processEvents() {
 
 	while (g_system->getMillis() < endTime) {
 		while (g_system->getEventManager()->pollEvent(event)) {
+			if (_wm->processEvent(event))
+				continue;
+
 			switch (event.type) {
 			case Common::EVENT_QUIT:
 				sc->_stopPlay = true;

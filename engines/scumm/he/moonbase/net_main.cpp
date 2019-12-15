@@ -20,6 +20,8 @@
  *
  */
 
+#include "backends/networking/curl/connectionmanager.h"
+
 #include "scumm/he/intern_he.h"
 #include "scumm/he/moonbase/moonbase.h"
 #include "scumm/he/moonbase/net_main.h"
@@ -34,7 +36,10 @@ Net::Net(ScummEngine_v100he *vm) : _latencyTime(1), _fakeLatency(false), _vm(vm)
 	_tmpbuffer = (byte *)malloc(MAX_PACKET_SIZE);
 
 	_myUserId = -1;
+	_myPlayerKey = -1;
 	_lastResult = 0;
+
+	_sessionsBeingQueried = false;
 
 	_sessionid = -1;
 	_sessions = nullptr;
@@ -48,6 +53,7 @@ Net::~Net() {
 	free(_packbuffer);
 
 	delete _sessions;
+	delete _packetdata;
 }
 
 int Net::hostGame(char *sessionName, char *userName) {
@@ -104,6 +110,7 @@ void Net::addUserCallback(Common::JSONValue *response) {
 
 	if (info.contains("userid")) {
 		_myUserId = info["userid"]->asIntegerNumber();
+		_myPlayerKey = info["playerkey"]->asIntegerNumber();
 	}
 	debug(1, "addUserCallback: got: '%s' as %d", response->stringify().c_str(), _myUserId);
 }
@@ -113,8 +120,12 @@ void Net::addUserErrorCallback(Networking::ErrorResponse error) {
 }
 
 int Net::removeUser() {
-	warning("STUB: Net::removeUser()"); // PN_RemoveUser
-	return 0;
+	debug(1, "Net::removeUser()"); // PN_RemoveUser
+
+	if (_myUserId != -1)
+		destroyPlayer(_myUserId);
+
+	return 1;
 }
 
 int Net::whoSentThis() {
@@ -191,12 +202,56 @@ int Net::joinSession(int sessionIndex) {
 }
 
 int Net::endSession() {
-	warning("STUB: Net::endSession()"); // PN_EndSession
-	return 0;
+	debug(1, "Net::endSession()"); // PN_EndSession
+
+	Networking::PostRequest rq(_serverprefix + "/endsession",
+		new Common::Callback<Net, Common::JSONValue *>(this, &Net::endSessionCallback),
+		new Common::Callback<Net, Networking::ErrorResponse>(this, &Net::endSessionErrorCallback));
+
+	char *buf = (char *)malloc(MAX_PACKET_SIZE);
+	snprintf(buf, MAX_PACKET_SIZE, "{\"sessionid\":%d, \"userid\":%d}", _sessionid, _myUserId);
+	rq.setPostData((byte *)buf, strlen(buf));
+	rq.setContentType("application/json");
+
+	rq.start();
+
+	while(rq.state() == Networking::PROCESSING) {
+		g_system->delayMillis(5);
+	}
+
+	return _lastResult;
 }
 
+void Net::endSessionCallback(Common::JSONValue *response) {
+	_lastResult = 1;
+}
+
+void Net::endSessionErrorCallback(Networking::ErrorResponse error) {
+	warning("Error in endSession(): %ld %s", error.httpResponseCode, error.response.c_str());
+
+	_lastResult = 0;
+}
+
+
 void Net::disableSessionJoining() {
-	warning("STUB: Net::disableSessionJoining()"); // PN_DisableSessionPlayerJoin
+	debug(1, "Net::disableSessionJoining()"); // PN_DisableSessionPlayerJoin
+
+	Networking::PostRequest *rq = new Networking::PostRequest(_serverprefix + "/disablesession",
+		nullptr,
+		new Common::Callback<Net, Networking::ErrorResponse>(this, &Net::disableSessionJoiningErrorCallback));
+
+	char *buf = (char *)malloc(MAX_PACKET_SIZE);
+	snprintf(buf, MAX_PACKET_SIZE, "{\"sessionid\":%d}", _sessionid);
+	rq->setPostData((byte *)buf, strlen(buf));
+	rq->setContentType("application/json");
+
+	rq->start();
+
+	ConnMan.addRequest(rq);
+}
+
+void Net::disableSessionJoiningErrorCallback(Networking::ErrorResponse error) {
+	warning("Error in disableSessionJoining(): %ld %s", error.httpResponseCode, error.response.c_str());
 }
 
 void Net::enableSessionJoining() {
@@ -226,29 +281,47 @@ int32 Net::setProviderByName(int32 parameter1, int32 parameter2) {
 
 void Net::setFakeLatency(int time) {
 	_latencyTime = time;
-	debug("NETWORK: Setting Fake Latency to %d ms \n", _latencyTime); // TODO: is it OK to use debug instead of SPUTM_xprintf?
+	debug("NETWORK: Setting Fake Latency to %d ms", _latencyTime);
 	_fakeLatency = true;
 }
 
 bool Net::destroyPlayer(int32 playerDPID) {
 	// bool PNETWIN_destroyplayer(DPID idPlayer)
-	warning("STUB: Net::destroyPlayer(%d)", playerDPID);
-	return false;
+	debug(1, "Net::destroyPlayer(%d)", playerDPID);
+
+	Networking::PostRequest *rq = new Networking::PostRequest(_serverprefix + "/removeuser",
+		nullptr,
+		new Common::Callback<Net, Networking::ErrorResponse>(this, &Net::destroyPlayerErrorCallback));
+
+	char *buf = (char *)malloc(MAX_PACKET_SIZE);
+	snprintf(buf, MAX_PACKET_SIZE, "{\"sessionid\":%d, \"userid\":%d}", _sessionid, playerDPID);
+	rq->setPostData((byte *)buf, strlen(buf));
+	rq->setContentType("application/json");
+
+	rq->start();
+
+	ConnMan.addRequest(rq);
+
+	return true;
+}
+
+void Net::destroyPlayerErrorCallback(Networking::ErrorResponse error) {
+	warning("Error in destroyPlayer(): %ld %s", error.httpResponseCode, error.response.c_str());
 }
 
 int32 Net::startQuerySessions() {
-	debug(1, "Net::startQuerySessions()"); // StartQuerySessions
+	if (!_sessionsBeingQueried) { // Do not run parallel queries
+		debug(1, "Net::startQuerySessions()"); // StartQuerySessions
 
-	Networking::PostRequest rq(_serverprefix + "/lobbies",
-		new Common::Callback<Net, Common::JSONValue *>(this, &Net::startQuerySessionsCallback),
-		new Common::Callback<Net, Networking::ErrorResponse>(this, &Net::startQuerySessionsErrorCallback));
+		Networking::PostRequest *rq = new Networking::PostRequest(_serverprefix + "/lobbies",
+			new Common::Callback<Net, Common::JSONValue *>(this, &Net::startQuerySessionsCallback),
+			new Common::Callback<Net, Networking::ErrorResponse>(this, &Net::startQuerySessionsErrorCallback));
 
-	delete _sessions;
+		_sessionsBeingQueried = true;
 
-	rq.start();
+		rq->start();
 
-	while(rq.state() == Networking::PROCESSING) {
-		g_system->delayMillis(5);
+		ConnMan.addRequest(rq);
 	}
 
 	if (!_sessions)
@@ -262,21 +335,28 @@ int32 Net::startQuerySessions() {
 void Net::startQuerySessionsCallback(Common::JSONValue *response) {
 	debug(1, "startQuerySessions: Got: '%s' which is %lu", response->stringify().c_str(), response->countChildren());
 
+	_sessionsBeingQueried = false;
+
+	delete _sessions;
+
 	_sessions = new Common::JSONValue(*response);
 }
 
 void Net::startQuerySessionsErrorCallback(Networking::ErrorResponse error) {
 	warning("Error in startQuerySessions(): %ld %s", error.httpResponseCode, error.response.c_str());
+
+	_sessionsBeingQueried = false;
 }
 
 int32 Net::updateQuerySessions() {
-	warning("STUB: Net::updateQuerySessions()"); // UpdateQuerySessions
+	debug(1, "Net::updateQuerySessions()"); // UpdateQuerySessions
 	return startQuerySessions();
 }
 
 void Net::stopQuerySessions() {
 	debug(1, "Net::stopQuerySessions()"); // StopQuerySessions
 
+	_sessionsBeingQueried = false;
 	// No op
 }
 
@@ -335,12 +415,12 @@ void Net::remoteStartScript(int typeOfSend, int sendTypeParam, int priority, int
 	else
 		res += "]";
 
-	warning("STUB: Net::remoteStartScript(%d, %d, %d, %d, ...)", typeOfSend, sendTypeParam, priority, argsCount); // PN_RemoteStartScriptCommand
+	debug(1, "Net::remoteStartScript(%d, %d, %d, %d, ...)", typeOfSend, sendTypeParam, priority, argsCount); // PN_RemoteStartScriptCommand
 
-	remoteSendData(typeOfSend, sendTypeParam, PACKETTYPE_REMOTESTARTSCRIPT, res, 0);
+	remoteSendData(typeOfSend, sendTypeParam, PACKETTYPE_REMOTESTARTSCRIPT, res);
 }
 
-int Net::remoteSendData(int typeOfSend, int sendTypeParam, int type, Common::String data, int defaultRes) {
+int Net::remoteSendData(int typeOfSend, int sendTypeParam, int type, Common::String data, int defaultRes, bool wait, int callid) {
 	// Since I am lazy, instead of constructing the JSON object manually
 	// I'd rather parse it
 	Common::String res = Common::String::format(
@@ -351,31 +431,42 @@ int Net::remoteSendData(int typeOfSend, int sendTypeParam, int type, Common::Str
 	byte *buf = (byte *)malloc(res.size() + 1);
 	strncpy((char *)buf, res.c_str(), res.size());
 
-	debug("Package to send: %s", res.c_str());
+	debug(2, "Package to send: %s", res.c_str());
 
-	Networking::PostRequest rq(_serverprefix + "/packet",
-		new Common::Callback<Net, Common::JSONValue *>(this, &Net::remoteSendDataCallback),
+	Networking::PostRequest *rq = new Networking::PostRequest(_serverprefix + "/packet",
+		nullptr,
 		new Common::Callback<Net, Networking::ErrorResponse>(this, &Net::remoteSendDataErrorCallback));
 
-	rq.setPostData(buf, res.size());
-	rq.setContentType("application/json");
+	rq->setPostData(buf, res.size());
+	rq->setContentType("application/json");
 
-	rq.start();
+	rq->start();
 
-	while(rq.state() == Networking::PROCESSING) {
-		g_system->delayMillis(5);
+	ConnMan.addRequest(rq);
+
+	if (!wait)
+		return 0;
+
+	uint32 timeout = g_system->getMillis() + 1000;
+
+	while (g_system->getMillis() < timeout) {
+		if (remoteReceiveData()) {
+			if (_packetdata->child("data")->hasChild("callid")) {
+				if (_packetdata->child("data")->child("callid")->asIntegerNumber() == callid) {
+					return _packetdata->child("data")->child("result")->asIntegerNumber();
+				}
+			}
+
+			warning("Net::remoteSendData(): Received wrong package: %s", _packetdata->stringify().c_str());
+		}
+
+		_vm->parseEvents();
 	}
 
 	if (!_sessions)
 		return 0;
 
 	return defaultRes;
-}
-
-void Net::remoteSendDataCallback(Common::JSONValue *response) {
-	debug(1, "remoteSendData: Got: '%s'", response->stringify().c_str());
-
-	_sessions = new Common::JSONValue(*response);
 }
 
 void Net::remoteSendDataErrorCallback(Networking::ErrorResponse error) {
@@ -423,11 +514,13 @@ void Net::remoteSendArray(int typeOfSend, int sendTypeParam, int priority, int a
 			jsonData += "]";
 	}
 
-	remoteSendData(typeOfSend, sendTypeParam, PACKETTYPE_REMOTESENDSCUMMARRAY, jsonData, 0);
+	remoteSendData(typeOfSend, sendTypeParam, PACKETTYPE_REMOTESENDSCUMMARRAY, jsonData);
 }
 
 int Net::remoteStartScriptFunction(int typeOfSend, int sendTypeParam, int priority, int defaultReturnValue, int argsCount, int32 *args) {
-	Common::String res = "\"params\": [";
+	int callid = _vm->_rnd.getRandomNumber(1000000);
+
+	Common::String res = Common::String::format("\"callid\":%d, \"params\": [", callid);
 
 	if (argsCount > 2)
 		for (int i = 0; i < argsCount - 1; i++)
@@ -438,9 +531,9 @@ int Net::remoteStartScriptFunction(int typeOfSend, int sendTypeParam, int priori
 	else
 		res += "]";
 
-	warning("STUB: Net::remoteStartScriptFunction(%d, %d, %d, %d, %d, ...)", typeOfSend, sendTypeParam, priority, defaultReturnValue, argsCount); // PN_RemoteStartScriptFunction
+	debug(1, "Net::remoteStartScriptFunction(%d, %d, %d, %d, %d, ...)", typeOfSend, sendTypeParam, priority, defaultReturnValue, argsCount); // PN_RemoteStartScriptFunction
 
-	return remoteSendData(typeOfSend, sendTypeParam, PACKETTYPE_REMOTESTARTSCRIPTRETURN, res, defaultReturnValue);
+	return remoteSendData(typeOfSend, sendTypeParam, PACKETTYPE_REMOTESTARTSCRIPTRETURN, res, defaultReturnValue, true, callid);
 }
 
 bool Net::getHostName(char *hostname, int length) {
@@ -551,9 +644,10 @@ bool Net::remoteReceiveData() {
 			_vm->runScript(_vm->VAR(_vm->VAR_REMOTE_START_SCRIPT), 1, 0, (int *)_tmpbuffer);
 			int result = _vm->pop();
 
-			Common::String res = Common::String::format("\"result\": %d", result);
+			Common::String res = Common::String::format("\"result\": %d, \"callid\": %d", result,
+					(int)_packetdata->child("data")->child("callid")->asIntegerNumber());
 
-			remoteSendData(PN_SENDTYPE_INDIVIDUAL, from, PACKETTYPE_REMOTESTARTSCRIPTRESULT, res, 0);
+			remoteSendData(PN_SENDTYPE_INDIVIDUAL, from, PACKETTYPE_REMOTESTARTSCRIPTRESULT, res);
 		}
 		break;
 
@@ -629,10 +723,6 @@ void Net::remoteReceiveDataCallback(Common::JSONValue *response) {
 
 void Net::remoteReceiveDataErrorCallback(Networking::ErrorResponse error) {
 	warning("Error in remoteReceiveData(): %ld %s", error.httpResponseCode, error.response.c_str());
-}
-
-void Net::unpackageArray(int arrayId, byte *data, int len) {
-	warning("STUB: unpackageArray");
 }
 
 

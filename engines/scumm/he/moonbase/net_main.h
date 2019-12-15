@@ -61,11 +61,10 @@ public:
 	bool initSession();
 	bool initUser();
 	void remoteStartScript(int typeOfSend, int sendTypeParam, int priority, int argsCount, int32 *args);
-	int remoteSendData(int typeOfSend, int sendTypeParam, int type, Common::String data, int defaultRes);
+	int remoteSendData(int typeOfSend, int sendTypeParam, int type, Common::String data, int defaultRes = 0, bool wait = false, int callid = 0);
 	void remoteSendArray(int typeOfSend, int sendTypeParam, int priority, int arrayIndex);
 	int remoteStartScriptFunction(int typeOfSend, int sendTypeParam, int priority, int defaultReturnValue, int argsCount, int32 *args);
 	void doNetworkOnceAFrame(int msecs);
-	void unpackageArray(int arrayId, byte *data, int len);
 
 private:
 	bool remoteReceiveData();
@@ -79,7 +78,13 @@ private:
 	void addUserCallback(Common::JSONValue *response);
 	void addUserErrorCallback(Networking::ErrorResponse error);
 
-	void remoteSendDataCallback(Common::JSONValue *response);
+	void disableSessionJoiningErrorCallback(Networking::ErrorResponse error);
+
+	void endSessionCallback(Common::JSONValue *response);
+	void endSessionErrorCallback(Networking::ErrorResponse error);
+
+	void destroyPlayerErrorCallback(Networking::ErrorResponse error);
+
 	void remoteSendDataErrorCallback(Networking::ErrorResponse error);
 
 	void remoteReceiveDataCallback(Common::JSONValue *response);
@@ -108,10 +113,13 @@ public:
 	byte *_tmpbuffer;
 
 	int _myUserId;
+	int _myPlayerKey;
 
 	int _lastResult;
 
 	int _sessionid;
+
+	bool _sessionsBeingQueried;
 
 	Common::JSONValue *_sessions;
 	Common::JSONValue *_packetdata;

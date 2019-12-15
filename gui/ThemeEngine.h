@@ -37,7 +37,7 @@
 #include "graphics/pixelformat.h"
 
 
-#define SCUMMVM_THEME_VERSION_STR "SCUMMVM_STX0.8.27"
+#define SCUMMVM_THEME_VERSION_STR "SCUMMVM_STX0.8.28"
 
 class OSystem;
 
@@ -79,6 +79,13 @@ enum DrawData {
 	kDDButtonHover,
 	kDDButtonDisabled,
 	kDDButtonPressed,
+
+	kDDDropDownButtonIdle,
+	kDDDropDownButtonHoverLeft,
+	kDDDropDownButtonHoverRight,
+	kDDDropDownButtonDisabled,
+	kDDDropDownButtonPressedLeft,
+	kDDDropDownButtonPressedRight,
 
 	kDDSliderFull,
 	kDDSliderHover,
@@ -399,6 +406,9 @@ public:
 
 	void drawButton(const Common::Rect &r, const Common::String &str, WidgetStateInfo state = kStateEnabled,
 	                uint16 hints = 0);
+
+	void drawDropDownButton(const Common::Rect &r, uint32 dropdownWidth, const Common::String &str,
+	                        WidgetStateInfo buttonState, bool inButton, bool inDropdown);
 
 	void drawSurface(const Common::Point &p, const Graphics::Surface &surface, bool themeTrans = false);
 

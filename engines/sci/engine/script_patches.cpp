@@ -132,6 +132,7 @@ static const char *const selectorNameTable[] = {
 	"nMsgType",     // Space Quest 4
 	"doVerb",       // Space Quest 4
 	"setRegions",   // Space Quest 4
+	"setSpeed",     // Space Quest 5, QFG4
 	"loop",         // Laura Bow 1 Colonel's Bequest, QFG4
 	"setLoop",      // Laura Bow 1 Colonel's Bequest, QFG4
 	"ignoreActors", // Laura Bow 1 Colonel's Bequest
@@ -188,7 +189,6 @@ static const char *const selectorNameTable[] = {
 	"sayMessage",   // QFG4
 	"setCursor",    // QFG4
 	"setLooper",    // QFG4
-	"setSpeed",     // QFG4
 	"useStamina",   // QFG4
 	"value",        // QFG4
 #endif
@@ -246,6 +246,7 @@ enum ScriptPatcherSelectors {
 	SELECTOR_nMsgType,
 	SELECTOR_doVerb,
 	SELECTOR_setRegions,
+	SELECTOR_setSpeed,
 	SELECTOR_loop,
 	SELECTOR_setLoop,
 	SELECTOR_ignoreActors,
@@ -303,7 +304,6 @@ enum ScriptPatcherSelectors {
 	SELECTOR_sayMessage,
 	SELECTOR_setCursor,
 	SELECTOR_setLooper,
-	SELECTOR_setSpeed,
 	SELECTOR_useStamina,
 	SELECTOR_value
 #endif
@@ -738,7 +738,7 @@ static const uint16 camelotSignatureSwordSheathing[] = {
 	0x32, SIG_UINT16(0x0085),           // jmp 0085 [ end of switch ]
 	0x3c,                               // dup
 	0x35, 0x02,                         // ldi 02
-	0x1a,                               // eq? [ sword-command == 2 (sheath) ]
+	0x1a,                               // eq? [ sword-command == 2 (sheathe) ]
 	0x30, SIG_UINT16(0x0013),           // bnt 0013
 	0x39, SIG_SELECTOR8(setScript),     // pushi setScript
 	0x78,                               // push1
@@ -812,10 +812,45 @@ static const uint16 camelotPatchSwordSheathing[] = {
 	PATCH_END
 };
 
+// When Arthur's sword is drawn, ARTHUR:doit calls kGetEvent a second time on
+//  each cycle to test if a shift key is pressed, causing input events to be
+//  frequently dropped. This is similar to Freddy Pharkas and QFG1VGA where this
+//  technique just happened to usually work in Sierra's interpreter. We fix this
+//  in the same way by using the current event instead of consuming a new one.
+//
+// Applies to: All versions
+// Responsible method: ARTHUR:doit
+// Fixes bug: #11269
+static const uint16 camelotSignatureSwordEvents[] = {
+	0x30, SIG_MAGICDWORD,               // bnt 0045
+	      SIG_UINT16(0x0045),
+	0x39, SIG_SELECTOR8(new),           // pushi new
+	0x76,                               // push0
+	0x51, 0x07,                         // class Event
+	0x4a, 0x04,                         // send 04 [ Event new: ]
+	0xa5, 0x01,                         // sat 01 [ temp1 = Event new: ]
+	SIG_ADDTOOFFSET(+53),
+	0x39, SIG_SELECTOR8(dispose),       // pushi dispose
+	0x76,                               // push0
+	0x85, 0x01,                         // lat 01
+	0x4a, 0x04,                         // send 04 [ temp1 dispose: ]
+	SIG_END
+};
+
+static const uint16 camelotPatchSwordEvents[] = {
+	0x31, 0x46,                         // bnt 46
+	0x38, PATCH_SELECTOR16(curEvent),   // pushi curEvent
+	0x76,                               // push0
+	0x51, 0x30,                         // class User [ User: curEvent ]
+	PATCH_ADDTOOFFSET(+57),
+	0x33, 0x05,                         // jmp 05 [ don't dispose event ]
+	PATCH_END
+};
 
 //         script, description,                                       signature                             patch
 static const SciScriptPatcherEntry camelotSignatures[] = {
 	{ true,     0, "fix sword sheathing",                          1, camelotSignatureSwordSheathing,       camelotPatchSwordSheathing },
+	{ true,     0, "fix sword events",                             1, camelotSignatureSwordEvents,          camelotPatchSwordEvents },
 	{ true,    11, "fix hunter missing points",                    1, camelotSignatureHunterMissingPoints,  camelotPatchHunterMissingPoints },
 	{ true,    62, "fix peepingTom Sierra bug",                    1, camelotSignaturePeepingTom,           camelotPatchPeepingTom },
 	{ true,    64, "fix Fatima room messages",                     2, camelotSignatureFatimaRoomMessages,   camelotPatchFatimaRoomMessages },
@@ -10379,80 +10414,6 @@ static const uint16 qfg4BenchmarkPatch[] = {
 	PATCH_END
 };
 
-// In room 800, at the start of the game, when automatically sliding down a
-// slope an error may happen inside Grooper::doit caused by a timing issue.
-//
-// We delay a bit, so that hero::cycler should always be set.
-//
-// Applies to at least: English CD, English floppy, German floppy
-// Responsible method: sFallsBackSide::changeState in script 803
-// Fixes bug: #9801
-static const uint16 qfg4SlidingDownSlopeSignature[] = {
-	0x87, 0x01,                       // lap param[1]
-	0x65, SIG_ADDTOOFFSET(+1),        // aTop state
-	0x36,                             // push
-	0x3c,                             // dup
-	0x35, 0x00,                       // ldi 00
-	0x1a,                             // eq?
-	0x31, 0x30,                       // bnt [skip state 0]
-	0x38, SIG_SELECTOR16(handsOff),   // pushi handsOff
-	0x76,                             // push0
-	0x81, 0x01,                       // lag global[1]
-	0x4a, SIG_UINT16(0x0004),         // send 04
-	SIG_MAGICDWORD,
-	0x38, SIG_SELECTOR16(cycleSpeed), // pushi cycleSpeed
-	0x76,                             // push0
-	0x81, 0x00,                       // lag global[0]
-	0x4a, SIG_UINT16(0x0004),         // send 04
-	0xa3, 0x00,                       // sal local[0]
-	0x38, SIG_SELECTOR16(setStep),    // pushi setStep
-	0x7a,                             // push2
-	0x78,                             // push1
-	0x78,                             // push1
-	0x38, SIG_SELECTOR16(setMotion),  // pushi setMotion
-	0x38, SIG_UINT16(0x0004),         // pushi 04
-	0x51, SIG_ADDTOOFFSET(+1),        // class PolyPath
-	0x36,                             // push
-	0x39, 0x49,                       // pushi $49
-	0x39, 0x50,                       // pushi $50
-	0x7c,                             // pushSelf
-	0x81, 0x00,                       // lag global[0]
-	0x4a, SIG_UINT16(0x0014),         // send $14
-	SIG_END
-};
-
-static const uint16 qfg4SlidingDownSlopePatch[] = {
-	PATCH_ADDTOOFFSET(+5),
-	0x2f, 0x34,                         // bt [skip state 0]
-	0x38, PATCH_SELECTOR16(handsOff),   // pushi handsOff
-	0x76,                               // push0
-	0x81, 0x01,                         // lag global[1]
-	0x4a, PATCH_UINT16(0x0004),         // send 04
-
-	0x78,                                     // push1
-	0x39, 0x20,                               // pushi $20
-	0x43, kScummVMWaitId, PATCH_UINT16(0x02), // callk Wait, $2
-	0x38, PATCH_SELECTOR16(setStep),    // pushi setStep
-	0x7a,                               // push2
-	0x78,                               // push1
-	0x78,                               // push1
-	0x38, PATCH_SELECTOR16(setMotion),  // pushi setMotion
-	0x38, PATCH_UINT16(0x0004),         // pushi 04
-	0x51, PATCH_GETORIGINALBYTE(+44),   // class PolyPath
-	0x36,                               // push
-	0x39, 0x49,                         // pushi $49
-	0x39, 0x50,                         // pushi $50
-	0x7c,                               // pushSelf
-	0x81, 0x00,                         // lag global[0]
-	0x38, PATCH_SELECTOR16(cycleSpeed), // pushi cycleSpeed
-	0x76,                               // push0
-	0x4a, PATCH_UINT16(0x0018),         // send $18
-	0xa3, 0x00,                         // sal local[0]
-	0x3a,                               // toss
-	0x48,                               // ret
-	PATCH_END
-};
-
 // WORKAROUND: Script needed, because of differences in our pathfinding
 // algorithm.
 // At the inn, there is a path that goes off screen. In our pathfinding
@@ -13144,6 +13105,43 @@ static const uint16 qfg4InnDoorCDPatch[] = {
 	PATCH_END
 };
 
+// In room 800, at the start of the game, automatically sliding down the top of
+//  the slope can crash the CD version in Grooper:doit. See the inn door patch
+//  above for details on these motion regressions and their solution.
+//
+// We fix this by calling hero:normalize at the start of sFallsBackSide to reset
+//  hero's state before starting the motion sequence.
+//
+// This patch is not applied to the NRS fan-patch included in the GOG version.
+//  It fixes this bug by adding a spin loop delay that's relative to game speed
+//  to sFallsBackSide.
+//
+// Applies to: English CD
+// Responsible method: sFallsBackSide:changeState(0)
+// Fixes bug: #9801
+static const uint16 qfg4SlidingDownSlopeCDSignature[] = {
+	0x87, 0x01,                       // lap 01
+	0x65, 0x16,                       // aTop state
+	0x36,                             // push
+	0x3c,                             // dup
+	0x35, SIG_MAGICDWORD, 0x00,       // ldi 00
+	0x1a,                             // eq?
+	0x31, 0x30,                       // bnt 30 [ state 1 ]
+	SIG_ADDTOOFFSET(+42),
+	0x4a, SIG_UINT16(0x0014),         // send 14 [ hero: setStep: 1 1 ... ]
+	SIG_END
+};
+
+static const uint16 qfg4SlidingDownSlopeCDPatch[] = {
+	PATCH_ADDTOOFFSET(+5),
+	0x2f, 0x34,                         // bt 34 [ state 1 ]
+	0x38, PATCH_SELECTOR16(normalize),  // pushi normalize
+	0x76,                               // push0
+	PATCH_ADDTOOFFSET(+42),
+	0x4a, PATCH_UINT16(0x0018),         // send 18 [ hero: normalize: setStep: 1 1 ... ]
+	PATCH_END
+};
+
 // Walking around the base of the slippery slope in room 800 can crash the CD
 //  version in either the Grooper or Grycler classes. See the inn door patch
 //  above for details on these regressions and their solution.
@@ -13978,15 +13976,23 @@ static const uint16 qfg4ChaseRepeatsPatch[] = {
 // We fix this by disposing of each cast member before painting black instead of
 //  hiding them. This hides them and terminates their motions. This exposes the
 //  previously unused 300 cycle delay, which is much longer than normal, so we
-//  also change that to 2 seconds. This is consistent with existing behavior
-//  and it's the same delay used in room 290's working version of this script.
+//  also change that to 4 seconds. This is consistent with existing behavior
+//  and close to the delay used in room 290's working version of this script.
 //  The majority of this patch is to free up the single byte needed to change
 //  the 8-bit hide selector to 16-bit dispose.
+//
+// Several rooms that sBlackOut takes place in, such as 557, have doit methods
+//  that can initiate new necrotaur motions after the cast has been disposed,
+//  which also crashes. We fix this by clearing flag 35 as each of these rooms
+//  requires it to be set to set a necrotaur motion. This is the "hunt" flag.
+//  It's okay to clear it here as it gets cleared in the dungeon.
 //
 // Applies to: All versions
 // Responsible method: sBlackOut:changeState(3)
 // Fixes bug: #11056
 static const uint16 qfg4NecrotaurBlackoutSignature[] = {
+	0x31, 0x4f,                         // bnt 4f [ next state ]
+	SIG_ADDTOOFFSET(+11),
 	SIG_MAGICDWORD,
 	0x39, SIG_SELECTOR8(hide),          // pushi hide
 	0x81, 0x05,                         // lag 05
@@ -14008,11 +14014,18 @@ static const uint16 qfg4NecrotaurBlackoutSignature[] = {
 	0x36,                               // push [ room:plane for kUpdatePlane ]
 	SIG_ADDTOOFFSET(+29),
 	0x34, SIG_UINT16(0x012c),           // ldi 012c
-	0x65,                               // aTop cycles [ cycles = 300 ]
+	0x65, SIG_ADDTOOFFSET(+1),          // aTop cycles [ cycles = 300 ]
+	0x33, 0x1c,                         // jmp 1c [ end of method ]
+	0x3c,                               // dup
+	0x35, SIG_ADDTOOFFSET(+1),          // ldi 04 or 05
+	0x1a,                               // eq?
+	0x31, 0x16,                         // bnt 16 [ end of method ]
 	SIG_END
 };
 
 static const uint16 qfg4NecrotaurBlackoutPatch[] = {
+	0x31, 0x55,                         // bnt 55 [ next state ]
+	PATCH_ADDTOOFFSET(+11),
 	0x38, PATCH_SELECTOR16(dispose),    // pushi dispose
 	0x81, 0x05,                         // lag 05
 	0x4a, PATCH_UINT16(0x0006),         // send 06 [ cast eachElementDo: dispose ]
@@ -14025,13 +14038,18 @@ static const uint16 qfg4NecrotaurBlackoutPatch[] = {
 	0x39, PATCH_SELECTOR8(back),        // pushi back
 	0x39, 0x01,                         // pushi 01
 	0x39, 0x00,                         // pushi 00
-	0x39, PATCH_GETORIGINALBYTE(+13),   // pushi picture
+	0x39, PATCH_GETORIGINALBYTE(+26),   // pushi picture
 	0x39, 0x01,                         // pushi 01
 	0x39, 0xff,                         // pushi ff
 	0x4a, PATCH_UINT16(0x000c),         // send 0c [ room:plane back: 0 picture: -1 ]
 	PATCH_ADDTOOFFSET(+29),
-	0x34, PATCH_UINT16(0x0002),         // ldi 0002
-	0x65, PATCH_GETORIGINALBYTEADJUST(+65, +2), // aTop seconds [ seconds = 2 ]
+	0x35, 0x04,                         // ldi 04
+	0x65, PATCH_GETORIGINALBYTEADJUST(+78, +2), // aTop seconds [ seconds = 4 ]
+	0x78,                               // push1
+	0x39, 0x23,                         // pushi 23
+	0x45, 0x03, PATCH_UINT16(0x0002),   // callb proc0_3 02 [ clear flag 35 ]
+	0x3a,                               // toss
+	0x48,                               // ret
 	PATCH_END
 };
 
@@ -14618,7 +14636,7 @@ static const SciScriptPatcherEntry qfg4Signatures[] = {
 	{  true,   800, "fix grapnel removing hero's scaler",          1, qfg4RopeScalerSignature,       qfg4RopeScalerPatch },
 	{  true,   801, "fix runes puzzle (1/2)",                      1, qfg4RunesPuzzleSignature1,     qfg4RunesPuzzlePatch1 },
 	{  true,   801, "fix runes puzzle (2/2)",                      1, qfg4RunesPuzzleSignature2,     qfg4RunesPuzzlePatch2 },
-	{  true,   803, "fix sliding down slope",                      1, qfg4SlidingDownSlopeSignature, qfg4SlidingDownSlopePatch },
+	{  true,   803, "CD: fix sliding down slope",                  1, qfg4SlidingDownSlopeCDSignature, qfg4SlidingDownSlopeCDPatch },
 	{  true,   803, "CD: fix walking up slippery slope",           1, qfg4WalkUpSlopeCDSignature,    qfg4WalkUpSlopeCDPatch },
 	{  true,   803, "CD: fix walking down slippery slope",         1, qfg4WalkDownSlopeCDSignature,  qfg4WalkDownSlopeCDPatch },
 	{  true,   803, "NRS: fix walking down slippery slope",        1, qfg4WalkDownSlopeNrsSignature, qfg4WalkDownSlopeNrsPatch },
@@ -16511,10 +16529,155 @@ static const uint16 sq5PatchCaptainChairFix[] = {
 	PATCH_END
 };
 
+// When using the fruit on WD40 in room 305, she can take off before ego's
+//  animation completes and lock up the game. WD40 remains on the log for five
+//  seconds but ego's animation runs at the game speed setting and the scripts
+//  don't coordinate. At slow speeds, ego's animation can take all five seconds.
+//
+// We fix this by not allowing WD40 to take off while ego has a script running.
+//  To do this we use existing code in sWD40LandOverRog that retries the current
+//  state after 10 ticks. This preserves the scene's timing unless WD40 would
+//  have gotten stuck, in which case she now waits for sFruitUpWD40 to complete.
+//
+// Applies to: All versions
+// Responsible method: sWD40LandOverRog:changeState
+// Fixes bug: #5162
+static const uint16 sq5SignatureWd40FruitFix[] = {
+	0x6d, 0x14,                     // dpToa state [ state-- ]
+	0x35, 0x0a,                     // ldi 0a
+	SIG_MAGICDWORD,
+	0x65, 0x20,                     // aTop ticks [ ticks = 10 ]
+	0x32, SIG_UINT16(0x0106),       // jmp 0106   [ end of method ]
+	SIG_ADDTOOFFSET(+57),
+	0x31, 0x28,                     // bnt 28 [ state 5 ]
+	SIG_ADDTOOFFSET(+7),
+	0x31, 0x18,                     // bnt 18
+	0x78,                           // push1
+	SIG_ADDTOOFFSET(+20),
+	0x32, SIG_UINT16(0x00aa),       // jmp 00aa [ end of method ]
+	0x35, 0x01,                     // ldi 01
+	0x65, 0x1a,                     // aTop cycles
+	0x32, SIG_UINT16(0x00a3),       // jmp 00a3 [ end of method ]
+	0x3c,                           // dup
+	0x35, 0x05,                     // ldi 05
+	0x1a,                           // eq?
+	0x31, 0x11,                     // bnt 11 [ state 6 ]
+	0x39, SIG_SELECTOR8(play),      // pushi play
+	0x78,                           // push1
+	0x39, 0x4b,                     // pushi 4b
+	0x72, SIG_UINT16(0x096e),       // lofsa theMusic3
+	0x4a, 0x06,                     // send 06 [ theMusic3 play: 75 ]
+	0x35, 0x05,                     // ldi 05
+	0x65, 0x1c,                     // aTop seconds [ seconds = 5 ]
+	0x32, SIG_UINT16(0x008c),       // jmp 008c [ end of method ]
+	0x3c,                           // dup
+	0x35, 0x06,                     // ldi 06
+	0x1a,                           // eq?
+	0x30, SIG_UINT16(0x0053),       // bnt 0053 [ state 7 ]
+	SIG_END
+};
+
+static const uint16 sq5PatchWd40FruitFix[] = {
+	PATCH_ADDTOOFFSET(+66),
+	0x31, 0x22,                     // bnt 22 [ state 5 ]
+	PATCH_ADDTOOFFSET(+7),
+	0x78,                           // push1
+	0x31, 0x16,                     // bnt 16
+	PATCH_ADDTOOFFSET(+20),
+	0x3a,                           // toss
+	0x48,                           // ret
+	0x69, 0x1a,                     // sTop cycles [ cycles = 1 ]
+	0x3c,                           // dup
+	0x35, 0x05,                     // ldi 05
+	0x1a,                           // eq?
+	0x31, 0x0d,                     // bnt 0d [ state 6 ]
+	0x39, PATCH_SELECTOR8(play),    // pushi play
+	0x78,                           // push1
+	0x39, 0x4b,                     // pushi 4b
+	0x72, PATCH_UINT16(0x096e),     // lofsa theMusic3
+	0x4a, 0x06,                     // send 06 [ theMusic3 play: 75 ]
+	0x69, 0x1c,                     // sTop seconds [ seconds = 5 ]
+	0x48,                           // ret
+	0x3c,                           // dup
+	0x35, 0x06,                     // ldi 06
+	0x1a,                           // eq?
+	0x31, 0x5e,                     // bnt 5e [ state 7 ]
+	0X38, PATCH_SELECTOR16(script), // pushi script
+	0x76,                           // push0
+	0x81, 0x00,                     // lag 00
+	0x4a, 0x04,                     // send 04 [ ego script? ]
+	0x2e, PATCH_UINT16(0xff76),     // bt ff76 [ state--, ticks = 10 ]
+	PATCH_END
+};
+
+// In the first release of SQ5, when the cloaking device alarm countdown on
+//  WD40's ship expires, a script enters an infinite loop and the interpreter
+//  stops responding.
+//
+// We fix this as Sierra did in later versions by adding a call to SQ5:handsOn
+//  and removing the call to sCountDown:dispose before going to deathRoom.
+//
+// Applies to: English PC 1.03
+// Responsible method: sCountDown:changeState(3)
+// Fixes bug: #11255
+static const uint16 sq5SignatureWd40AlarmCountdownFix[] = {
+	0x3c,                           // dup
+	0x35, 0x03,                     // ldi 03
+	0x1a,                           // eq?
+	0x31, 0x0b,                     // bnt 0b [ end of method ]
+	0x78,                           // push1
+	0x39, 0x15,                     // pushi 15
+	SIG_MAGICDWORD,
+	0x45, 0x09, 0x02,               // callb proc0_9 02 [ go to deathRoom ]
+	0x39, SIG_SELECTOR8(dispose),   // pushi dispose
+	0x76,                           // push0
+	0x54, 0x04,                     // self 04 [ self dispose: ]
+	SIG_END
+};
+
+static const uint16 sq5PatchWd40AlarmCountdownFix[] = {
+	0x38, PATCH_SELECTOR16(handsOn),// pushi handsOn
+	0x76,                           // push0
+	0x81, 0x01,                     // lag 01
+	0x4a, 0x04,                     // send 04 [ SQ5 handsOn: ]
+	0x78,                           // push1
+	0x39, 0x15,                     // pushi 15
+	0x45, 0x09, 0x02,               // callb proc0_9 02 [ go to deathRoom ]
+	0x3a,                           // toss
+	0x48,                           // ret
+	PATCH_END
+};
+
+// In the transporter room, several scripts attempt to temporarily set ego's
+//  speed to 6 but instead change the game speed. This prevents ego's speed from
+//  being restored. The user must then do this manually in the control panel.
+//  These bugs are due to calling ego:setSpeed instead of ego:cycleSpeed, which
+//  we fix. This occurs when randomly beaming in with the funnyBeam script and
+//  when talking to Cliffy about Bea before curing her.
+//
+// Applies to: All versions
+// Responsible methods: funnyBeam:changeState, talkAboutBea:changeState
+// Fixes bug: #11264
+static const uint16 sq5SignatureTransporterRoomSpeedFix[] = {
+	0x38, SIG_MAGICDWORD,           // pushi setSpeed
+	      SIG_SELECTOR16(setSpeed),
+	0x78,                           // push1
+	0x39, 0x06,                     // pushi 06
+	SIG_END
+};
+
+static const uint16 sq5PatchTransporterRoomSpeedFix[] = {
+	0x38, PATCH_SELECTOR16(cycleSpeed), // pushi cycleSpeed
+	PATCH_END
+};
+
 //          script, description,                                      signature                             patch
 static const SciScriptPatcherEntry sq5Signatures[] = {
 	{  true,   200, "captain chair lockup fix",                    1, sq5SignatureCaptainChairFix,          sq5PatchCaptainChairFix },
 	{  true,   226, "toolbox fix",                                 1, sq5SignatureToolboxFix,               sq5PatchToolboxFix },
+	{  true,   243, "transporter room speed fix",                  3, sq5SignatureTransporterRoomSpeedFix,  sq5PatchTransporterRoomSpeedFix },
+	{  true,   305, "wd40 fruit fix",                              1, sq5SignatureWd40FruitFix,             sq5PatchWd40FruitFix },
+	{  true,   335, "wd40 alarm countdown fix",                    1, sq5SignatureWd40AlarmCountdownFix,    sq5PatchWd40AlarmCountdownFix },
 	{  true,  1000, "drive bay pathfinding fix",                   1, sq5SignatureDriveBayPathfindingFix,   sq5PatchDriveBayPathfindingFix },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
@@ -17162,6 +17325,9 @@ void ScriptPatcher::applyPatch(const SciScriptPatcherEntry *patchEntry, SciSpan<
 		case PATCH_CODE_BYTE:
 			scriptData[offset] = patchValue & PATCH_BYTEMASK;
 			offset++;
+			break;
+		default:
+			break;
 		}
 		patchData++;
 		patchWord = *patchData;
@@ -17240,6 +17406,9 @@ bool ScriptPatcher::verifySignature(uint32 byteOffset, const uint16 *signatureDa
 			} else {
 				sigWord = SIG_MISMATCH; // out of bounds
 			}
+			break;
+		default:
+			break;
 		}
 
 		if (sigWord == SIG_MISMATCH)
@@ -17350,6 +17519,8 @@ void ScriptPatcher::calculateMagicDWordAndVerify(const char *signatureDescriptio
 				}
 				break;
 			}
+			default:
+				break;
 			}
 			magicOffset -= 2;
 			if (magicDWordLeft) {

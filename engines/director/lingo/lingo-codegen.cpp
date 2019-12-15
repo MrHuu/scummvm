@@ -53,23 +53,29 @@
 namespace Director {
 
 void Lingo::execute(uint pc) {
-	for(_pc = pc; (*_currentScript)[_pc] != STOP && !_returning;) {
-		Common::String instr = decodeInstruction(_pc);
+	for (_pc = pc; !_returning && (*_currentScript)[_pc] != STOP;) {
+		Common::String instr = decodeInstruction(_currentScript, _pc);
+		uint current = _pc;
 
 		if (debugChannelSet(5, kDebugLingoExec))
-			printStack("Stack before: ");
+			printStack("Stack before: ", current);
 
-		debugC(1, kDebugLingoExec, "[%3d]: %s", _pc, instr.c_str());
+		debugC(1, kDebugLingoExec, "[%3d]: %s", current, instr.c_str());
 
 		_pc++;
 		(*((*_currentScript)[_pc - 1]))();
 
 		if (debugChannelSet(5, kDebugLingoExec))
-			printStack("Stack after: ");
+			printStack("Stack after: ", current);
+
+		if (_pc >= (*_currentScript).size()) {
+			warning("Lingo::execute(): Bad PC (%d)", _pc);
+			break;
+		}
 	}
 }
 
-void Lingo::printStack(const char *s) {
+void Lingo::printStack(const char *s, uint pc) {
 	Common::String stack(s);
 
 	for (uint i = 0; i < _stack.size(); i++) {
@@ -77,24 +83,25 @@ void Lingo::printStack(const char *s) {
 		d.toString();
 		stack += Common::String::format("<%s> ", d.u.s->c_str());
 	}
-	debugC(5, kDebugLingoExec, "%s", stack.c_str());
+	debugC(5, kDebugLingoExec, "[%3d]: %s", pc, stack.c_str());
 }
 
-Common::String Lingo::decodeInstruction(uint pc, uint *newPc) {
+Common::String Lingo::decodeInstruction(ScriptData *sd, uint pc, uint *newPc) {
 	Symbol sym;
 	Common::String res;
 
-	sym.u.func = (*_currentScript)[pc++];
+	sym.u.func = (*sd)[pc++];
 	if (_functions.contains((void *)sym.u.s)) {
 		res = _functions[(void *)sym.u.s]->name;
 		const char *pars = _functions[(void *)sym.u.s]->proto;
 		inst i;
+		uint start = pc;
 
 		while (*pars) {
 			switch (*pars++) {
 			case 'i':
 				{
-					i = (*_currentScript)[pc++];
+					i = (*sd)[pc++];
 					int v = READ_UINT32(&i);
 
 					res += Common::String::format(" %d", v);
@@ -103,7 +110,7 @@ Common::String Lingo::decodeInstruction(uint pc, uint *newPc) {
 			case 'f':
 				{
 					Datum d;
-					i = (*_currentScript)[pc++];
+					i = (*sd)[pc++];
 					d.u.f = *(double *)(&i);
 
 					res += Common::String::format(" %f", d.u.f);
@@ -111,15 +118,15 @@ Common::String Lingo::decodeInstruction(uint pc, uint *newPc) {
 				}
 			case 'o':
 				{
-					i = (*_currentScript)[pc++];
+					i = (*sd)[pc++];
 					int v = READ_UINT32(&i);
 
-					res += Common::String::format(" [%5d]", v);
+					res += Common::String::format(" [%5d]", v + start - 1);
 					break;
 				}
 			case 's':
 				{
-					char *s = (char *)&(*_currentScript)[pc];
+					char *s = (char *)&(*sd)[pc];
 					pc += calcStringAlignment(s);
 
 					res += Common::String::format(" \"%s\"", s);
@@ -207,11 +214,11 @@ void Lingo::cleanLocalVars() {
 	g_lingo->_localvars = 0;
 }
 
-void Lingo::define(Common::String &name, int start, int nargs, Common::String *prefix, int end) {
+Symbol *Lingo::define(Common::String &name, int start, int nargs, Common::String *prefix, int end, bool removeCode) {
 	if (prefix)
 		name = *prefix + "-" + name;
 
-	debugC(1, kDebugLingoCompile, "define(\"%s\", %d, %d, %d)", name.c_str(), start, _currentScript->size() - 1, nargs);
+	debugC(1, kDebugLingoCompile, "define(\"%s\"(len: %d), %d, %d, \"%s\", %d)", name.c_str(), _currentScript->size() - 1, start, nargs, (prefix ? prefix->c_str() : ""), end);
 
 	Symbol *sym = getHandler(name);
 	if (sym == NULL) { // Create variable if it was not defined
@@ -235,9 +242,27 @@ void Lingo::define(Common::String &name, int start, int nargs, Common::String *p
 	if (end == -1)
 		end = _currentScript->size();
 
-	sym->u.defn = new ScriptData(&(*_currentScript)[start], end - start + 1);
+	sym->u.defn = new ScriptData(&(*_currentScript)[start], end - start);
 	sym->nargs = nargs;
 	sym->maxArgs = nargs;
+
+	// Now remove all defined code from the _currentScript
+	if (removeCode)
+		for (int i = end - 1; i >= start; i--) {
+			_currentScript->remove_at(i);
+		}
+
+	if (debugChannelSet(1, kDebugLingoCompile)) {
+		uint pc = 0;
+		while (pc < sym->u.defn->size()) {
+			uint spc = pc;
+			Common::String instr = g_lingo->decodeInstruction(sym->u.defn, pc, &pc);
+			debugC(1, kDebugLingoCompile, "[%5d] %s", spc, instr.c_str());
+		}
+		debugC(1, kDebugLingoCompile, "<end define code>");
+	}
+
+	return sym;
 }
 
 int Lingo::codeString(const char *str) {
@@ -274,22 +299,20 @@ int Lingo::codeFloat(double f) {
 	return _currentScript->size();
 }
 
-int Lingo::codeConst(int val) {
-	int res = g_lingo->code1(g_lingo->c_constpush);
+int Lingo::codeInt(int val) {
 	inst i = 0;
 	WRITE_UINT32(&i, val);
 	g_lingo->code1(i);
 
-	return res;
+	return _currentScript->size();
 }
 
 int Lingo::codeArray(int arraySize) {
-	int res = g_lingo->code1(g_lingo->c_arraypush);
 	inst i = 0;
 	WRITE_UINT32(&i, arraySize);
 	g_lingo->code1(i);
 
-	return res;
+	return _currentScript->size();
 }
 
 void Lingo::codeArg(Common::String *s) {
@@ -337,6 +360,14 @@ int Lingo::codeFunc(Common::String *s, int numpar) {
 }
 
 int Lingo::codeMe(Common::String *method, int numpar) {
+	// Check if need to encode reference to the factory
+	if (method == nullptr) {
+		int ret = g_lingo->code1(g_lingo->c_factory);
+		g_lingo->codeString(g_lingo->_currentFactory.c_str());
+
+		return ret;
+	}
+
 	int ret = g_lingo->code1(g_lingo->c_call);
 
 	Common::String m(g_lingo->_currentFactory);
@@ -355,13 +386,19 @@ int Lingo::codeMe(Common::String *method, int numpar) {
 
 void Lingo::codeLabel(int label) {
 	_labelstack.push_back(label);
+	debugC(4, kDebugLingoCompile, "codeLabel: Added label %d", label);
 }
 
-void Lingo::processIf(int elselabel, int endlabel) {
+void Lingo::processIf(int startlabel, int endlabel, int finalElse) {
 	inst ielse1, iend;
-	int  else1 = elselabel;
+	int  else1 = 0;
+
+	debugC(4, kDebugLingoCompile, "processIf(%d, %d, %d)", startlabel, endlabel, finalElse);
 
 	WRITE_UINT32(&iend, endlabel);
+
+	int finalElsePos = -1;
+	bool multiIf = _labelstack.size() > 1;
 
 	while (true) {
 		if (_labelstack.empty()) {
@@ -379,11 +416,25 @@ void Lingo::processIf(int elselabel, int endlabel) {
 		if (else1)
 			else1 = else1 - label;
 
+		// Store position of the last 'if', so we could set reference to the
+		// 'finalElse' part
+		if (finalElse && finalElsePos == -1) {
+			finalElsePos = label;
+		}
+
+		debugC(4, kDebugLingoCompile, "processIf: %d: %d %d", label, else1 + label, endlabel + label);
+
 		WRITE_UINT32(&ielse1, else1);
 		(*_currentScript)[label + 2] = ielse1;    /* elsepart */
 		(*_currentScript)[label + 3] = iend;      /* end, if cond fails */
 
 		else1 = label;
+	}
+
+	if (multiIf && finalElsePos != -1) {
+		debugC(4, kDebugLingoCompile, "processIf: storing %d to %d", finalElse - finalElsePos + startlabel, finalElsePos);
+		WRITE_UINT32(&ielse1, finalElse - finalElsePos + startlabel);
+		(*_currentScript)[finalElsePos + 2] = ielse1;
 	}
 }
 

@@ -25,12 +25,16 @@
 
 #include "backends/graphics/surfacesdl/surfacesdl-graphics.h"
 
+enum {
+	GFX_HALF = 12
+};
+
 class LinuxmotoSdlGraphicsManager : public SurfaceSdlGraphicsManager {
 public:
 	LinuxmotoSdlGraphicsManager(SdlEventSource *sdlEventSource, SdlWindow *window);
 
 	virtual void initSize(uint w, uint h, const Graphics::PixelFormat *format = NULL) override;
-	virtual void setGraphicsModeIntern() override;
+	const OSystem::GraphicsMode *getSupportedGraphicsModes() const override;
 	virtual int getGraphicsModeScale(int mode) const override;
 	virtual void internUpdateScreen() override;
 	virtual ScalerProc *getGraphicsScalerProc(int mode) const override;

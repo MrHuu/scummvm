@@ -69,6 +69,31 @@ MODULE_OBJS += \
 	advsys/vm.o
 endif
 
+ifdef ENABLE_GLK_AGT
+MODULE_OBJS += \
+	agt/agil.o \
+	agt/agt.o \
+	agt/agtread.o \
+	agt/agxfile.o \
+	agt/auxfile.o \
+	agt/debugcmd.o \
+	agt/detection.o \
+	agt/disassemble.o \
+	agt/exec.o \
+	agt/filename.o \
+	agt/gamedata.o \
+	agt/interface.o \
+	agt/metacommand.o \
+	agt/object.o \
+	agt/os_glk.o \
+	agt/parser.o \
+	agt/runverb.o \
+	agt/savegame.o \
+	agt/token.o \
+	agt/util.o \
+	agt/vars.o
+endif
+
 ifdef ENABLE_GLK_ALAN2
 MODULE_OBJS += \
 	alan2/alan2.o \
@@ -87,7 +112,6 @@ MODULE_OBJS += \
 	alan2/rules.o \
 	alan2/stack.o \
 	alan2/sysdep.o \
-	alan2/term.o \
 	alan2/types.o
 endif
 
@@ -141,6 +165,30 @@ MODULE_OBJS += \
 	alan3/types.o \
 	alan3/utils.o \
 	alan3/word.o
+endif
+
+ifdef ENABLE_GLK_ARCHETYPE
+MODULE_OBJS += \
+	archetype/archetype.o \
+	archetype/array.o \
+	archetype/crypt.o \
+	archetype/detection.o \
+	archetype/error.o \
+	archetype/expression.o \
+	archetype/game_stat.o \
+	archetype/heap_sort.o \
+	archetype/id_table.o \
+	archetype/interpreter.o \
+	archetype/keywords.o \
+	archetype/linked_list.o \
+	archetype/misc.o \
+	archetype/parser.o \
+	archetype/saveload.o \
+	archetype/semantic.o \
+	archetype/string.o \
+	archetype/sys_object.o \
+	archetype/timestamp.o \
+	archetype/token.o
 endif
 
 ifdef ENABLE_GLK_FROTZ
@@ -239,9 +287,8 @@ ifdef ENABLE_GLK_MAGNETIC
 MODULE_OBJS += \
 	magnetic/detection.o \
 	magnetic/emu.o \
-	magnetic/graphics.o \
-	magnetic/magnetic.o \
-	magnetic/sound.o
+	magnetic/glk.o \
+	magnetic/magnetic.o
 endif
 
 ifdef ENABLE_GLK_QUEST

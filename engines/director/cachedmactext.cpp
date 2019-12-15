@@ -33,42 +33,50 @@ void CachedMacText::makeMacText() {
 	assert(_width != -1);
 	assert(_wm != NULL);
 
-	if ((int)_textCast->textAlign == -1)
+	delete _macText;
+	_macText = nullptr;
+
+	if ((int)_textCast->_textAlign == -1)
 		_align = (Graphics::TextAlign)3;
 	else
-		_align = (Graphics::TextAlign)((int)_textCast->textAlign + 1);
+		_align = (Graphics::TextAlign)((int)_textCast->_textAlign + 1);
+
+	Graphics::MacFont *macFont = new Graphics::MacFont(_textCast->_fontId,
+										_textCast->_fontSize,
+										_textCast->_textSlant);
+
+	debug(5, "CachedMacText::makeMacText(): font id: %d size: %d slant: %d name: %s '%s'",
+		_textCast->_fontId, _textCast->_fontSize, _textCast->_textSlant, macFont->getName().c_str(),
+		Common::toPrintable(_textCast->_ftext).c_str());
 
 	_macText = new Graphics::MacText(_textCast->_ftext,
-	                                 _wm,
-	                                 _macFont,
-	                                 0x00,
-	                                 0xff,
-	                                 _width,
-	                                 _align,
-	                                 1);
+										_wm,
+										macFont,
+										0x00,
+										0xff,
+										_width,
+										_align,
+										1);
 	// TODO destroy me
 }
 
 CachedMacText::CachedMacText(TextCast *const textCast,
-                             int version,
-                             int defaultWidth,
-                             Graphics::MacWindowManager *const wm
-                            )
+								int version,
+								int defaultWidth,
+								Graphics::MacWindowManager *const wm
+								)
 	:
-	_surface(NULL), _macFont(NULL),
-	_macText(NULL), _width(defaultWidth), _dirty(true), _textCast(textCast),
-	_wm(wm) {
-	_macFont = new Graphics::MacFont(_textCast->fontId,
-	                                 _textCast->fontSize,
-	                                 _textCast->textSlant);
-	// TODO destroy me
+	_surface(NULL), _macText(NULL), _width(defaultWidth), _dirty(true),
+	_textCast(textCast), _wm(wm) {
+
+	debug(5, "CachedMacText::CachedMacText(): font id: %d '%s'", _textCast->_fontId, Common::toPrintable(_textCast->_ftext).c_str());
 
 	if (_width == -1)  {
 		if (version >= 4) {
 			// This came from frame.cpp
-			_width = _textCast->initialRect.right;
+			_width = _textCast->_initialRect.right;
 		} else {
-			_width = _textCast->initialRect.width();
+			_width = _textCast->_initialRect.width();
 		}
 	}
 
@@ -94,8 +102,9 @@ void CachedMacText::clip(int width) {
 }
 
 void CachedMacText::forceDirty() {
-	// STUB
-	assert(false);
+	_dirty = true;
+
+	makeMacText();
 }
 
 const Graphics::ManagedSurface *CachedMacText::getSurface() {

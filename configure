@@ -534,7 +534,7 @@ get_system_exe_extension() {
 	gph-linux)
 		_exeext=".gph"
 		;;
-	mingw* | *os2-emx | wince)
+	mingw* | *os2-emx)
 		_exeext=".exe"
 		;;
 	*)
@@ -941,7 +941,7 @@ Configuration:
   -h, --help              display this help and exit
   --backend=BACKEND       backend to build (3ds, android, dc, dingux, ds, gcw0,
                           gph, iphone, ios7, linuxmoto, maemo, n64, null, openpandora,
-                          ps2, psp, psp2, samsungtv, sdl, switch, tizen, webos, wii, wince) [sdl]
+                          ps2, psp, psp2, samsungtv, sdl, switch, tizen, webos, wii) [sdl]
 
 Installation directories:
   --prefix=PREFIX         install architecture-independent files in PREFIX
@@ -1002,7 +1002,6 @@ Special configuration feature:
                                            tizen for Samsung Tizen
                                            webos for HP Palm WebOS
                                            wii for Nintendo Wii
-                                           wince for Windows CE
 
 Game engines:
   --enable-all-engines     enable all engines, including those which are
@@ -1789,11 +1788,6 @@ wii)
 	_host_cpu=powerpc
 	_host_alias=powerpc-eabi
 	;;
-wince)
-	_host_os=wince
-	_host_cpu=arm
-	_host_alias=arm-mingw32ce
-	;;
 *)
 	if test -n "$_host"; then
 		guessed_host=`$_srcdir/config.sub $_host`
@@ -1985,9 +1979,9 @@ EOF
 
 	if test -n "$_host"; then
 		# In cross-compiling mode, we cannot run the result
-		eval "$1 $CXXFLAGS -o $TMPO.o -c tmp_cxx_compiler.cpp" 2> /dev/null && cc_check_clean tmp_cxx_compiler.cpp
+		eval "$1 $CXXFLAGS -o $TMPO.o -c tmp_cxx_compiler.cpp" 2>> "$TMPLOG" && cc_check_clean tmp_cxx_compiler.cpp
 	else
-		eval "$1 $CXXFLAGS $LDFLAGS -o $TMPO$HOSTEXEEXT tmp_cxx_compiler.cpp" 2> /dev/null && eval "$TMPO$HOSTEXEEXT 2> /dev/null" && cc_check_clean tmp_cxx_compiler.cpp
+		eval "$1 $CXXFLAGS $LDFLAGS -o $TMPO$HOSTEXEEXT tmp_cxx_compiler.cpp" 2>> "$TMPLOG" && eval "$TMPO$HOSTEXEEXT 2>> $TMPLOG" && cc_check_clean tmp_cxx_compiler.cpp
 	fi
 }
 
@@ -2185,7 +2179,7 @@ if test "$have_gcc" = yes ; then
 			case $_host_os in
 			# newlib-based system include files suppress non-C89 function
 			# declarations under __STRICT_ANSI__
-			3ds | amigaos* | android | androidsdl | dreamcast | ds | gamecube | mingw* | mint* | n64 | psp | ps2 | ps3 | psp2 | switch | tizen | wii | wince )
+			3ds | amigaos* | android | androidsdl | dreamcast | ds | gamecube | mingw* | mint* | n64 | psp | ps2 | ps3 | psp2 | switch | tizen | wii )
 				;;
 			*)
 				append_var CXXFLAGS "-ansi"
@@ -2499,7 +2493,7 @@ case $_host_cpu in
 			openpandora)
 				define_in_config_if_yes yes 'USE_ARM_NEON_ASPECT_CORRECTOR'
 				;;
-			android | android-arm | androidsdl-armeabi | arm-*riscos | caanoo | ds | gp2x | gp2xwiz | maemo | tizen | wince)
+			android | android-arm | androidsdl-armeabi | arm-*riscos | caanoo | ds | gp2x | gp2xwiz | maemo | tizen)
 				define_in_config_if_yes yes 'USE_ARM_SCALER_ASM'
 				# FIXME: The following feature exhibits a bug. It produces distorted
 				# sound since 9003ce517ff9906b0288f9f7c02197fd091d4554. The ARM
@@ -2558,11 +2552,6 @@ case $_host_os in
 		append_var CXXFLAGS "-fomit-frame-pointer"
 		append_var CXXFLAGS "-I$DEVKITPRO/libctru/include"
 		append_var CXXFLAGS "-I$DEVKITPRO/portlibs/3ds/include"
-		if test "$_dynamic_modules" = no ; then
-			append_var LDFLAGS "-Wl,--gc-sections"
-		else
-			append_var LDFLAGS "-Wl,--no-gc-sections"
-		fi
 		append_var LDFLAGS "-L$DEVKITPRO/libctru/lib"
 		append_var LDFLAGS "-L$DEVKITPRO/portlibs/3ds/lib"
 		append_var LIBS "-lcitro3d -lctru"
@@ -3039,23 +3028,6 @@ case $_host_os in
 			append_var LDFLAGS "-Wl,--no-gc-sections"
 		fi
 		;;
-	wince)
-		_optimization_level=-O3
-		append_var CXXFLAGS "-fno-inline-functions"
-		append_var CXXFLAGS "-march=armv4"
-		append_var CXXFLAGS "-mtune=xscale"
-		append_var DEFINES "-D_WIN32_WCE=300"
-		append_var DEFINES "-D__ARM__"
-		append_var DEFINES "-D_ARM_"
-		append_var DEFINES "-DUNICODE"
-		append_var DEFINES "-DFPM_DEFAULT"
-		append_var DEFINES "-DNONSTANDARD_PORT"
-		append_var DEFINES "-DWRAP_MALLOC"
-		append_var DEFINES "-DWIN32"
-		append_var DEFINES "-Dcdecl="
-		append_var DEFINES "-D__cdecl__="
-		add_line_to_config_mk "WRAP_MALLOC = 1"
-		;;
 esac
 
 if test -n "$_host"; then
@@ -3075,6 +3047,7 @@ if test -n "$_host"; then
 			_port_mk="backends/platform/3ds/3ds.mk"
 			;;
 		android | android-arm | android-v7a | android-arm-v7a | android-arm64-v8a | android-mips | android-mips64 | android-x86 | android-x86_64 | ouya)
+			# also __ANDROID__ is defined by Clang in the NDK
 			DEFINES="$DEFINES -D__ANDROID_PLAIN_PORT__ -DANDROID_PLAIN_PORT"
 			# we link a .so as default
 			append_var LDFLAGS "-shared"
@@ -3537,16 +3510,6 @@ if test -n "$_host"; then
 			add_line_to_config_h "#define USE_WII_SMB"
 			add_line_to_config_h "#define USE_WII_KBD"
 			;;
-		wince)
-			append_var LDFLAGS "-Wl,--stack,65536"
-			if test "$_tremor" = auto; then
-				_tremolo=yes
-			fi
-			_backend="wince"
-			_detectlang=yes
-			_mt32emu=no
-			_port_mk="backends/platform/wince/wince.mk"
-			;;
 		*)
 			echo "WARNING: Unknown target, continuing with auto-detected values"
 			;;
@@ -3561,10 +3524,16 @@ case $_backend in
 		;;
 	android)
 		append_var DEFINES "-DREDUCE_MEMORY_USAGE"
+		append_var DEFINES "-DNONSTANDARD_PORT"
+		append_var INCLUDES '-I$(srcdir)/backends/platform/android'
 		append_var CXXFLAGS "-Wa,--noexecstack"
 		append_var LDFLAGS "-Wl,-z,noexecstack"
 		# removed the following directive - was causing compilation issues when not also explicitly using --disable-mt32emu
 #		append_var INCLUDES "-isystem $ANDROID_NDK/sources/cxx-stl/system/include"
+		_sdl=no
+		if test "$_host" = ouya; then
+			_sdlnet=no
+		fi
 		;;
 	androidsdl)
 		_sdl=auto
@@ -3736,21 +3705,24 @@ case $_backend in
 			;;
 		esac
 		;;
-	wince)
-		append_var INCLUDES '-I$(srcdir)/backends/platform/wince'
-		append_var INCLUDES '-I$(srcdir)/backends/platform/wince/CEgui'
-		append_var INCLUDES '-I$(srcdir)/backends/platform/wince/CEkeys'
-		append_var INCLUDES '-I$(srcdir)/backends/platform/wince/missing'
-		append_var LIBS "-static -lSDL"
-		_sdl=yes
-		_sdlversion=1.2.0
-		;;
 	*)
 		echo "support for $_backend backend not implemented in configure script yet"
 		exit 1
 		;;
 esac
 append_var MODULES "backends/platform/$_backend"
+
+#
+# Check for pkg-config
+#
+echocheck "pkg-config"
+_pkg_config=no
+command -v $_pkgconfig >/dev/null 2>&1 && _pkg_config=yes
+echo "$_pkg_config"
+
+if test "$_pkg_config" = yes && test -n "$_host" && test -z "$PKG_CONFIG_LIBDIR"; then
+	echo "WARNING: When cross-compiling PKG_CONFIG_LIBDIR must be set to the location of the .pc files for the target"
+fi
 
 #
 # Setup SDL specifics for SDL based backends
@@ -3777,6 +3749,8 @@ EOF
 		exit 1
 	fi
 fi
+
+_sdlMajorVersionNumber=0
 if test "$_sdl" = yes ; then
 	append_var DEFINES "-DSDL_BACKEND"
 	add_line_to_config_mk "SDL_BACKEND = 1"
@@ -3785,23 +3759,67 @@ if test "$_sdl" = yes ; then
 	case $_sdlversion in
 		2.0.*)
 			add_line_to_config_mk "USE_SDL2 = 1"
-			append_var SDL_NET_LIBS "-lSDL2_net"
+			_sdlMajorVersionNumber=2
 			;;
 		*)
-			append_var SDL_NET_LIBS "-lSDL_net"
+			_sdlMajorVersionNumber=1
 			;;
 	esac
+fi
+
+#
+# Some platforms (eg. Android, iOS) may use an edited version
+# of SDL-net or SDL2-net that does not require SDL or SDL2 respectively
+#
+if test "$_sdlnet" = auto ; then
+	# If SDL2 was detected, then test for SDL2_net exclusively
+	# If SDL was detected, then test for SDL_net exclusively
+	# If neither SDL nor SDL2 detected, then test for both (SDL2_net success takes priority)
+	set_var SDL2_NET_LIBS   "$SDL_NET_LIBS"
+	set_var SDL2_NET_CFLAGS "$SDL_NET_CFLAGS"
+	set_var SDL1_NET_LIBS   "$SDL_NET_LIBS"
+	set_var SDL1_NET_CFLAGS "$SDL_NET_CFLAGS"
+
+	if test "$_sdl" = no || test "$_sdlMajorVersionNumber" = 2; then
+		if test "$_pkg_config" = "yes" && $_pkgconfig --exists SDL2_net; then
+			append_var SDL2_NET_LIBS "`$_pkgconfig --libs SDL2_net`"
+			append_var SDL2_NET_CFLAGS "`$_pkgconfig --cflags SDL2_net`"
+		else
+			append_var SDL2_NET_LIBS "-lSDL2_net"
+		fi
+	fi
+
+	if test "$_sdl" = no || test "$_sdlMajorVersionNumber" = 1; then
+		if test "$_pkg_config" = "yes" && $_pkgconfig --exists SDL_net; then
+			append_var SDL1_NET_LIBS "`$_pkgconfig --libs SDL_net`"
+			append_var SDL1_NET_CFLAGS "`$_pkgconfig --cflags SDL_net`"
+		else
+			append_var SDL1_NET_LIBS "-lSDL_net"
+		fi
+	fi
 
 	# Check for SDL_Net
 	echocheck "SDL_Net"
-	if test "$_sdlnet" = auto ; then
-		_sdlnet=no
+	_sdlnet=no
+	cat > $TMPC << EOF
+#include "SDL_net.h"
+int main(int argc, char *argv[]) { SDLNet_Init(); return 0; }
+EOF
+
+	cc_check $SDL2_NET_LIBS $LIBS $INCLUDES $SDL2_NET_CFLAGS && _sdlnet=yes
+	if test "$_sdlnet" = yes ; then
+		set_var SDL_NET_LIBS   "$SDL2_NET_LIBS"
+		set_var SDL_NET_CFLAGS "$SDL2_NET_CFLAGS"
+	else
 		cat > $TMPC << EOF
 #include "SDL_net.h"
 int main(int argc, char *argv[]) { SDLNet_Init(); return 0; }
 EOF
-		cc_check $SDL_NET_LIBS $LIBS $INCLUDES $SDL_NET_CFLAGS && _sdlnet=yes
+		cc_check $SDL1_NET_LIBS $LIBS $INCLUDES $SDL1_NET_CFLAGS && _sdlnet=yes
+		set_var SDL_NET_LIBS   "$SDL1_NET_LIBS"
+		set_var SDL_NET_CFLAGS "$SDL1_NET_CFLAGS"
 	fi
+
 	if test "$_sdlnet" = yes ; then
 		# Some platforms require SDL to be after SDL_Net, thus we prepend var
 		prepend_var LIBS "$SDL_NET_LIBS"
@@ -3892,7 +3910,7 @@ esac
 #
 echo_n "Checking if host is POSIX compliant... "
 case $_host_os in
-	amigaos* | cygwin* | dreamcast | ds | gamecube | mingw* | n64 | ps2 | ps3 | psp2 | psp | riscos | wii | wince)
+	amigaos* | cygwin* | dreamcast | ds | gamecube | mingw* | n64 | ps2 | ps3 | psp2 | psp | riscos | wii)
 		_posix=no
 		;;
 	3ds | android | androidsdl | beos* | bsd* | darwin* | freebsd* | gnu* | gph-linux | haiku* | hpux* | iphone | ios7 | irix*| k*bsd*-gnu* | linux* | maemo | mint* | netbsd* | openbsd* | solaris* | sunos* | switch | uclinux* | webos)
@@ -3968,6 +3986,13 @@ _mak_plugins=
 if test "$_dynamic_modules" = yes ; then
 	echo_n "Checking whether building plugins is supported... "
 	case $_host_os in
+	3ds)
+		_elf_loader=yes
+		append_var DEFINES "-DUNCACHED_PLUGINS"
+_mak_plugins='
+PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/3ds/plugin.ld -march=armv6k -mfloat-abi=hard
+'
+		;;
 	amigaos)
 		_plugin_prefix="lib"
 		_plugin_suffix=".so"
@@ -4096,18 +4121,6 @@ PRE_OBJS_FLAGS		:= -Wl,--whole-archive
 POST_OBJS_FLAGS		:= -Wl,--export-all-symbols -Wl,--no-whole-archive -Wl,--out-implib,./libscummvm.a
 '
 		;;
-	wince)
-		append_var DEFINES "-DUNCACHED_PLUGINS"
-		HOSTEXEEXT=".dll"
-		_plugin_prefix=""
-		_plugin_suffix=".plugin"
-_mak_plugins='
-PLUGIN_EXTRA_DEPS	= $(EXECUTABLE)
-PLUGIN_LDFLAGS		:= -shared -lscummvm -L.
-PRE_OBJS_FLAGS		:= -Wl,--whole-archive
-POST_OBJS_FLAGS		:= -Wl,--export-all-symbols -Wl,--no-whole-archive -Wl,--out-implib,./libscummvm.a -shared
-'
-		;;
 	ps2)
 		_elf_loader=yes
 		append_var DEFINES "-DUNCACHED_PLUGINS"
@@ -4220,18 +4233,6 @@ cat > $TMPC << EOF
 int main(void) { return 0; }
 EOF
 cc_check -lm && append_var LIBS "-lm"
-
-#
-# Check for pkg-config
-#
-echocheck "pkg-config"
-_pkg_config=no
-command -v $_pkgconfig >/dev/null 2>&1 && _pkg_config=yes
-echo "$_pkg_config"
-
-if test "$_pkg_config" = yes && test -n "$_host" && test -z "$PKG_CONFIG_LIBDIR"; then
-	echo "WARNING: When cross-compiling PKG_CONFIG_LIBDIR must be set to the location of the .pc files for the target"
-fi
 
 #
 # Check for Ogg
@@ -5554,16 +5555,17 @@ echo "$_bink"
 # Check whether to build updates support
 #
 echo_n "Building updates support... "
-define_in_config_if_yes $_updates 'USE_UPDATES'
 if test "$_updates" = yes; then
 	if test "$_sparkle" = yes; then
 		echo "Sparkle"
 	else
+		_updates=no;
 		echo "$_updates"
 	fi
 else
 	echo "$_updates"
 fi
+define_in_config_if_yes $_updates 'USE_UPDATES'
 
 #
 # Figure out installation directories
@@ -5581,6 +5583,9 @@ case $_host_os in
 esac
 
 case $_backend in
+	3ds)
+		append_var DEFINES "-DPLUGIN_DIRECTORY=\\\"$datadir/plugins\\\""
+		;;
 	openpandora)
 		# Add ../plugins as a path so plugins can be found when running from a .PND.
 		append_var DEFINES "-DPLUGIN_DIRECTORY=\\\"../plugins\\\""
@@ -5686,6 +5691,13 @@ case $_backend in
 		fi
 		if test "$_tremor" = yes -o "$_flac" = yes; then
 			append_var LIBS "-logg"
+		fi
+
+		# Moved -Wl,--gc-sections here to avoid it interfering with the library checks
+		if test "$_dynamic_modules" = no ; then
+			append_var LDFLAGS "-Wl,--gc-sections"
+		else
+			append_var LDFLAGS "-Wl,--no-gc-sections"
 		fi
 		;;
 	android)

@@ -38,7 +38,7 @@ static const char *const fontNames[] = {
 	"Chicago",	// system font
 	"Geneva",	// application font
 	"New York",
-	"Geneva",
+	NULL, // FIXME: "Geneva",
 
 	"Monaco",
 	"Venice",
@@ -339,6 +339,9 @@ void MacFontManager::clearFontMapping() {
 
 const Common::String MacFontManager::getFontName(int id, int size, int slant, bool tryGen) {
 	Common::String n;
+
+	if (id == 3) // This is Geneva
+		id = 1;
 
 	if (_extraFontNames.contains(id)) {
 		n = _extraFontNames[id];

@@ -39,11 +39,11 @@ struct EventHandlerType {
 	{ kEventBeginSprite,		"beginSprite" },
 	{ kEventEndSprite,			"endSprite" },
 
-	{ kEventEnterFrame, 		"enterFrame" },			//			D4
-	{ kEventPrepareFrame, 		"prepareFrame" },
+	{ kEventEnterFrame,			"enterFrame" },			//			D4
+	{ kEventPrepareFrame,		"prepareFrame" },
 	{ kEventIdle,				"idle" },
 	{ kEventStepFrame,			"stepFrame"},
-	{ kEventExitFrame, 			"exitFrame" },			//			D4
+	{ kEventExitFrame,			"exitFrame" },			//			D4
 
 	{ kEventActivateWindow,		"activateWindow" },
 	{ kEventDeactivateWindow,	"deactivateWindow" },
@@ -189,18 +189,18 @@ void Lingo::runMovieScript(LEvent event) {
 	 * window [p.81 of D4 docs]
 	 */
 
-	for (uint i = 0; i < _scripts[kMovieScript].size(); i++) {
-		// processEvent(event,
-		//			 kMovieScript,
-		//			 ?);
+	for (uint i = 0; i < _scriptContexts[kMovieScript].size(); i++) {
+		processEvent(event,
+					 kMovieScript,
+					 i);
 		// TODO: How do know which script handles the message?
 	}
-	debugC(3, kDebugLingoExec, "STUB: processEvent(event, kMovieScript, ?)");
+	debugC(3, kDebugEvents, "STUB: processEvent(event, kMovieScript, ?)");
 }
 
 void Lingo::processFrameEvent(LEvent event) {
 	/* [in D4] the enterFrame, exitFrame, idle and timeout messages
-	 * are sent to a frame script and then a movie script.  If the
+	 * are sent to a frame script and then a movie script.	If the
 	 * current frame has no frame script when the event occurs, the
 	 * message goes to movie scripts.
 	 * [p.81 of D4 docs]
@@ -224,8 +224,8 @@ void Lingo::processFrameEvent(LEvent event) {
 			entity = score->_frames[score->getCurrentFrame()]->_actionId;
 		}
 		processEvent(event,
-		             kFrameScript,
-		             entity);
+					 kFrameScript,
+					 entity);
 		runMovieScript(event);
 	}
 }
@@ -301,12 +301,12 @@ void Lingo::processEvent(LEvent event, ScriptType st, int entityId) {
 	if (_handlers.contains(ENTITY_INDEX(event, entityId))) {
 		debugC(1, kDebugEvents, "Lingo::processEvent(%s, %s, %d), _eventHandler", _eventHandlerTypes[event], scriptType2str(st), entityId);
 		call(_eventHandlerTypes[event], 0); // D4+ Events
-	} else if (event == kEventNone && _scripts[st].contains(entityId)) {
+	} else if (event == kEventNone && _scriptContexts[st].contains(entityId)) {
 		debugC(1, kDebugEvents, "Lingo::processEvent(%s, %s, %d), script", _eventHandlerTypes[event], scriptType2str(st), entityId);
 
-		executeScript(st, entityId); // D3 list of scripts.
+		executeScript(st, entityId, 0); // D3 list of scripts.
 	} else {
-		//debugC(3, kDebugLingoExec, "STUB: processEvent(%s) for %d", _eventHandlerTypes[event], entityId);
+		debugC(3, kDebugEvents, "STUB: processEvent(%s, %s, %d)", _eventHandlerTypes[event], scriptType2str(st), entityId);
 	}
 }
 

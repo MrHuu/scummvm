@@ -9,7 +9,7 @@ CXXFLAGS += -std=gnu++11
 ASFLAGS  += -mfloat-abi=hard
 LDFLAGS  += -specs=3dsx.specs $(ARCH) -L$(DEVKITPRO)/libctru/lib -L$(DEVKITPRO)/portlibs/3ds/lib
 
-.PHONY: clean_3ds
+.PHONY: clean_3ds dist_3ds
 
 clean: clean_3ds
 
@@ -21,8 +21,9 @@ clean_3ds:
 	$(RM) $(TARGET).bnr
 	$(RM) $(TARGET).cia
 	$(RM) -rf romfs
+	$(RM) -rf dist_3ds
 
-romfs: $(DIST_FILES_THEMES) $(DIST_FILES_ENGINEDATA) $(DIST_FILES_NETWORKING) $(DIST_FILES_VKEYBD) $(DIST_3DS_EXTRA_FILES)
+romfs: $(DIST_FILES_THEMES) $(DIST_FILES_ENGINEDATA) $(DIST_FILES_NETWORKING) $(DIST_FILES_VKEYBD) $(DIST_3DS_EXTRA_FILES) $(PLUGINS)
 	@rm -rf romfs
 	@mkdir -p romfs
 	@cp $(DIST_FILES_THEMES) romfs/
@@ -38,11 +39,14 @@ endif
 ifdef DIST_3DS_EXTRA_FILES
 	@cp -a $(DIST_3DS_EXTRA_FILES) romfs/
 endif
+ifeq ($(DYNAMIC_MODULES),1)
+	@mkdir -p romfs/plugins
+	@for i in $(PLUGINS); do $(STRIP) --strip-debug $$i -o romfs/plugins/`basename $$i`; done
+endif
 ifdef GAME
 	@cp -R ./backends/platform/3ds/app/$(GAME)/game romfs/
 ifdef GAMEDAT
 	@cp ./dists/engine-data/$(GAMEDAT) romfs/$(GAMEDAT)
-endif
 endif
 
 $(TARGET).smdh: $(APP_ICON)
@@ -63,6 +67,14 @@ ifeq ($(GAME),)
 else
 	@makerom -f cia -target t -exefslogo -o $@ -elf $(EXECUTABLE) -rsf $(APP_RSF) -banner $(TARGET).bnr -icon $(TARGET).smdh -DAPP_ROMFS=romfs/ -DAPP_UNIQUE_ID=$(APP_UNIQUE_ID) -D_GAME="$(TARGET)"
 endif
+	@echo built ... $(notdir $@)
+
+dist_3ds: $(TARGET).cia $(TARGET).3dsx $(DIST_FILES_DOCS)
+	@rm -rf dist_3ds
+	@mkdir -p dist_3ds
+	@cp $(TARGET).3dsx $(TARGET).cia dist_3ds/
+	@cp $(DIST_FILES_DOCS) dist_3ds/
+	@cp $(srcdir)/backends/platform/3ds/README.md dist_3ds/README-3DS.md
 	@echo built ... $(notdir $@)
 
 .cia: $(TARGET).cia

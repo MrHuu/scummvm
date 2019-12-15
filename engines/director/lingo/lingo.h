@@ -31,6 +31,7 @@
 #include "director/score.h"
 #include "director/lingo/lingo-gr.h"
 #include "director/lingo/lingo-the.h"
+#include "director/lingo/lingo-bytecode.h"
 
 namespace Director {
 
@@ -99,7 +100,7 @@ struct Symbol {	/* symbol table entry */
 		void (*func)();		/* OPCODE */
 		void (*bltin)(int);	/* BUILTIN */
 		Common::String	*s;	/* STRING */
-		FloatArray *arr;	/* ARRAY, POINT, RECT */
+		FloatArray *farr;	/* ARRAY, POINT, RECT */
 	} u;
 	int nargs;		/* number of arguments */
 	int maxArgs;	/* maximal number of arguments, for builtins */
@@ -114,11 +115,11 @@ struct Datum {	/* interpreter stack type */
 	int type;
 
 	union {
-		int	i;
-		double f;
-		Common::String *s;
+		int	i;				/* INT, ARGC, ARGCNORET */
+		double f;			/* FLOAT */
+		Common::String *s;	/* STRING */
 		Symbol	*sym;
-		FloatArray *arr;	/* ARRAY, POINT, RECT */
+		FloatArray *farr;	/* ARRAY, POINT, RECT */
 	} u;
 
 	Datum() { u.sym = NULL; type = VOID; }
@@ -140,7 +141,12 @@ struct Builtin {
 	Builtin(void (*func1)(void), int nargs1) : func(func1), nargs(nargs1) {}
 };
 
-typedef Common::HashMap<int32, ScriptData *> ScriptHash;
+struct ScriptContext {
+	Common::Array<ScriptData *> functions;
+	Common::Array<Datum> constants;
+};
+
+typedef Common::HashMap<int32, ScriptContext *> ScriptContextHash;
 typedef Common::Array<Datum> StackData;
 typedef Common::HashMap<Common::String, Symbol *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> SymbolHash;
 typedef Common::HashMap<Common::String, Builtin *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> BuiltinHash;
@@ -163,17 +169,21 @@ public:
 	void restartLingo();
 
 	void addCode(const char *code, ScriptType type, uint16 id);
-	void executeScript(ScriptType type, uint16 id);
-	void printStack(const char *s);
-	Common::String decodeInstruction(uint pc, uint *newPC = NULL);
+	void addCodeV4(Common::SeekableSubReadStreamEndian &stream, ScriptType type, uint16 id);
+	void addNamesV4(Common::SeekableSubReadStreamEndian &stream);
+	void executeScript(ScriptType type, uint16 id, uint16 function);
+	void printStack(const char *s, uint pc);
+	Common::String decodeInstruction(ScriptData *sd, uint pc, uint *newPC = NULL);
 
 	void initBuiltIns();
 	void initFuncs();
+	void initBytecode();
 	void initTheEntities();
 
 	void runTests();
 
 private:
+	Common::String codePreprocessor(const char *s, bool simple = false);
 	const char *findNextDefinition(const char *s);
 
 	// lingo-events.cpp
@@ -198,17 +208,18 @@ public:
 	void popContext();
 	Symbol *lookupVar(const char *name, bool create = true, bool putInGlobalList = false);
 	void cleanLocalVars();
-	void define(Common::String &s, int start, int nargs, Common::String *prefix = NULL, int end = -1);
-	void processIf(int elselabel, int endlabel);
+	Symbol *define(Common::String &s, int start, int nargs, Common::String *prefix = NULL, int end = -1, bool removeCode = true);
+	void processIf(int elselabel, int endlabel, int finalElse);
 
 	int alignTypes(Datum &d1, Datum &d2);
 
 	int code1(inst code) { _currentScript->push_back(code); return _currentScript->size() - 1; }
 	int code2(inst code_1, inst code_2) { int o = code1(code_1); code1(code_2); return o; }
 	int code3(inst code_1, inst code_2, inst code_3) { int o = code1(code_1); code1(code_2); code1(code_3); return o; }
+	int code4(inst code_1, inst code_2, inst code_3, inst code_4) { int o = code1(code_1); code1(code_2); code1(code_3); code1(code_4); return o; }
 	int codeString(const char *s);
 	void codeLabel(int label);
-	int codeConst(int val);
+	int codeInt(int val);
 	int codeArray(int arraySize);
 
 	int calcStringAlignment(const char *s) {
@@ -226,6 +237,15 @@ public:
 	int codeMe(Common::String *method, int numpar);
 	int codeFloat(double f);
 	void codeFactory(Common::String &s);
+
+	inst readInst() { return getInst(_pc++); }
+	inst getInst(uint pc) { return (*_currentScript)[pc]; }
+	int readInt() { return getInt(_pc++); }
+	int getInt(uint pc) { return (int)READ_UINT32(&((*_currentScript)[pc])); }
+	double readFloat() { double d = getFloat(_pc); _pc += calcCodeAlignment(sizeof(double)); return d; }
+	double getFloat(uint pc) { return *(double *)(&((*_currentScript)[pc])); }
+	char *readString() { char *s = getString(_pc); _pc += calcStringAlignment(s); return s; }
+	char *getString(uint pc) { return (char *)(&((*_currentScript)[pc])); }
 
 	void pushVoid();
 
@@ -252,6 +272,8 @@ public:
 
 	static void c_intersects();
 	static void c_within();
+	static void c_field();
+	static void c_of();
 	static void c_charOf();
 	static void c_charToOf();
 	static void c_itemOf();
@@ -261,12 +283,15 @@ public:
 	static void c_wordOf();
 	static void c_wordToOf();
 
-	static void c_constpush();
+	static void c_intpush();
 	static void c_voidpush();
-	static void c_fconstpush();
+	static void c_floatpush();
 	static void c_stringpush();
 	static void c_symbolpush();
+	static void c_constpush();
 	static void c_varpush();
+	static void c_argcpush();
+	static void c_argcnoretpush();
 	static void c_arraypush();
 	static void c_assign();
 	bool verify(Symbol *s);
@@ -283,6 +308,8 @@ public:
 	static void c_ifcode();
 	static void c_whencode();
 	static void c_tellcode();
+	static void c_tell();
+	static void c_telldone();
 	static void c_exitRepeat();
 	static void c_eq();
 	static void c_neq();
@@ -290,6 +317,8 @@ public:
 	static void c_lt();
 	static void c_ge();
 	static void c_le();
+	static void c_jump();
+	static void c_jumpifz();
 	static void c_call();
 
 	void call(Common::String name, int nargs);
@@ -304,18 +333,33 @@ public:
 	static void c_gotoprevious();
 	static void c_global();
 	static void c_instance();
+	static void c_factory();
 	static void c_property();
 
 	static void c_play();
 	static void c_playdone();
 
 	static void c_open();
+	static void c_hilite();
+
+	// stubs for unknown instructions
+	static void c_unk();
+	static void c_unk1();
+	static void c_unk2();
+
+	// bytecode-related instructions
+	static void cb_localcall();
+	static void cb_call();
+	static void cb_v4theentitypush();
+	static void cb_v4theentitynamepush();
+	static void cb_v4theentityassign();
 
 	void printSTUBWithArglist(const char *funcname, int nargs, const char *prefix = "STUB:");
 	void convertVOIDtoString(int arg, int nargs);
 	void dropStack(int nargs);
 	void drop(uint num);
 
+	// builtin functions
 	static void b_abs(int nargs);
 	static void b_atan(int nargs);
 	static void b_cos(int nargs);
@@ -417,6 +461,7 @@ public:
 	static void b_dontPassEvent(int nargs);
 	static void b_delay(int nargs);
 	static void b_do(int nargs);
+	static void b_go(int nargs);
 	static void b_halt(int nargs);
 	static void b_nothing(int nargs);
 	static void b_pass(int nargs);
@@ -428,6 +473,7 @@ public:
 	static void b_restart(int nargs);
 	static void b_shutDown(int nargs);
 	static void b_startTimer(int nargs);
+	static void b_return(int nargs);
 
 	static void b_closeDA(int nargs);
 	static void b_closeResFile(int nargs);
@@ -473,7 +519,7 @@ public:
 	static void b_enter(int nargs);
 	static void b_false(int nargs);
 	static void b_quote(int nargs);
-	static void b_return(int nargs);
+	static void b_returnconst(int nargs);
 	static void b_tab(int nargs);
 	static void b_true(int nargs);
 	static void b_version(int nargs);
@@ -507,9 +553,11 @@ public:
 	Datum getTheCast(Datum &id, int field);
 
 public:
-	ScriptData *_currentScript;
 	ScriptType _currentScriptType;
 	uint16 _currentEntityId;
+	ScriptContext *_currentScriptContext;
+	uint16 _currentScriptFunction;
+	ScriptData *_currentScript;
 	bool _returning;
 	bool _indef;
 	bool _ignoreMe;
@@ -520,6 +568,7 @@ public:
 	TheEntityHash _theEntities;
 	TheEntityFieldHash _theEntityFields;
 	Common::Array<int> _labelstack;
+	Common::Array<Common::String> _namelist;
 
 	SymbolHash _builtins;
 	Common::HashMap<Common::String, bool> _twoWordBuiltins;
@@ -534,6 +583,7 @@ public:
 
 	bool _inFactory;
 	Common::String _currentFactory;
+	bool _inCond;
 
 	bool _exitRepeat;
 
@@ -547,15 +597,18 @@ private:
 	Datum pop(void);
 
 	Common::HashMap<uint32, const char *> _eventHandlerTypes;
-	Common::HashMap<Common::String, uint32> _eventHandlerTypeIds;
+	Common::HashMap<Common::String, uint32, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> _eventHandlerTypeIds;
 	Common::HashMap<Common::String, Audio::AudioStream *> _audioAliases;
 
-	ScriptHash _scripts[kMaxScriptType + 1];
+	ScriptContextHash _scriptContexts[kMaxScriptType + 1];
 
 	SymbolHash _globalvars;
 	SymbolHash *_localvars;
 
 	FuncHash _functions;
+
+	Common::HashMap<int, LingoV4Bytecode *> _lingoV4;
+	Common::HashMap<int, LingoV4TheEntity *> _lingoV4TheEntity;
 
 	uint _pc;
 

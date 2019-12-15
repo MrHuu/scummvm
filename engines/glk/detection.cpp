@@ -34,6 +34,11 @@
 #include "glk/advsys/advsys.h"
 #endif
 
+#ifdef ENABLE_GLK_AGT
+#include "glk/agt/detection.h"
+#include "glk/agt/agt.h"
+#endif
+
 #ifdef ENABLE_GLK_ALAN2
 #include "glk/alan2/detection.h"
 #include "glk/alan2/alan2.h"
@@ -42,6 +47,11 @@
 #ifdef ENABLE_GLK_ALAN3
 #include "glk/alan3/detection.h"
 #include "glk/alan3/alan3.h"
+#endif
+
+#ifdef ENABLE_GLK_ARCHETYPE
+#include "glk/archetype/archetype.h"
+#include "glk/archetype/detection.h"
 #endif
 
 #ifdef ENABLE_GLK_FROTZ
@@ -209,12 +219,20 @@ Common::Error GlkMetaEngine::createInstance(OSystem *syst, Engine **engine) cons
 	if ((*engine = create<Glk::AdvSys::AdvSysMetaEngine, Glk::AdvSys::AdvSys>(syst, gameDesc)) != nullptr) {}
 	else
 #endif
+#ifdef ENABLE_GLK_AGT
+		if ((*engine = create<Glk::AGT::AGTMetaEngine, Glk::AGT::AGT>(syst, gameDesc)) != nullptr) {}
+		else
+#endif
 #ifdef ENABLE_GLK_ALAN2
 	if ((*engine = create<Glk::Alan2::Alan2MetaEngine, Glk::Alan2::Alan2>(syst, gameDesc)) != nullptr) {}
 	else
 #endif
 #ifdef ENABLE_GLK_ALAN3
 	if ((*engine = create<Glk::Alan3::Alan3MetaEngine, Glk::Alan3::Alan3>(syst, gameDesc)) != nullptr) {}
+	else
+#endif
+#ifdef ENABLE_GLK_ARCHETYPE
+	if ((*engine = create<Glk::Archetype::ArchetypeMetaEngine, Glk::Archetype::Archetype>(syst, gameDesc)) != nullptr) {}
 	else
 #endif
 #ifdef ENABLE_GLK_FROTZ
@@ -294,11 +312,17 @@ PlainGameList GlkMetaEngine::getSupportedGames() const {
 #ifdef ENABLE_GLK_ADVSYS
 	Glk::AdvSys::AdvSysMetaEngine::getSupportedGames(list);
 #endif
+#ifdef ENABLE_GLK_AGT
+	Glk::AGT::AGTMetaEngine::getSupportedGames(list);
+#endif
 #ifdef ENABLE_GLK_ALAN2
 	Glk::Alan2::Alan2MetaEngine::getSupportedGames(list);
 #endif
 #ifdef ENABLE_GLK_ALAN3
 	Glk::Alan3::Alan3MetaEngine::getSupportedGames(list);
+#endif
+#ifdef ENABLE_GLK_ARCHETYPE
+	Glk::Archetype::ArchetypeMetaEngine::getSupportedGames(list);
 #endif
 #ifdef ENABLE_GLK_FROTZ
 	Glk::Frotz::FrotzMetaEngine::getSupportedGames(list);
@@ -345,8 +369,14 @@ PlainGameDescriptor GlkMetaEngine::findGame(const char *gameId) const {
 #ifdef ENABLE_GLK_ALAN2
 	FIND_GAME(Alan2);
 #endif
+#ifdef ENABLE_GLK_AGT
+	FIND_GAME(AGT);
+#endif
 #ifdef ENABLE_GLK_ALAN3
 	FIND_GAME(Alan3);
+#endif
+#ifdef ENABLE_GLK_ARCHETYPE
+	FIND_GAME(Archetype);
 #endif
 #ifdef ENABLE_GLK_FROTZ
 	FIND_GAME(Frotz);
@@ -392,11 +422,17 @@ DetectedGames GlkMetaEngine::detectGames(const Common::FSList &fslist) const {
 #ifdef ENABLE_GLK_ADVSYS
 	Glk::AdvSys::AdvSysMetaEngine::detectGames(fslist, detectedGames);
 #endif
+#ifdef ENABLE_GLK_AGT
+	Glk::AGT::AGTMetaEngine::detectGames(fslist, detectedGames);
+#endif
 #ifdef ENABLE_GLK_ALAN2
 	Glk::Alan2::Alan2MetaEngine::detectGames(fslist, detectedGames);
 #endif
 #ifdef ENABLE_GLK_ALAN3
 	Glk::Alan3::Alan3MetaEngine::detectGames(fslist, detectedGames);
+#endif
+#ifdef ENABLE_GLK_ARCHETYPE
+	Glk::Archetype::ArchetypeMetaEngine::detectGames(fslist, detectedGames);
 #endif
 #ifdef ENABLE_GLK_FROTZ
 	Glk::Frotz::FrotzMetaEngine::detectGames(fslist, detectedGames);
@@ -437,11 +473,17 @@ void GlkMetaEngine::detectClashes() const {
 #ifdef ENABLE_GLK_ADVSYS
 	Glk::AdvSys::AdvSysMetaEngine::detectClashes(map);
 #endif
+#ifdef ENABLE_GLK_AGT
+	Glk::AGT::AGTMetaEngine::detectClashes(map);
+#endif
 #ifdef ENABLE_GLK_ALAN2
 	Glk::Alan2::Alan2MetaEngine::detectClashes(map);
 #endif
 #ifdef ENABLE_GLK_ALAN3
 	Glk::Alan3::Alan3MetaEngine::detectClashes(map);
+#endif
+#ifdef ENABLE_GLK_ARCHETYPE
+	Glk::Archetype::ArchetypeMetaEngine::detectClashes(map);
 #endif
 #ifdef ENABLE_GLK_FROTZ
 	Glk::Frotz::FrotzMetaEngine::detectClashes(map);

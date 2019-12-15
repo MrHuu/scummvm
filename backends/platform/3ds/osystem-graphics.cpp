@@ -24,6 +24,8 @@
 #include "backends/platform/3ds/osystem.h"
 #include "backends/platform/3ds/shader_shbin.h"
 #include "common/rect.h"
+#include "graphics/fontman.h"
+#include "gui/gui-manager.h"
 #include "options-dialog.h"
 #include "config.h"
 
@@ -122,35 +124,21 @@ bool OSystem_3DS::getFeatureState(OSystem::Feature f) {
 	}
 }
 
-const OSystem::GraphicsMode *
-OSystem_3DS::getSupportedGraphicsModes() const {
-	return s_graphicsModes;
-}
-
-int OSystem_3DS::getDefaultGraphicsMode() const {
-	return GFX_LINEAR;
-}
-
-bool OSystem_3DS::setGraphicsMode(int mode) {
-	return true;
-}
-
-void OSystem_3DS::resetGraphicsScale() {
-	debug("resetGraphicsScale");
-}
-
-int OSystem_3DS::getGraphicsMode() const {
-	return GFX_LINEAR;
-}
 void OSystem_3DS::initSize(uint width, uint height,
                                    const Graphics::PixelFormat *format) {
 	debug("3ds initsize w:%d h:%d", width, height);
+	int oldScreen = config.screen;
 	loadConfig();
+	if (config.screen != oldScreen) {
+		_screenChangeId++;
+	}
 
 	_gameWidth = width;
 	_gameHeight = height;
 	_gameTopTexture.create(width, height, _pfGameTexture);
-	_overlay.create(getOverlayWidth(), getOverlayHeight(), _pfGameTexture);
+	_overlay.create(400, 320, _pfGameTexture);
+	_magCenterX = _magWidth / 2;
+	_magCenterY = _magHeight / 2;
 
 	if (format) {
 		debug("pixelformat: %d %d %d %d %d", format->bytesPerPixel, format->rBits(), format->gBits(), format->bBits(), format->aBits());
@@ -177,27 +165,29 @@ void OSystem_3DS::updateSize() {
 			float r = 400.f / _gameWidth;
 			_gameTopTexture.setScale(r, r);
 			_gameTopX = 0;
-			_gameTopY = (240.f - r * _gameHeight) / 2.f;
+			_gameTopY = (240.f / r - _gameHeight) / 2.f;
 		} else {
 			float r = 240.f / _gameHeight;
 			_gameTopTexture.setScale(r, r);
 			_gameTopY = 0;
-			_gameTopX = (400.f - r * _gameWidth) / 2.f;
+			_gameTopX = (400.f / r - _gameWidth) / 2.f;
 		}
 		if (ratio > 320.f / 240.f) {
 			float r = 320.f / _gameWidth;
 			_gameBottomTexture.setScale(r, r);
 			_gameBottomX = 0;
-			_gameBottomY = (240.f - r * _gameHeight) / 2.f;
+			_gameBottomY = (240.f / r - _gameHeight) / 2.f;
 		} else {
 			float r = 240.f / _gameHeight;
 			_gameBottomTexture.setScale(r, r);
 			_gameBottomY = 0;
-			_gameBottomX = (320.f - r * _gameWidth) / 2.f;
+			_gameBottomX = (320.f / r - _gameWidth) / 2.f;
 		}
 	}
 	_gameTopTexture.setPosition(_gameTopX, _gameTopY);
 	_gameBottomTexture.setPosition(_gameBottomX, _gameBottomY);
+	_gameTopTexture.setOffset(0, 0);
+	_gameBottomTexture.setOffset(0, 0);
 	if (_overlayVisible)
 		_cursorTexture.setScale(1.f, 1.f);
 	else if (config.screen == kScreenTop)
@@ -222,6 +212,16 @@ void OSystem_3DS::beginGFXTransaction() {
 }
 OSystem::TransactionError OSystem_3DS::endGFXTransaction() {
 	return OSystem::kTransactionSuccess;
+}
+
+float OSystem_3DS::getScaleRatio() const {
+	if (_overlayVisible) {
+		return 1.0;
+	} else if (config.screen == kScreenTop) {
+		return _gameTopTexture.getScaleX();
+	} else {
+		return _gameBottomTexture.getScaleX();
+	}
 }
 
 void OSystem_3DS::setPalette(const byte *colors, uint start, uint num) {
@@ -272,6 +272,11 @@ void OSystem_3DS::updateScreen() {
 		return;
 
 // 	updateFocus();
+	updateMagnify();
+
+	if (_osdMessage.getPixels() && _osdMessageEndTime <= getMillis(true)) {
+		_osdMessage.free();
+	}
 
 	C3D_FrameBegin(0);
 		_gameTopTexture.transfer();
@@ -281,6 +286,7 @@ void OSystem_3DS::updateScreen() {
 		if (_cursorVisible && config.showCursor) {
 			_cursorTexture.transfer();
 		}
+		_osdMessage.transfer();
 		_activityIcon.transfer();
 	C3D_FrameEnd(0);
 
@@ -300,6 +306,11 @@ void OSystem_3DS::updateScreen() {
 				_activityIcon.setPosition(400 - _activityIcon.actualWidth, 0);
 				C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _modelviewLocation, _activityIcon.getMatrix());
 				_activityIcon.render();
+			}
+			if (_osdMessage.getPixels() && config.screen == kScreenTop) {
+				_osdMessage.setPosition((400 - _osdMessage.actualWidth) / 2, (240 - _osdMessage.actualHeight) / 2);
+				C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _modelviewLocation, _osdMessage.getMatrix());
+				_osdMessage.render();
 			}
 			if (_cursorVisible && config.showCursor && config.screen == kScreenTop) {
 				C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _modelviewLocation, _cursorTexture.getMatrix());
@@ -323,6 +334,11 @@ void OSystem_3DS::updateScreen() {
 				C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _modelviewLocation, _activityIcon.getMatrix());
 				_activityIcon.render();
 			}
+			if (_osdMessage.getPixels()) {
+				_osdMessage.setPosition((320 - _osdMessage.actualWidth) / 2, (240 - _osdMessage.actualHeight) / 2);
+				C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _modelviewLocation, _osdMessage.getMatrix());
+				_osdMessage.render();
+			}
 			if (_cursorVisible && config.showCursor) {
 				C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, _modelviewLocation, _cursorTexture.getMatrix());
 				_cursorTexture.render();
@@ -331,11 +347,16 @@ void OSystem_3DS::updateScreen() {
 	C3D_FrameEnd(0);
 }
 
-void OSystem_3DS::setShakePos(int shakeOffset) {
+void OSystem_3DS::setShakePos(int shakeXOffset, int shakeYOffset) {
 	// TODO: implement this in overlay, top screen, and mouse too
-	_screenShakeOffset = shakeOffset;
-	_gameTopTexture.setPosition(_gameTopX, _gameTopY + _gameTopTexture.getScaleY() * shakeOffset);
-	_gameBottomTexture.setPosition(_gameBottomX, _gameBottomY + _gameBottomTexture.getScaleY() * shakeOffset);
+	_screenShakeXOffset = shakeXOffset;
+	_screenShakeYOffset = shakeYOffset;
+	int topX = _gameTopX + (_gameTopTexture.getScaleX() * shakeXOffset);
+	int topY = _gameTopY + (_gameTopTexture.getScaleY() * shakeYOffset);
+	_gameTopTexture.setPosition(topX, topY);
+	int bottomX = _gameBottomX + (_gameBottomTexture.getScaleX() * shakeXOffset);
+	int bottomY = _gameBottomY + (_gameBottomTexture.getScaleY() * shakeYOffset);
+	_gameBottomTexture.setPosition(bottomX, bottomY);
 }
 
 void OSystem_3DS::setFocusRectangle(const Common::Rect &rect) {
@@ -415,6 +436,30 @@ void OSystem_3DS::updateFocus() {
 	}
 }
 
+void OSystem_3DS::updateMagnify() {
+	if (_magnifyMode == MODE_MAGON && config.screen != kScreenBoth) {
+		// Only allow to magnify when both screens are enabled
+		_magnifyMode = MODE_MAGOFF;
+	}
+
+	// TODO: When exiting GUI, prevent cursor's position within GUI from changing
+	// position of magnification viewport. Possible solution: save in-game cursor
+	// coordinates separately from GUI cursor coordinates?
+	if (_magnifyMode == MODE_MAGON) {
+		if (!g_gui.isActive()) {
+			_magX = (_cursorX < _magCenterX) ?
+				0 : ((_cursorX < (_gameWidth - _magCenterX)) ?
+				_cursorX - _magCenterX : _gameWidth - _magWidth);
+			_magY = (_cursorY < _magCenterY) ?
+				0 : ((_cursorY < _gameHeight - _magCenterY) ?
+				_cursorY - _magCenterY : _gameHeight - _magHeight);
+		}
+		_gameTopTexture.setScale(1.f,1.f);
+		_gameTopTexture.setPosition(0,0);
+		_gameTopTexture.setOffset(_magX, _magY);
+	}
+}
+
 void OSystem_3DS::showOverlay() {
 	_overlayVisible = true;
 	updateSize();
@@ -448,6 +493,57 @@ void OSystem_3DS::copyRectToOverlay(const void *buf, int pitch, int x,
 	_overlay.markDirty();
 }
 
+void OSystem_3DS::displayMessageOnOSD(const char *msg) {
+	// The font we are going to use:
+	const Graphics::Font *font = FontMan.getFontByUsage(Graphics::FontManager::kLocalizedFont);
+	if (!font) {
+		warning("No available font to render OSD messages");
+		return;
+	}
+
+	// Split the message into separate lines.
+	Common::Array<Common::String> lines;
+	const char *ptr;
+	for (ptr = msg; *ptr; ++ptr) {
+		if (*ptr == '\n') {
+			lines.push_back(Common::String(msg, ptr - msg));
+			msg = ptr + 1;
+		}
+	}
+	lines.push_back(Common::String(msg, ptr - msg));
+
+	// Determine a rect which would contain the message string (clipped to the
+	// screen dimensions).
+	const int vOffset = 6;
+	const int lineSpacing = 1;
+	const int lineHeight = font->getFontHeight() + 2 * lineSpacing;
+	int width = 0;
+	int height = lineHeight * lines.size() + 2 * vOffset;
+	uint i;
+	for (i = 0; i < lines.size(); i++) {
+		width = MAX(width, font->getStringWidth(lines[i]) + 14);
+	}
+
+	// Clip the rect
+	if (width > getOverlayWidth())
+		width = getOverlayWidth();
+	if (height > getOverlayHeight())
+		height = getOverlayHeight();
+
+	_osdMessage.create(width, height, _pfGameTexture);
+	_osdMessage.fillRect(Common::Rect(width, height), _pfGameTexture.ARGBToColor(200, 0, 0, 0));
+
+	// Render the message, centered, and in white
+	for (i = 0; i < lines.size(); i++) {
+		font->drawString(&_osdMessage, lines[i],
+		                 0, 0 + i * lineHeight + vOffset + lineSpacing, width,
+		                 _pfGameTexture.RGBToColor(255, 255, 255),
+		                 Graphics::kTextAlignCenter);
+	}
+
+	_osdMessageEndTime = getMillis(true) + kOSDMessageDuration;
+}
+
 void OSystem_3DS::displayActivityIconOnOSD(const Graphics::Surface *icon) {
 	if (!icon) {
 		_activityIcon.free();
@@ -469,7 +565,7 @@ int16 OSystem_3DS::getOverlayHeight() {
 }
 
 int16 OSystem_3DS::getOverlayWidth() {
-	return 320;
+	return config.screen == kScreenTop ? 400 : 320;
 }
 
 bool OSystem_3DS::showMouse(bool visible) {
@@ -483,18 +579,17 @@ void OSystem_3DS::warpMouse(int x, int y) {
 	_cursorY = y;
 
 	// TODO: adjust for _cursorScalable ?
-	int offsetx = 0;
-	int offsety = 0;
 	x -= _cursorHotspotX;
 	y -= _cursorHotspotY;
+
+	int offsetx = 0;
+	int offsety = 0;
 	if (!_overlayVisible) {
-		offsetx += config.screen == kScreenTop ? _gameTopX : _gameBottomX;
-		offsety += config.screen == kScreenTop ? _gameTopY : _gameBottomY;
+		offsetx = config.screen == kScreenTop ? _gameTopTexture.getPosX() : _gameBottomTexture.getPosX();
+		offsety = config.screen == kScreenTop ? _gameTopTexture.getPosY() : _gameBottomTexture.getPosY();
 	}
-	float scalex = config.screen == kScreenTop ? (float)_gameTopTexture.actualWidth / _gameWidth : 1.f;
-	float scaley = config.screen == kScreenTop ? (float)_gameTopTexture.actualHeight / _gameHeight : 1.f;
-	_cursorTexture.setPosition(scalex * x + offsetx,
-							   scaley * y + offsety);
+
+	_cursorTexture.setPosition(x + offsetx, y + offsety);
 }
 
 void OSystem_3DS::setCursorDelta(float deltaX, float deltaY) {

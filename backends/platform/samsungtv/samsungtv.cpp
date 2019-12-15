@@ -27,12 +27,9 @@
 #include "backends/platform/samsungtv/samsungtv.h"
 #include "backends/events/samsungtvsdl/samsungtvsdl-events.h"
 #include "backends/graphics/samsungtvsdl/samsungtvsdl-graphics.h"
+#include "backends/saves/default/default-saves.h"
+#include "backends/fs/posix/posix-fs.h"
 #include "common/textconsole.h"
-
-OSystem_SDL_SamsungTV::OSystem_SDL_SamsungTV()
-	:
-	OSystem_POSIX("/mtd_rwarea/.scummvmrc") {
-}
 
 void OSystem_SDL_SamsungTV::initBackend() {
 	// Create the savefile manager
@@ -57,9 +54,12 @@ void OSystem_SDL_SamsungTV::quit() {
 
 void OSystem_SDL_SamsungTV::fatalError() {
 	delete this;
-	// FIXME
-	warning("fatal error");
+	warning("ScummVM: Fatal internal error.");
 	for (;;) {}
+}
+
+Common::String OSystem_SDL_SamsungTV::getDefaultConfigFileName() {
+	return "/mtd_rwarea/.scummvmrc";
 }
 
 Common::String OSystem_SDL_SamsungTV::getDefaultLogFileName() {

@@ -436,7 +436,8 @@ void OpenGLGraphicsManager::initSize(uint width, uint height, const Graphics::Pi
 
 	_currentState.gameWidth = width;
 	_currentState.gameHeight = height;
-	_gameScreenShakeOffset = 0;
+	_gameScreenShakeXOffset = 0;
+	_gameScreenShakeYOffset = 0;
 }
 
 int16 OpenGLGraphicsManager::getWidth() const {
@@ -452,11 +453,6 @@ void OpenGLGraphicsManager::copyRectToScreen(const void *buf, int pitch, int x, 
 }
 
 void OpenGLGraphicsManager::fillScreen(uint32 col) {
-	// FIXME: This does not conform to the OSystem specs because fillScreen
-	// is always taking CLUT8 color values and use color indexed mode. This is,
-	// however, plain odd and probably was a forgotten when we introduced
-	// RGB support. Thus, we simply do the "sane" thing here and hope OSystem
-	// gets fixed one day.
 	_gameScreen->fill(col);
 }
 

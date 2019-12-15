@@ -27,6 +27,9 @@
 #include "director/frame.h"
 #include "director/sprite.h"
 
+#include "graphics/macgui/macwindowmanager.h"
+#include "graphics/macgui/macmenu.h"
+
 namespace Director {
 
 static struct BuiltinProto {
@@ -105,6 +108,7 @@ static struct BuiltinProto {
 	{ "dontPassEvent",	Lingo::b_dontPassEvent,	0, 0, false },	// D2 c
 	{ "delay",	 		Lingo::b_delay,			1, 1, false },	// D2 c
 	{ "do",		 		Lingo::b_do,			1, 1, false },	// D2 c
+	{ "go",				Lingo::b_go, 			1, 2, false },
 	{ "halt",	 		Lingo::b_halt,			0, 0, false },	//			D4 c
 	{ "nothing",		Lingo::b_nothing,		0, 0, false },	// D2 c
 	{ "pass",			Lingo::b_pass,			0, 0, false },	//			D4 c
@@ -116,6 +120,7 @@ static struct BuiltinProto {
 	{ "preLoadCast",	Lingo::b_preLoadCast,	-1,0, false },	//		D3 c
 	{ "quit",			Lingo::b_quit,			0, 0, false },	// D2 c
 	{ "restart",		Lingo::b_restart,		0, 0, false },	// D2 c
+	{ "return",			Lingo::b_return,		1, 1, false },	// D2 function
 	{ "shutDown",		Lingo::b_shutDown,		0, 0, false },	// D2 c
 	{ "startTimer",		Lingo::b_startTimer,	0, 0, false },	// D2 c
 		// when keyDown											// D2
@@ -202,7 +207,7 @@ static struct BuiltinProto {
 	{ "enter",			Lingo::b_enter,			0, 0, false },	// D2
 	{ "false",			Lingo::b_false,			0, 0, false },	// D2
 	{ "quote",			Lingo::b_quote,			0, 0, false },	// D2
-	{ "return",			Lingo::b_return,		0, 0, false },	// D2
+//	{ "return",			Lingo::b_returnconst,	0, 0, false },	// D2 // FIXME
 	{ "tab",			Lingo::b_tab,			0, 0, false },	// D2
 	{ "true",			Lingo::b_true,			0, 0, false },	// D2
 	{ "version",		Lingo::b_version,		0, 0, false },	//		D3
@@ -383,7 +388,7 @@ void Lingo::printSTUBWithArglist(const char *funcname, int nargs, const char *pr
 
 	s += ")";
 
-	warning("%s %s", prefix, s.c_str());
+	debug(5, "%s %s", prefix, s.c_str());
 }
 
 void Lingo::convertVOIDtoString(int arg, int nargs) {
@@ -887,6 +892,12 @@ void Lingo::b_do(int nargs) {
 	warning("STUB: b_do(%s)", d.u.s->c_str());
 }
 
+void Lingo::b_go(int nargs) {
+	g_lingo->printSTUBWithArglist("b_go", nargs);
+
+	g_lingo->dropStack(nargs);
+}
+
 void Lingo::b_halt(int nargs) {
 	b_quit(nargs);
 
@@ -954,6 +965,11 @@ void Lingo::b_quit(int nargs) {
 		g_director->getCurrentScore()->_stopPlay = true;
 
 	g_lingo->pushVoid();
+}
+
+void Lingo::b_return(int nargs) {
+	// We do not touch the top of the stack, it will be returned
+	c_procret();
 }
 
 void Lingo::b_restart(int nargs) {
@@ -1142,7 +1158,101 @@ void Lingo::b_importFileInto(int nargs) {
 }
 
 void Lingo::b_installMenu(int nargs) {
+	// installMenu castNum
 	Datum d = g_lingo->pop();
+
+	d.toInt();
+
+	if (g_director->getVersion() < 4)
+		d.u.i += 1024;
+
+	const Stxt *stxt = g_director->getCurrentScore()->_loadedStxts->getVal(d.u.i, nullptr);
+
+	if (!stxt) {
+		warning("installMenu: Unknown cast number #%d", d.u.i);
+		return;
+	}
+
+	Common::String menuStxt = g_lingo->codePreprocessor(stxt->_ptext.c_str(), true);
+	Common::String line;
+	int linenum = -1; // We increment it before processing
+
+	Graphics::MacMenu *menu = g_director->_wm->addMenu();
+	int submenu = -1;
+	Common::String submenuText;
+	//Graphics::MacMenuSubMenu *submenu = nullptr;
+
+	for (const byte *s = (const byte *)menuStxt.c_str(); *s; s++) {
+		// Get next line
+		line.clear();
+		while (*s && *s != '\n') { // If we see a whitespace
+			if (*s == (byte)'\xc2') {
+				s++;
+				if (*s == '\n') {
+					line += ' ';
+
+					s++;
+				}
+			} else {
+				line += *s++;
+			}
+		}
+
+		linenum++;
+
+		if (line.empty())
+			continue;
+
+		if (line.hasPrefixIgnoreCase("menu:")) {
+			const char *p = &line.c_str()[5];
+
+			while (*p && (*p == ' ' || *p == '\t'))
+				p++;
+
+			if (!submenuText.empty()) {
+				menu->createSubMenuFromString(submenu, submenuText.c_str(), 100);
+			}
+
+			warning("menu: '%s'", Common::toPrintable(p).c_str());
+			submenu = menu->addMenuItem(nullptr, Common::String(p));
+
+			submenuText.clear();
+
+			continue;
+		}
+
+		// We have either '=' or \xc5 as a separator
+		const char *p = strchr(line.c_str(), '=');
+
+		if (!p)
+			p = strchr(line.c_str(), '\xc5');
+
+		if (!p) {
+			warning("installMenu: syntax error at line %d", linenum);
+			continue;
+		}
+
+		Common::String text(line.c_str(), p);
+		Common::String command(p + 1);
+
+		text.trim();
+		command.trim();
+
+		warning("text: '%s'  command: '%s'", Common::toPrintable(text).c_str(), Common::toPrintable(command).c_str());
+
+		if (!submenuText.empty())
+			submenuText += ';';
+
+		submenuText += text;
+
+		if (!*s) // if we reached end of string, do not increment it but break
+			break;
+	}
+
+	if (!submenuText.empty()) {
+		menu->createSubMenuFromString(submenu, submenuText.c_str(), 100);
+	}
+
 	warning("STUB: b_installMenu(%d)", d.u.i);
 }
 
@@ -1265,9 +1375,62 @@ void Lingo::b_unLoadCast(int nargs) {
 }
 
 void Lingo::b_zoomBox(int nargs) {
-	g_lingo->printSTUBWithArglist("b_zoomBox", nargs);
+	// zoomBox startSprite, endSprite [, delatTicks]
+	//   ticks are in 1/60th, default 1
+	if (nargs < 2 || nargs > 3) {
+		warning("b_zoomBox: expected 2 or 3 arguments, got %d", nargs);
 
-	g_lingo->dropStack(nargs);
+		g_lingo->dropStack(nargs);
+
+		return;
+	}
+
+	int delayTicks = 1;
+	if (nargs > 2) {
+		Datum d = g_lingo->pop();
+		d.toInt();
+
+		delayTicks = d.u.i;
+	}
+
+	Datum endSprite = g_lingo->pop();
+	Datum startSprite = g_lingo->pop();
+
+	startSprite.toInt();
+	endSprite.toInt();
+
+	Score *score = g_director->getCurrentScore();
+	uint16 curFrame = score->getCurrentFrame();
+	Frame *frame = score->_frames[curFrame];
+
+	Common::Rect *startRect = frame->getSpriteRect(startSprite.u.i);
+	if (!startRect) {
+		warning("b_zoomBox: unknown start sprite #%d", startSprite.u.i);
+		return;
+	}
+
+	// Looks for endSprite in the current frame, otherwise
+	// Looks for endSprite in the next frame
+	Common::Rect *endRect = frame->getSpriteRect(endSprite.u.i);
+	if (!endRect) {
+		if ((uint)curFrame + 1 < score->_frames.size())
+			score->_frames[curFrame + 1]->getSpriteRect(endSprite.u.i);
+	}
+
+	if (!endRect) {
+		warning("b_zoomBox: unknown end sprite #%d", endSprite.u.i);
+		return;
+	}
+
+	ZoomBox *box = new ZoomBox;
+	box->start = *startRect;
+	box->end = *endRect;
+	box->delay = delayTicks;
+	box->step = 0;
+	box->startTime = g_system->getMillis();
+	box->nextTime  = g_system->getMillis() + 1000 * box->step / 60;
+
+	score->addZoomBox(box);
 }
 
 void Lingo::b_updateStage(int nargs) {
@@ -1316,10 +1479,10 @@ void Lingo::b_point(int nargs) {
 	x.toFloat();
 	y.toFloat();
 
-	d.u.arr = new FloatArray;
+	d.u.farr = new FloatArray;
 
-	d.u.arr->push_back(x.u.f);
-	d.u.arr->push_back(y.u.f);
+	d.u.farr->push_back(x.u.f);
+	d.u.farr->push_back(y.u.f);
 	d.type = POINT;
 
 	g_lingo->push(d);
@@ -1463,7 +1626,7 @@ void Lingo::b_quote(int nargs) {
 	g_lingo->push(Datum(new Common::String("\"")));
 }
 
-void Lingo::b_return(int nargs) {
+void Lingo::b_returnconst(int nargs) {
 	g_lingo->push(Datum(new Common::String("\r")));
 }
 

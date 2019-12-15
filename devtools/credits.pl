@@ -751,7 +751,7 @@ begin_credits("Credits");
 				add_person("Torbj&ouml;rn Andersson", "eriktorbjorn", "");
 				add_person("Bertrand Augereau", "Tramb", "");
 				add_person("Filippos Karapetis", "[md5]", "");
-				add_person("Vladimir Menshakov", "whoozle", "(retired)");
+				add_person("Vladimir Menshakov", "whoozle", "");
 				add_person("Willem Jan Palenstijn", "wjp", "");
 			end_section();
 
@@ -966,7 +966,7 @@ begin_credits("Credits");
 
 			begin_section("TeenAgent");
 				add_person("Robert Megone", "sanguine", "Help with callback rewriting");
-				add_person("Vladimir Menshakov", "whoozle", "(retired)");
+				add_person("Vladimir Menshakov", "whoozle", "");
 			end_section();
 
 			begin_section("Tinsel");
@@ -1100,7 +1100,7 @@ begin_credits("Credits");
 
 			begin_section("PocketPC / WinCE");
 				add_person("Nicolas Bacca", "arisme", "(retired)");
-				add_person("Ismail Khatib", "CeRiAl", "");
+				add_person("Ismail Khatib", "CeRiAl", "(retired)");
 				add_person("Kostas Nakos", "Jubanka", "(retired)");
 			end_section();
 

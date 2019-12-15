@@ -22,21 +22,22 @@
 
 #define FORBIDDEN_SYMBOL_EXCEPTION_time_h
 
-#include "osystem.h"
+#include "backends/platform/3ds/osystem.h"
+
+#include "backends/platform/3ds/config.h"
+#include "backends/platform/3ds/options-dialog.h"
 #include "backends/timer/default/default-timer.h"
+#include "common/translation.h"
 #include "engines/engine.h"
-#include "gui.h"
-#include "options-dialog.h"
-#include "config.h"
+#include "gui/gui-manager.h"
 
 namespace _3DS {
 
 static Common::Mutex *eventMutex;
 static InputMode inputMode = MODE_DRAG;
+static InputMode savedInputMode = MODE_DRAG;
 static aptHookCookie cookie;
 static bool optionMenuOpening = false;
-static Common::String messageOSD;
-static bool showMessageOSD = false;
 
 static void pushEventQueue(Common::Queue<Common::Event> *queue, Common::Event &event) {
 	Common::StackLock lock(*eventMutex);
@@ -50,8 +51,6 @@ static void eventThreadFunc(void *arg) {
 	uint32 touchStartTime = osys->getMillis();
 	touchPosition lastTouch = {0, 0};
 	bool isRightClick = false;
-	float cursorX = 0;
-	float cursorY = 0;
 	float cursorDeltaX = 0;
 	float cursorDeltaY = 0;
 	int circleDeadzone = 20;
@@ -92,8 +91,7 @@ static void eventThreadFunc(void *arg) {
 				if (touch.py > 239 - borderSnapZone)
 					touch.py = 239;
 			}
-			cursorX = touch.px;
-			cursorY = touch.py;
+
 			osys->transformPoint(touch);
 
 			osys->warpMouse(touch.px, touch.py);
@@ -129,16 +127,14 @@ static void eventThreadFunc(void *arg) {
 				pushEventQueue(eventQueue, event);
 			}
 		} else if (cursorDeltaX != 0 || cursorDeltaY != 0) {
-			cursorX += cursorDeltaX;
-			cursorY -= cursorDeltaY;
-			if (cursorX < 0) cursorX = 0;
-			if (cursorY < 0) cursorY = 0;
-			if (cursorX > 320) cursorX = 320;
-			if (cursorY > 240) cursorY = 240;
-			lastTouch.px = cursorX;
-			lastTouch.py = cursorY;
-			osys->transformPoint(lastTouch);
+			float scaleRatio = osys->getScaleRatio();
+
+			lastTouch.px += cursorDeltaX / scaleRatio;
+			lastTouch.py -= cursorDeltaY / scaleRatio;
+
+			osys->clipPoint(lastTouch);
 			osys->warpMouse(lastTouch.px, lastTouch.py);
+
 			event.mouse.x = lastTouch.px;
 			event.mouse.y = lastTouch.py;
 			event.type = Common::EVENT_MOUSEMOVE;
@@ -146,13 +142,45 @@ static void eventThreadFunc(void *arg) {
 		}
 
 		// Button events
+		if (keysPressed & KEY_L) {
+			if (g_gui.isActive()) {
+				osys->displayMessageOnOSD(_("Magnify Mode cannot be activated in menus."));
+			} else if (config.screen != kScreenBoth && osys->getMagnifyMode() == MODE_MAGOFF) {
+				// TODO: Automatically enable both screens while magnify mode is on
+				osys->displayMessageOnOSD(_("Magnify Mode can only be activated\n when both screens are enabled."));
+			} else if (osys->getWidth() <= 400 && osys->getHeight() <= 240) {
+				osys->displayMessageOnOSD(_("In-game resolution too small to magnify."));
+			} else {
+				if (osys->getMagnifyMode() == MODE_MAGOFF) {
+					osys->setMagnifyMode(MODE_MAGON);
+					if (inputMode == MODE_DRAG) {
+						inputMode = MODE_HOVER;
+						osys->displayMessageOnOSD(_("Magnify Mode On. Switching to Hover Mode..."));
+					} else {
+						osys->displayMessageOnOSD(_("Magnify Mode On"));
+					}
+				} else {
+					osys->setMagnifyMode(MODE_MAGOFF);
+					osys->updateSize();
+					if (savedInputMode == MODE_DRAG) {
+						inputMode = savedInputMode;
+						osys->displayMessageOnOSD(_("Magnify Mode Off. Reactivating Drag Mode..."));
+					} else {
+						osys->displayMessageOnOSD(_("Magnify Mode Off"));
+					}
+				}
+			}
+		}
 		if (keysPressed & KEY_R) {
 			if (inputMode == MODE_DRAG) {
-				inputMode = MODE_HOVER;
-				osys->displayMessageOnOSD("Hover Mode");
+				inputMode = savedInputMode = MODE_HOVER;
+				osys->displayMessageOnOSD(_("Hover Mode"));
 			} else {
-				inputMode = MODE_DRAG;
-				osys->displayMessageOnOSD("Drag Mode");
+				if (osys->getMagnifyMode() == MODE_MAGOFF) {
+					inputMode = savedInputMode = MODE_DRAG;
+					osys->displayMessageOnOSD(_("Drag Mode"));
+				} else
+					osys->displayMessageOnOSD(_("Cannot Switch to Drag Mode while Magnify Mode is On"));
 			}
 		}
 		if (keysPressed & KEY_A || keysPressed & KEY_DLEFT || keysReleased & KEY_A || keysReleased & KEY_DLEFT) {
@@ -165,6 +193,16 @@ static void eventThreadFunc(void *arg) {
 				event.type = Common::EVENT_LBUTTONUP;
 			pushEventQueue(eventQueue, event);
 		}
+		if (keysPressed & KEY_B || keysReleased & KEY_B || keysPressed & KEY_DDOWN || keysReleased & KEY_DDOWN) {
+			if (keysPressed & KEY_B || keysPressed & KEY_DDOWN)
+				event.type = Common::EVENT_KEYDOWN;
+			else
+				event.type = Common::EVENT_KEYUP;
+			event.kbd.keycode = Common::KEYCODE_ESCAPE;
+			event.kbd.ascii = Common::ASCII_ESCAPE;
+			event.kbd.flags = 0;
+			pushEventQueue(eventQueue, event);
+		}
 		if (keysPressed & KEY_X || keysPressed & KEY_DUP || keysReleased & KEY_X || keysReleased & KEY_DUP) {
 			// SIMULATE RIGHT CLICK
 			event.mouse.x = lastTouch.px;
@@ -175,44 +213,30 @@ static void eventThreadFunc(void *arg) {
 				event.type = Common::EVENT_RBUTTONUP;
 			pushEventQueue(eventQueue, event);
 		}
-		if (keysPressed & KEY_L) {
+		if (keysPressed & KEY_Y || keysPressed & KEY_DRIGHT) {
 			event.type = Common::EVENT_VIRTUAL_KEYBOARD;
 			pushEventQueue(eventQueue, event);
 		}
-//-- Standalone builds
-#ifdef _NEVERHOOD_MENU
-		/* DISABLED for now
 		if (keysPressed & KEY_START) {
 			event.type = Common::EVENT_MAINMENU;
 			pushEventQueue(eventQueue, event);
 		}
-		*/
-#else
-		if (keysPressed & KEY_START) {
-			event.type = Common::EVENT_MAINMENU;
-			pushEventQueue(eventQueue, event);
-		}
-#endif
 		if (keysPressed & KEY_SELECT) {
 			if (!optionMenuOpened)
 				optionMenuOpening = true;
 		}
-		
-#ifdef _NEVERHOOD_MENU
-		if (keysPressed & KEY_START || keysReleased & KEY_START) {
-			if (keysPressed & KEY_START)
-#else
-		if (keysPressed & KEY_B || keysReleased & KEY_B || keysPressed & KEY_DDOWN || keysReleased & KEY_DDOWN) {
-			if (keysPressed & KEY_B || keysPressed & KEY_DDOWN)
-#endif
-			
-				event.type = Common::EVENT_KEYDOWN;
-			else
-				event.type = Common::EVENT_KEYUP;
-			event.kbd.keycode = Common::KEYCODE_ESCAPE;
-			event.kbd.ascii = Common::ASCII_ESCAPE;
-			event.kbd.flags = 0;
-			pushEventQueue(eventQueue, event);
+
+		// If magnify mode is on when returning to Launcher, turn it off
+		if (g_system->getEventManager()->shouldRTL()) {
+			if (osys->getMagnifyMode() == MODE_MAGON) {
+				osys->setMagnifyMode(MODE_MAGOFF);
+				osys->updateSize();
+				if (savedInputMode == MODE_DRAG) {
+					inputMode = savedInputMode;
+					osys->displayMessageOnOSD(_("Magnify Mode Off. Reactivating Drag Mode.\nReturning to Launcher..."));
+				} else
+					osys->displayMessageOnOSD(_("Magnify Mode Off. Returning to Launcher..."));
+			}
 		}
 
 		// TODO: EVENT_PREDICTIVE_DIALOG
@@ -280,33 +304,33 @@ void OSystem_3DS::destroyEvents() {
 
 void OSystem_3DS::transformPoint(touchPosition &point) {
 	if (!_overlayVisible) {
-		point.px = static_cast<float>(point.px) / _gameBottomTexture.getScaleX() - _gameBottomX;
-		point.py = static_cast<float>(point.py) / _gameBottomTexture.getScaleY() - _gameBottomY;
+		point.px = static_cast<float>(point.px) / _gameBottomTexture.getScaleX() - _gameBottomTexture.getPosX();
+		point.py = static_cast<float>(point.py) / _gameBottomTexture.getScaleY() - _gameBottomTexture.getPosY();
+	}
+
+	clipPoint(point);
+}
+
+void OSystem_3DS::clipPoint(touchPosition &point) {
+	if (_overlayVisible) {
+		point.px = CLIP<uint16>(point.px, 0, getOverlayWidth()  - 1);
+		point.py = CLIP<uint16>(point.py, 0, getOverlayHeight() - 1);
+	} else {
+		point.px = CLIP<uint16>(point.px, 0, _gameTopTexture.actualWidth  - 1);
+		point.py = CLIP<uint16>(point.py, 0, _gameTopTexture.actualHeight - 1);
 	}
 }
 
-void OSystem_3DS::displayMessageOnOSD(const char *msg) {
-	messageOSD = msg;
-	showMessageOSD = true;
+void OSystem_3DS::setMagnifyMode(MagnifyMode mode) {
+	_magnifyMode = mode;
 }
 
 bool OSystem_3DS::pollEvent(Common::Event &event) {
-	if (showMessageOSD) {
-		showMessageOSD = false;
-		StatusMessageDialog dialog(messageOSD, 800);
-		dialog.runModal();
-	}
-
 	aptMainLoop(); // Call apt hook when necessary
 
 	if (optionMenuOpening) {
 		optionMenuOpening = false;
-		OptionsDialog dialog;
-		if (g_engine)
-			g_engine->pauseEngine(true);
-		dialog.runModal();
-		if (g_engine)
-			g_engine->pauseEngine(false);
+		runOptionsDialog();
 	}
 
 	Common::StackLock lock(*eventMutex);
@@ -316,6 +340,33 @@ bool OSystem_3DS::pollEvent(Common::Event &event) {
 
 	event = _eventQueue.pop();
 	return true;
+}
+
+void OSystem_3DS::runOptionsDialog() {
+	OptionsDialog dialog;
+	if (g_engine)
+		g_engine->pauseEngine(true);
+	int result = dialog.runModal();
+	if (g_engine)
+		g_engine->pauseEngine(false);
+
+	if (result > 0) {
+		int oldScreen = config.screen;
+
+		config.showCursor   = dialog.getShowCursor();
+		config.snapToBorder = dialog.getSnapToBorder();
+		config.stretchToFit = dialog.getStretchToFit();
+		config.sensitivity  = dialog.getSensitivity();
+		config.screen       = dialog.getScreen();
+
+		saveConfig();
+		loadConfig();
+
+		if (config.screen != oldScreen) {
+			_screenChangeId++;
+			g_gui.checkScreenChange();
+		}
+	}
 }
 
 } // namespace _3DS

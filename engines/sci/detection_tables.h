@@ -3208,7 +3208,7 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		Common::EN_ANY, Common::kPlatformDOS, ADGF_NO_FLAGS, GUIO_PHANTASMAGORIA },
 
 	// Phantasmagoria - English DOS (from jvprat)
-	// Executable scanning reports "2.100.002", VERSION file reports "1.100.000UK"
+	// Executable scanning reports "2.100.002", VERSION file reports "1.000.001UK"
 	{"phantasmagoria", "", {
 		{"resmap.001", 0, "416138651ea828219ca454cae18341a3", 11518},
 		{"ressci.001", 0, "3aae6559aa1df273bc542d5ac6330d75", 65844612},
@@ -3318,7 +3318,7 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 	// Phantasmagoria - English DOS/Windows (GOG version) - ressci.* merged in ressci.000
 	// Windows executable scanning reports "2.100.002" - "Sep 19 1995 15:09:43"
 	// DOS executable scanning reports "2.100.002" - "Sep 19 1995 09:15:40"
-	// VERSION file reports "1.100.001UK"
+	// VERSION file reports "1.000.001UK"
 	// Supplied by littleboy in patch #3112884
 	{"phantasmagoria", "", {
 		{"ressci.000", 0, "cd5967f9b9586e3380645961c0765be3", 116822037},
@@ -3326,9 +3326,17 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		AD_LISTEND},
 		Common::EN_ANY, Common::kPlatformDOS, ADGF_NO_FLAGS, GUIO_PHANTASMAGORIA },
 
+	// Phantasmagoria - German Patch V3 externally applied to GOG English DOS/Windows version
+	{"phantasmagoria", "", {
+		{"ressci.000", 0, "cd5967f9b9586e3380645961c0765be3", 116817874},
+		{"resmap.000", 0, "59a0362e4133d4d82d546d75333813ae", 16486},
+		AD_LISTEND},
+		Common::DE_DEU, Common::kPlatformDOS, ADGF_NO_FLAGS, GUIO_PHANTASMAGORIA },
+
 	// Phantasmagoria - English Macintosh
 	// NOTE: This only contains disc 1 files (as well as the two persistent files:
 	// Data1 and Data13. Other discs have conflicting names :(
+	// Game script sets version to "1.000.000"
 	{"phantasmagoria", "", {
 		{"Data1", 0, "0fcb42802f49edb5af60532bd7b60c4f", 14705669},
 		{"Data2", 0, "d52f612058ec78e300385df3336a4ba2", 14516712},
@@ -4999,6 +5007,10 @@ static const struct ADGameDescription SciGameDescriptions[] = {
                             GAMEOPTION_ORIGINAL_SAVELOAD, \
                             GAMEOPTION_ENABLE_BLACK_LINED_VIDEO, \
                             GAMEOPTION_HQ_VIDEO)
+#define GUIO_SQ6_MAC  GUIO4(GUIO_LINKSPEECHTOSFX, \
+                            GUIO_NOASPECT, \
+                            GAMEOPTION_ENABLE_BLACK_LINED_VIDEO, \
+                            GAMEOPTION_HQ_VIDEO)
 
 	// Space Quest 6 - English DOS/Win3.11 CD (from the Space Quest Collection)
 	// Executable scanning reports "2.100.002", VERSION file reports "1.0"
@@ -5048,8 +5060,27 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		AD_LISTEND},
 		Common::EN_ANY, Common::kPlatformWindows, ADGF_DEMO, GUIO_SQ6_DEMO },
 
+	// Space Quest 6 - English Macintosh CD
+	// VERSION file reports "1.000"
+	{"sq6", "", {
+		{"Data1", 0, "37d452ef82e3c054a2531d3028acbd9a", 11488588},
+		{"Data2", 0, "c4d2da963e1ae9f52bac4bece8ecef19", 6912519},
+		{"Data3", 0, "d1ee854dc7ac5e439aaaed683404dd53", 5527552},
+		{"Data4", 0, "4126aa73958a00203e97f843e888d82b", 5872808},
+		{"Data5", 0, "9b3558495d861ebb97ceaaec6f1686c1", 5916650},
+		{"Data6", 0, "7ce6c5172ee8cd23476d5c9fcf41a545", 5340247},
+		{"Data7", 0, "7103d65a3b94ca0cdb88d83e0faa6589", 6017850},
+		{"Data8", 0, "0f30545c9789f4b31613a671d47b5b67", 2266349},
+		{"Data9", 0, "d667feaefef37089577b3fb925c676ed", 2941306},
+		{"Data10", 0, "92d878ff44fc4ef6b0d9e8cda2f11d2c", 4037677},
+		{"Data11", 0, "08ca4f202e115df26cf80aa2a722a959", 925888},
+		{"Data12", 0, "5c715987024fbc666c1c3fea2bcdce42", 1869183},
+	AD_LISTEND },
+	Common::EN_ANY, Common::kPlatformMacintosh, ADGF_MACRESFORK | ADGF_UNSTABLE, GUIO_SQ6_MAC },
+
 #undef GUIO_SQ6_DEMO
 #undef GUIO_SQ6
+#undef GUIO_SQ6_MAC
 
 #endif // ENABLE_SCI32
 

@@ -20,8 +20,10 @@
  *
  */
 
+#include "common/encoding.h"
 #include "common/str.h"
 #include "common/ustr.h"
+#include "common/util.h"
 
 namespace Common {
 
@@ -35,7 +37,7 @@ namespace Common {
 //
 // More comprehensive one lives in wintermute/utils/convert_utf.cpp
 void String::decodeUTF8(U32String &dst) const {
-    // The String class, and therefore the Font class as well, assume one
+	// The String class, and therefore the Font class as well, assume one
 	// character is one byte, but in this case it's actually an UTF-8
 	// string with up to 4 bytes per character. To work around this,
 	// convert it to an U32String before drawing it, because our Font class
@@ -46,40 +48,40 @@ void String::decodeUTF8(U32String &dst) const {
 		uint num = 1;
 
 		if ((_str[i] & 0xF8) == 0xF0) {
-            num = 4;
+			num = 4;
 		} else if ((_str[i] & 0xF0) == 0xE0) {
-		    num = 3;
-        } else if ((_str[i] & 0xE0) == 0xC0) {
-            num = 2;
+			num = 3;
+		} else if ((_str[i] & 0xE0) == 0xC0) {
+			num = 2;
 		}
 
 		if (i - _size >= num) {
-            switch (num) {
-            case 4:
-                chr |= (_str[i++] & 0x07) << 18;
-                chr |= (_str[i++] & 0x3F) << 12;
-                chr |= (_str[i++] & 0x3F) << 6;
-                chr |= (_str[i++] & 0x3F);
-                break;
+			switch (num) {
+			case 4:
+				chr |= (_str[i++] & 0x07) << 18;
+				chr |= (_str[i++] & 0x3F) << 12;
+				chr |= (_str[i++] & 0x3F) << 6;
+				chr |= (_str[i++] & 0x3F);
+				break;
 
-            case 3:
-                chr |= (_str[i++] & 0x0F) << 12;
-                chr |= (_str[i++] & 0x3F) << 6;
-                chr |= (_str[i++] & 0x3F);
-                break;
+			case 3:
+				chr |= (_str[i++] & 0x0F) << 12;
+				chr |= (_str[i++] & 0x3F) << 6;
+				chr |= (_str[i++] & 0x3F);
+				break;
 
-            case 2:
-                chr |= (_str[i++] & 0x1F) << 6;
-                chr |= (_str[i++] & 0x3F);
-                break;
+			case 2:
+				chr |= (_str[i++] & 0x1F) << 6;
+				chr |= (_str[i++] & 0x3F);
+				break;
 
-            default:
-                chr = (_str[i++] & 0x7F);
-                break;
-            }
-        } else {
-            break;
-        }
+			default:
+				chr = (_str[i++] & 0x7F);
+				break;
+			}
+		} else {
+			break;
+		}
 
 		dst += chr;
 	}
@@ -265,8 +267,23 @@ static const uint32 g_windows1257ConversionTable[] = {0x20AC, 0x0081, 0x201A, 0x
 										 0x0173, 0x0142, 0x015B, 0x016B, 0x00FC, 0x017C, 0x017E, 0x02D9};
 
 
+/* This array must match the enum defined in str-enc.h */
+static char const *const g_codePageMap[] = {
+	"UTF-8", /* kUtf8 */
+	"WINDOWS-1250", /* kWindows1250 */
+	"WINDOWS-1251", /* kWindows1251 */
+	"WINDOWS-1252", /* kWindows1252 */
+	"WINDOWS-1253", /* kWindows1253 */
+	"WINDOWS-1254", /* kWindows1254 */
+	"WINDOWS-1255", /* kWindows1255 */
+	"WINDOWS-1257", /* kWindows1257 */
+	"MS932", /* kWindows932 */
+	"MSCP949", /* kWindows949 */
+	"CP950"  /* kWindows950 */
+};
+
 void String::decodeOneByte(U32String &dst, CodePage page) const {
-    for (uint i = 0; i < _size; ++i) {
+	for (uint i = 0; i < _size; ++i) {
 		if ((byte)_str[i] <= 0x7F) {
 			dst += _str[i];
 			continue;
@@ -303,11 +320,22 @@ void String::decodeOneByte(U32String &dst, CodePage page) const {
 }
 
 U32String String::decode(CodePage page) const {
-    U32String unicodeString;
-    if (page == kUtf8) {
+	if (page == kCodePageInvalid ||
+			page >= ARRAYSIZE(g_codePageMap)) {
+		error("Invalid codepage");
+	}
+	char *result = Encoding::convert("UTF-32", g_codePageMap[page], _str, _size);
+	if (result) {
+		U32String unicodeString((uint32 *)result);
+		free(result);
+		return unicodeString;
+	}
+
+	U32String unicodeString;
+	if (page == kUtf8) {
 		decodeUTF8(unicodeString);
 	} else {
-	    decodeOneByte(unicodeString, page);
+		decodeOneByte(unicodeString, page);
 	}
 	return unicodeString;
 }
@@ -363,11 +391,24 @@ void U32String::encodeOneByte(String &dst, CodePage page) const {
 
 
 String U32String::encode(CodePage page) const {
-    String string;
-    if (page == kUtf8) {
+	if (page == kCodePageInvalid ||
+			page >= ARRAYSIZE(g_codePageMap)) {
+		error("Invalid codepage");
+	}
+	char *result = Encoding::convert(g_codePageMap[page], "UTF-32", (const char *)_str, _size * 4);
+	if (result) {
+		// Encodings in CodePage all use '\0' as string ending
+		// That would be problematic if CodePage has UTF-16 or UTF-32
+		String string(result);
+		free(result);
+		return string;
+	}
+
+	String string;
+	if (page == kUtf8) {
 		encodeUTF8(string);
 	} else {
-	    encodeOneByte(string, page);
+		encodeOneByte(string, page);
 	}
 	return string;
 }
@@ -383,11 +424,11 @@ U32String convertUtf8ToUtf32(const String &str) {
 }
 
 String convertFromU32String(const U32String &string, CodePage page) {
-    return string.encode(page);
+	return string.encode(page);
 }
 
 String convertUtf32ToUtf8(const U32String &u32str) {
-    return u32str.encode(kUtf8);
+	return u32str.encode(kUtf8);
 }
 
 } // End of namespace Common

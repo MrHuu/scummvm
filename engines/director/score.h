@@ -46,6 +46,15 @@ struct Label;
 class Lingo;
 class Sprite;
 
+struct ZoomBox {
+	Common::Rect start;
+	Common::Rect end;
+	int delay;
+	int step;
+	uint32 startTime;
+	uint32 nextTime;
+};
+
 enum ScriptType {
 	kMovieScript = 0,
 	kSpriteScript = 1,
@@ -53,7 +62,7 @@ enum ScriptType {
 	kCastScript = 3,
 	kGlobalScript = 4,
 	kNoneScript = -1,
-	kMaxScriptType = 4
+	kMaxScriptType = 4	// Sync with score.cpp:45, array scriptTypes[]
 };
 
 const char *scriptType2str(ScriptType scr);
@@ -94,6 +103,10 @@ public:
 	int getCurrentLabelNumber();
 	int getNextLabelNumber(int referenceFrame);
 
+	void addZoomBox(ZoomBox *box);
+	void renderZoomBox(bool redraw = false);
+	bool haveZoomBox() { return !_zoomBoxes.empty(); }
+
 private:
 	void update();
 	void readVersion(uint32 rid);
@@ -101,6 +114,8 @@ private:
 	void loadFrames(Common::SeekableSubReadStreamEndian &stream);
 	void loadLabels(Common::SeekableSubReadStreamEndian &stream);
 	void loadActions(Common::SeekableSubReadStreamEndian &stream);
+	void loadLingoNames(Common::SeekableSubReadStreamEndian &stream);
+	void loadLingoScript(Common::SeekableSubReadStreamEndian &stream);
 	void loadScriptText(Common::SeekableSubReadStreamEndian &stream);
 	void loadFileInfo(Common::SeekableSubReadStreamEndian &stream);
 	void loadFontMap(Common::SeekableSubReadStreamEndian &stream);
@@ -121,6 +136,7 @@ public:
 	Common::HashMap<uint16, Common::String> _fontMap;
 	Graphics::ManagedSurface *_surface;
 	Graphics::ManagedSurface *_trailSurface;
+	Graphics::ManagedSurface *_backSurface;
 	Graphics::Font *_font;
 	Archive *_movieArchive;
 	Common::Rect _movieRect;
@@ -148,7 +164,8 @@ private:
 	byte _currentFrameRate;
 	uint16 _castArrayStart;
 	uint16 _currentFrame;
-	Common::String _currentLabel;
+	uint16 _nextFrame;
+	int _currentLabel;
 	uint32 _flags;
 	uint16 _castArrayEnd;
 	uint16 _movieScriptCount;
@@ -156,6 +173,8 @@ private:
 	Lingo *_lingo;
 	DirectorSound *_soundManager;
 	DirectorEngine *_vm;
+
+	Common::Array<ZoomBox *> _zoomBoxes;
 };
 
 } // End of namespace Director
