@@ -48,6 +48,7 @@ ifdef GAME
 ifdef GAMEDAT
 	@cp ./dists/engine-data/$(GAMEDAT) romfs/$(GAMEDAT)
 endif
+endif
 
 $(TARGET).smdh: $(APP_ICON)
 	@smdhtool --create "$(APP_TITLE)" "$(APP_DESCRIPTION)" "$(APP_AUTHOR)" $(APP_ICON) $@
