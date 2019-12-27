@@ -24,16 +24,18 @@
 #define DIRECTOR_DIRECTOR_H
 
 #include "common/random.h"
-#include "common/substream.h"
+#include "common/rect.h"
 
 #include "common/hashmap.h"
 #include "engines/engine.h"
-#include "director/cast.h"
+#include "director/types.h"
 
 #define CHANNEL_COUNT 30
 
 namespace Common {
 class MacResManager;
+class SeekableReadStream;
+class SeekableSubReadStreamEndian;
 }
 
 namespace Graphics {
@@ -64,7 +66,10 @@ enum {
 	kDebugEvents			= 1 << 5,
 	kDebugLingoParse		= 1 << 6,
 	kDebugLingoCompileOnly	= 1 << 7,
-	kDebugSlow				= 1 << 8
+	kDebugSlow				= 1 << 8,
+	kDebugFast				= 1 << 9,
+	kDebugNoLoop			= 1 << 10,
+	kDebugBytecode			= 1 << 11
 };
 
 struct MovieReference {

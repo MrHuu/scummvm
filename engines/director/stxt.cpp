@@ -20,6 +20,9 @@
  *
  */
 
+#include "common/substream.h"
+
+#include "director/director.h"
 #include "director/stxt.h"
 
 namespace Director {

@@ -32,8 +32,10 @@
 
 #include "common/str.h"
 
+#include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-gr.h"
+#include "director/lingo/lingo-the.h"
 
 using namespace Director;
 
@@ -101,7 +103,7 @@ whitespace [\t ]
 (?i:if)			{ count(); return tIF; }
 (?i:else[\t ]+if)	{ count(); return tELSIF; }
 (?i:else)		{ count(); return tELSE; }
-(?i:end)([\t ]*{identifier})?	{
+(?i:end)([\t ]+{identifier})?	{
 		count();
 
 		const char *ptr = &yytext[4]; // Skip 'end '
@@ -121,8 +123,8 @@ whitespace [\t ]
 	}
 (?i:factory)	{ count(); return tFACTORY; }
 (?i:exit)		{ count(); return tEXIT; }
-(?i:frame)		{ count(); return tFRAME; }
 (?i:global)		{ count(); return tGLOBAL; }
+(?i:go[\t ]+to[\t ]+frame)	{ count(); return tGO; }
 (?i:go[\t ]+to)	{ count(); return tGO; }
 (?i:go)			{ count(); return tGO; }
 (?i:instance)	{ count(); return tINSTANCE; }
@@ -132,7 +134,17 @@ whitespace [\t ]
 (?i:line)		{ count(); return tLINE; }
 (?i:loop)		{ count(); return checkImmediate(tLOOP); }
 (?i:macro)		{ count(); return tMACRO; }
-(?i:method)		{ count(); return tMETHOD; }
+(?i:method)([\t ]*{identifier})		{
+		count();
+
+		const char *ptr = &yytext[6]; // Skip 'method '
+		while (*ptr == ' ' || *ptr == '\t')
+			ptr++;
+
+		yylval.s = new Common::String(ptr);
+
+		return tMETHOD;
+	}
 (?i:mod)		{ count(); return tMOD; }
 (?i:movie)		{ count(); return tMOVIE; }
 (?i:next)		{ count(); return tNEXT; }
@@ -141,6 +153,7 @@ whitespace [\t ]
 (?i:on)			{ count(); return tON; }		// D3
 (?i:open)		{ count(); return tOPEN; }
 (?i:or)			{ count(); return tOR; }
+(?i:play[\t ]+frame)	{ count(); return tPLAY; }
 (?i:play)		{ count(); return tPLAY; }
 (?i:playAccel)	{ count(); yylval.s = new Common::String(yytext); return tPLAYACCEL; }
 (?i:previous)	{ count(); return tPREVIOUS; }
@@ -196,11 +209,11 @@ whitespace [\t ]
 			field = Common::String::format("%d%s", g_lingo->_theEntities[ptr]->entity, field.c_str());
 
 			if (!g_lingo->_theEntityFields.contains(field)) {
-				error("Unhandled the field %s", ptr);
+				error("LEXER: Unhandled the field %s", ptr);
 			}
 
 			if (g_lingo->_theEntityFields[field]->entity != g_lingo->_theEntities[ptr]->entity)
-				error("Unsupported field '%s' for entity '%s'", field.c_str(), ptr);
+				error("LEXER: Unsupported field '%s' for entity '%s'", field.c_str(), ptr);
 
 			yylval.e[0] = g_lingo->_theEntities[ptr]->entity;
 			yylval.e[1] = g_lingo->_theEntityFields[field]->field;
@@ -211,7 +224,7 @@ whitespace [\t ]
 				return THEENTITY;
 		}
 
-		warning("Unhandled the entity %s", ptr);
+		warning("LEXER: Unhandled the entity %s", ptr);
 	}
 (?i:the[ \t]+[[:alpha:]]+[ \t+](date|time))		{
 		count();
@@ -230,11 +243,11 @@ whitespace [\t ]
 		field = Common::String::format("%d%s", g_lingo->_theEntities[ptr]->entity, field.c_str());
 
 		if (!g_lingo->_theEntityFields.contains(field)) {
-			error("Unhandled the field %s", ptr);
+			error("LEXER: Unhandled the field %s", ptr);
 		}
 
 		if (g_lingo->_theEntityFields[field]->entity != g_lingo->_theEntities[ptr]->entity)
-			error("Unsupported field '%s' for entity '%s'", field.c_str(), ptr);
+			error("LEXER: Unsupported field '%s' for entity '%s'", field.c_str(), ptr);
 
 		yylval.e[0] = g_lingo->_theEntities[ptr]->entity;
 		yylval.e[1] = g_lingo->_theEntityFields[field]->field;
@@ -261,7 +274,7 @@ whitespace [\t ]
 				return THEENTITY;
 		}
 
-		warning("Unhandled the entity %s", ptr);
+		warning("LEXER: Unhandled the entity %s", ptr);
 	}
 (?i:then)			{ count(); return tTHEN; }
 (?i:to)				{ count(); return tTO; }
@@ -284,6 +297,15 @@ whitespace [\t ]
 
 		if (g_lingo->_ignoreMe && yylval.s->equalsIgnoreCase("me"))
 			return ID;
+
+		// When we are defining arguments, allow any string
+		if (g_lingo->_indef == kStateInArgs)
+			return ID;
+
+		// First of all, match against argument list
+		if (g_lingo->_indef == kStateInDef)
+			if (g_lingo->isInArgStack(yylval.s))
+				return ID;
 
 		if (g_lingo->_twoWordBuiltins.contains(yytext))
 			return TWOWORDBUILTIN;

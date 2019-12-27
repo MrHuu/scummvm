@@ -20,13 +20,14 @@
  *
  */
 
-#include "common/archive.h"
 #include "common/file.h"
 #include "common/str-array.h"
 
+#include "director/director.h"
 #include "director/lingo/lingo.h"
-#include "director/lingo/lingo-gr.h"
+#include "director/cast.h"
 #include "director/frame.h"
+#include "director/score.h"
 #include "director/sprite.h"
 
 namespace Director {
@@ -50,7 +51,7 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 	_currentEntityId = 0;
 	_pc = 0;
 	_returning = false;
-	_indef = false;
+	_indef = kStateNone;
 	_ignoreMe = false;
 	_immediateMode = false;
 
@@ -69,6 +70,8 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 	_exitRepeat = false;
 
 	_localvars = NULL;
+
+	_dontPassEvent = false;
 
 	initEventHandlerTypes();
 
@@ -213,246 +216,6 @@ void Lingo::addCode(const char *code, ScriptType type, uint16 id) {
 		}
 		debugC(2, kDebugLingoCompile, "<end code>");
 	}
-}
-
-static Common::String nexttok(const char *s, const char **newP = nullptr) {
-	Common::String res;
-
-	// Scan first non-whitespace
-	while (*s && (*s == ' ' || *s == '\t')) // If we see a whitespace
-		s++;
-
-	// Now copy everything till whitespace
-	while (*s && *s != ' ' && *s != '\t' && *s != '\n')
-		res += *s++;
-
-	if (newP)
-		*newP = s;
-
-	return res;
-}
-
-static Common::String prevtok(const char *s, const char *lineStart, const char **newP = nullptr) {
-	Common::String res;
-
-	// Scan first non-whitespace
-	while (s >= lineStart && (*s == ' ' || *s == '\t')) // If we see a whitespace
-		s--;
-
-	// Now copy everything till whitespace
-	while (s >= lineStart && *s != ' ' && *s != '\t')
-		res = *s-- + res;
-
-	if (newP)
-		*newP = s;
-
-	return res;
-}
-
-Common::String Lingo::codePreprocessor(const char *s, bool simple) {
-	Common::String res;
-
-	// Strip comments
-	while (*s) {
-		if (*s == '-' && *(s + 1) == '-') { // At the end of the line we will have \0
-			while (*s && *s != '\n')
-				s++;
-		}
-
-		if (*s == '\r')
-			res += '\n';
-		else if (*s)
-			res += *s;
-
-		s++;
-	}
-
-	Common::String tmp(res);
-	res.clear();
-
-	// Strip trailing whitespaces
-	s = tmp.c_str();
-	while (*s) {
-		if (*s == ' ' || *s == '\t') { // If we see a whitespace
-			const char *ps = s; // Remember where we saw it
-
-			while (*ps == ' ' || *ps == '\t')	// Scan until end of whitespaces
-				ps++;
-
-			if (*ps) {	// Not end of the string
-				if (*ps == '\n') {	// If it is newline, then we continue from it
-					s = ps;
-				} else {	// It is not a newline
-					while (s != ps) {	// Add all whitespaces
-						res += *s;
-						s++;
-					}
-				}
-			}
-		}
-
-		if (*s)
-			res += *s;
-
-		s++;
-	}
-
-	if (simple)
-		return res;
-
-	tmp = res;
-	s = tmp.c_str();
-	res.clear();
-
-	// Preprocess if statements
-	// Here we add ' end if' at end of each statement, which lets us
-	// make the grammar very straightforward
-	Common::String line, tok;
-	const char *lineStart, *prevEnd;
-	int iflevel = 0;
-
-	while (*s) {
-		line.clear();
-
-		// Get next line
-		while (*s && *s != '\n') { // If we see a whitespace
-			if (*s == '\xc2') {
-				res += *s++;
-				if (*s == '\n') {
-					line += ' ';
-					res += *s++;
-				}
-			} else {
-				res += *s;
-				line += tolower(*s++);
-			}
-		}
-		debugC(2, kDebugLingoParse, "line: %d                         '%s'", iflevel, line.c_str());
-
-		if (line.size() < 4) { // If line is too small, then skip it
-			if (*s)	// copy newline symbol
-				res += *s++;
-
-			debugC(2, kDebugLingoParse, "too small");
-
-			continue;
-		}
-
-		tok = nexttok(line.c_str(), &lineStart);
-		if (tok.equals("if")) {
-			tok = prevtok(&line.c_str()[line.size() - 1], lineStart, &prevEnd);
-			debugC(2, kDebugLingoParse, "start-if <%s>", tok.c_str());
-
-			if (tok.equals("if")) {
-				debugC(2, kDebugLingoParse, "end-if");
-				tok = prevtok(prevEnd, lineStart);
-
-				if (tok.equals("end")) {
-					// do nothing, we open and close same line
-					debugC(2, kDebugLingoParse, "end-end");
-				} else {
-					iflevel++;
-				}
-			} else if (tok.equals("then")) {
-				debugC(2, kDebugLingoParse, "last-then");
-				iflevel++;
-			} else if (tok.equals("else")) {
-				debugC(2, kDebugLingoParse, "last-else");
-				iflevel++;
-			} else { // other token
-				// Now check if we have tNLELSE
-				if (!*s) {
-					iflevel++;	// end, we have to add 'end if'
-					break;
-				}
-				const char *s1 = s + 1;
-
-				while (*s1 && *s1 == '\n')
-					s1++;
-				tok = nexttok(s1);
-
-				if (tok.equalsIgnoreCase("else")) { // ignore case because it is look-ahead
-					debugC(2, kDebugLingoParse, "tNLELSE");
-					iflevel++;
-				} else {
-					debugC(2, kDebugLingoParse, "++++ end if (no nlelse after single liner)");
-					res += " end if";
-				}
-			}
-		} else if (tok.equals("else")) {
-			debugC(2, kDebugLingoParse, "start-else");
-			bool elseif = false;
-
-			tok = nexttok(lineStart);
-			if (tok.equals("if")) {
-				debugC(2, kDebugLingoParse, "second-if");
-				elseif = true;
-			} else if (tok.empty()) {
-				debugC(2, kDebugLingoParse, "lonely-else");
-				continue;
-			}
-
-			tok = prevtok(&line.c_str()[line.size() - 1], lineStart, &prevEnd);
-			debugC(2, kDebugLingoParse, "last: '%s'", tok.c_str());
-
-			if (tok.equals("if")) {
-				debugC(2, kDebugLingoParse, "end-if");
-				tok = prevtok(prevEnd, lineStart);
-
-				if (tok.equals("end")) {
-					debugC(2, kDebugLingoParse, "end-end");
-					iflevel--;
-				}
-			} else if (tok.equals("then")) {
-				debugC(2, kDebugLingoParse, "last-then");
-
-				if (elseif == false) {
-					warning("Badly nested then");
-				}
-			} else if (tok.equals("else")) {
-				debugC(2, kDebugLingoParse, "last-else");
-				if (elseif == false) {
-					warning("Badly nested else");
-				}
-			} else { // check if we have tNLELSE
-				if (!*s) {
-					break;
-				}
-				const char *s1 = s + 1;
-
-				while (*s1 && *s1 == '\n')
-					s1++;
-				tok = nexttok(s1);
-
-				if (tok.equalsIgnoreCase("else") && elseif) {
-					// Nothing to do here, same level
-					debugC(2, kDebugLingoParse, "tNLELSE");
-				} else {
-					debugC(2, kDebugLingoParse, "++++ end if (no tNLELSE)");
-					res += " end if";
-					iflevel--;
-				}
-			}
-		} else if (tok.equals("end")) {
-			debugC(2, kDebugLingoParse, "start-end");
-
-			tok = nexttok(lineStart);
-			if (tok.equals("if")) {
-				debugC(2, kDebugLingoParse, "second-if");
-				iflevel--;
-			}
-		}
-	}
-
-	for (int i = 0; i < iflevel; i++) {
-		debugC(2, kDebugLingoParse, "++++ end if (unclosed)");
-		res += "\nend if";
-	}
-
-
-	debugC(2, kDebugLingoParse, "#############\n%s\n#############", res.c_str());
-
-	return res;
 }
 
 void Lingo::executeScript(ScriptType type, uint16 id, uint16 function) {
@@ -613,7 +376,21 @@ Common::String *Datum::toString() {
 		*s = Common::String::format("var: #%s", u.sym->name.c_str());
 		break;
 	case REFERENCE:
-		*s = Common::String::format("field#%d", u.i);
+		{
+			int idx = u.i;
+
+			if (!g_director->getCurrentScore()->_loadedText->contains(idx)) {
+				if (!g_director->getCurrentScore()->_loadedText->contains(idx - 1024)) {
+					warning("toString(): Unknown REFERENCE %d", idx);
+					*s = "";
+					break;
+				} else {
+					idx -= 1024;
+				}
+			}
+
+			*s = g_director->getCurrentScore()->_loadedText->getVal(idx)->_ptext;
+		}
 		break;
 	default:
 		warning("Incorrect operation toString() for type: %s", type2str());

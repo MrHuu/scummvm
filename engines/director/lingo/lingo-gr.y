@@ -46,10 +46,15 @@
 
 %debug
 
+// %glr-parser
+// %defines "engines/director/lingo/lingo-gr.h"
+
 %{
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#include "common/endian.h"
 #include "common/hash-str.h"
+#include "common/rect.h"
 
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-gr.h"
@@ -94,10 +99,10 @@ void checkEnd(Common::String *token, const char *expect, bool required) {
 %token<s> BLTIN BLTINNOARGS BLTINNOARGSORONE BLTINONEARG BLTINARGLIST TWOWORDBUILTIN
 %token<s> FBLTIN FBLTINNOARGS FBLTINONEARG FBLTINARGLIST RBLTIN RBLTINONEARG
 %token<s> ID STRING HANDLER SYMBOL
-%token<s> ENDCLAUSE tPLAYACCEL
-%token tDOWN tELSE tELSIF tEXIT tFRAME tGLOBAL tGO tIF tINTO tLOOP tMACRO
+%token<s> ENDCLAUSE tPLAYACCEL tMETHOD
+%token tDOWN tELSE tELSIF tEXIT tGLOBAL tGO tIF tINTO tLOOP tMACRO
 %token tMOVIE tNEXT tOF tPREVIOUS tPUT tREPEAT tSET tTHEN tTO tWHEN
-%token tWITH tWHILE tNLELSE tFACTORY tMETHOD tOPEN tPLAY tDONE tINSTANCE
+%token tWITH tWHILE tNLELSE tFACTORY tOPEN tPLAY tDONE tINSTANCE
 %token tGE tLE tEQ tNEQ tAND tOR tNOT tMOD
 %token tAFTER tBEFORE tCONCAT tCONTAINS tSTARTS tCHAR tITEM tLINE tWORD
 %token tSPRITE tINTERSECTS tWITHIN tTELL tPROPERTY
@@ -183,6 +188,12 @@ stmtoneliner: macro
 	| proc
 	;
 
+stmtonelinerwithif: macro
+	| expr
+	| proc
+	| ifoneliner
+	;
+
 stmt: stmtoneliner
 	| ifstmt
 	// repeat while (expression = TRUE)
@@ -229,7 +240,7 @@ stmt: stmtoneliner
 		(*g_lingo->_currentScript)[$1 + 3] = body;	/* body of loop */
 		(*g_lingo->_currentScript)[$1 + 4] = inc;	/* increment */
 		(*g_lingo->_currentScript)[$1 + 5] = end; }	/* end, if cond fails */
-	| when stmtoneliner end {
+	| when stmtonelinerwithif end {
 		inst end = 0;
 		WRITE_UINT32(&end, $3 - $1);
 		g_lingo->code1(STOP);
@@ -274,6 +285,29 @@ elseifstmt: elseif expr end tTHEN stmtlist end {
 
 		g_lingo->codeLabel($1); }
 	;
+
+ifoneliner: if expr end tTHEN stmtoneliner end tELSE begin stmtoneliner end tENDIF {
+		inst then = 0, else1 = 0, end = 0;
+		WRITE_UINT32(&then, $3 - $1);
+		WRITE_UINT32(&else1, $6 - $1);
+		WRITE_UINT32(&end, $10 - $1);
+		(*g_lingo->_currentScript)[$1 + 1] = then;	/* thenpart */
+		(*g_lingo->_currentScript)[$1 + 2] = else1;	/* elsepart */
+		(*g_lingo->_currentScript)[$1 + 3] = end;	/* end, if cond fails */
+
+		g_lingo->processIf($1, $10 - $1, $8 - $1); }
+	| if expr end tTHEN stmtoneliner end tENDIF {
+			inst then = 0, else1 = 0, end = 0;
+			WRITE_UINT32(&then, $3 - $1);
+			WRITE_UINT32(&else1, 0);
+			WRITE_UINT32(&end, $6 - $1);
+			(*g_lingo->_currentScript)[$1 + 1] = then;	/* thenpart */
+			(*g_lingo->_currentScript)[$1 + 2] = else1;	/* elsepart */
+			(*g_lingo->_currentScript)[$1 + 3] = end;	/* end, if cond fails */
+
+			g_lingo->processIf($1, $6 - $1, $6 - $1); }
+	;
+
 
 repeatwhile:	tREPEAT tWHILE		{ $$ = g_lingo->code3(g_lingo->c_repeatwhilecode, STOP, STOP); }
 	;
@@ -398,10 +432,12 @@ expr: simpleexpr { $$ = $1; }
 	| tLINE expr tTO expr tOF expr		{ g_lingo->code1(g_lingo->c_lineToOf); }
 	| tWORD expr tOF expr				{ g_lingo->code1(g_lingo->c_wordOf); }
 	| tWORD expr tTO expr tOF expr		{ g_lingo->code1(g_lingo->c_wordToOf); }
-	| tME 							{ g_lingo->codeMe(nullptr, 0); }
+	| tME '(' ID ')'					{ g_lingo->codeMe($3, 0); }
+	| tME '(' ID ',' arglist ')'		{ g_lingo->codeMe($3, $5); }
+	| tME								{ g_lingo->codeMe(nullptr, 0); }
 	;
 
-reference: 	RBLTINONEARG expr		{
+reference: 	RBLTINONEARG simpleexpr	{
 		g_lingo->codeFunc($1, 1);
 		delete $1; }
 	;
@@ -428,8 +464,6 @@ proc: tPUT expr				{ g_lingo->code1(g_lingo->c_printtop); }
 		g_lingo->codeFunc($1, 1);
 		delete $1; }
 	| BLTINARGLIST nonemptyarglist			{ g_lingo->codeFunc($1, $2); }
-	| tME '(' ID ')'				{ g_lingo->codeMe($3, 0); }
-	| tME '(' ID ',' arglist ')'	{ g_lingo->codeMe($3, $5); }
 	| tOPEN expr tWITH expr	{ g_lingo->code1(g_lingo->c_open); }
 	| tOPEN expr 			{ g_lingo->code2(g_lingo->c_voidpush, g_lingo->c_open); }
 	| TWOWORDBUILTIN ID arglist	{ Common::String s(*$1); s += '-'; s += *$2; g_lingo->codeFunc(&s, $3); }
@@ -458,11 +492,11 @@ instancelist: ID				{ g_lingo->code1(g_lingo->c_instance); g_lingo->codeString($
 gotofunc: tGO tLOOP				{ g_lingo->code1(g_lingo->c_gotoloop); }
 	| tGO tNEXT					{ g_lingo->code1(g_lingo->c_gotonext); }
 	| tGO tPREVIOUS				{ g_lingo->code1(g_lingo->c_gotoprevious); }
-	| tGO gotoframe 			{
+	| tGO expr 			{
 		g_lingo->code1(g_lingo->c_intpush);
 		g_lingo->codeInt(1);
 		g_lingo->code1(g_lingo->c_goto); }
-	| tGO gotoframe gotomovie	{
+	| tGO expr gotomovie	{
 		g_lingo->code1(g_lingo->c_intpush);
 		g_lingo->codeInt(3);
 		g_lingo->code1(g_lingo->c_goto); }
@@ -472,20 +506,16 @@ gotofunc: tGO tLOOP				{ g_lingo->code1(g_lingo->c_gotoloop); }
 		g_lingo->code1(g_lingo->c_goto); }
 	;
 
-gotoframe: tFRAME expr
-	| expr
-	;
-
 gotomovie: tOF tMOVIE expr
 	| tMOVIE expr
 	;
 
 playfunc: tPLAY tDONE			{ g_lingo->code1(g_lingo->c_playdone); }
-	| tPLAY gotoframe 			{
+	| tPLAY expr 			{
 		g_lingo->code1(g_lingo->c_intpush);
 		g_lingo->codeInt(1);
 		g_lingo->code1(g_lingo->c_play); }
-	| tPLAY gotoframe gotomovie	{
+	| tPLAY expr gotomovie	{
 		g_lingo->code1(g_lingo->c_intpush);
 		g_lingo->codeInt(3);
 		g_lingo->code1(g_lingo->c_play); }
@@ -523,36 +553,40 @@ playfunc: tPLAY tDONE			{ g_lingo->code1(g_lingo->c_playdone); }
 //
 // See also:
 //   on keyword
-defn: tMACRO ID { g_lingo->_indef = true; g_lingo->_currentFactory.clear(); }
+defn: tMACRO ID { g_lingo->_indef = kStateInArgs; g_lingo->_currentFactory.clear(); }
 		begin argdef '\n' argstore stmtlist 		{
 			g_lingo->code1(g_lingo->c_procret);
 			g_lingo->define(*$2, $4, $5);
-			g_lingo->_indef = false; }
+			g_lingo->clearArgStack();
+			g_lingo->_indef = kStateNone; }
 	| tFACTORY ID	{ g_lingo->codeFactory(*$2); }
-	| tMETHOD ID { g_lingo->_indef = true; }
+	| tMETHOD { g_lingo->_indef = kStateInArgs; }
 		begin argdef '\n' argstore stmtlist 		{
 			g_lingo->code1(g_lingo->c_procret);
-			g_lingo->define(*$2, $4, $5 + 1, &g_lingo->_currentFactory);
-			g_lingo->_indef = false; }
-	| on begin  argdef '\n' argstore stmtlist ENDCLAUSE endargdef {	// D3
+			g_lingo->define(*$1, $3, $4 + 1, &g_lingo->_currentFactory);
+			g_lingo->clearArgStack();
+			g_lingo->_indef = kStateNone; }
+	| on begin argdef '\n' argstore stmtlist ENDCLAUSE endargdef {	// D3
 		g_lingo->code1(g_lingo->c_procret);
 		g_lingo->define(*$1, $2, $3);
-		g_lingo->_indef = false;
+		g_lingo->clearArgStack();
+		g_lingo->_indef = kStateNone;
 		g_lingo->_ignoreMe = false;
 
 		checkEnd($7, $1->c_str(), false); }
 	| on begin argdef '\n' argstore stmtlist {	// D4. No 'end' clause
 		g_lingo->code1(g_lingo->c_procret);
 		g_lingo->define(*$1, $2, $3);
-		g_lingo->_indef = false;
+		g_lingo->_indef = kStateNone;
+		g_lingo->clearArgStack();
 		g_lingo->_ignoreMe = false; }
 
-on:  tON ID { $$ = $2; g_lingo->_indef = true; g_lingo->_currentFactory.clear(); g_lingo->_ignoreMe = true; }
+on:  tON ID { $$ = $2; g_lingo->_indef = kStateInArgs; g_lingo->_currentFactory.clear(); g_lingo->_ignoreMe = true; }
 
 argdef:  /* nothing */ 		{ $$ = 0; }
 	| ID					{ g_lingo->codeArg($1); $$ = 1; }
 	| argdef ',' ID			{ g_lingo->codeArg($3); $$ = $1 + 1; }
-	| argdef '\n' ',' ID		{ g_lingo->codeArg($4); $$ = $1 + 1; }
+	| argdef '\n' ',' ID	{ g_lingo->codeArg($4); $$ = $1 + 1; }
 	;
 
 endargdef:	/* nothing */
@@ -560,9 +594,8 @@ endargdef:	/* nothing */
 	| endargdef ',' ID
 	;
 
-argstore:	  /* nothing */		{ g_lingo->codeArgStore(); }
+argstore:	  /* nothing */		{ g_lingo->codeArgStore(); g_lingo->_indef = kStateInDef; }
 	;
-
 
 macro: ID nonemptyarglist	{
 		g_lingo->code1(g_lingo->c_call);

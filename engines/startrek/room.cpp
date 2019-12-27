@@ -49,6 +49,7 @@ Room::Room(StarTrekEngine *vm, const Common::String &name) : _vm(vm), _awayMissi
 
 	int size = rdfFile->size();
 	_rdfData = new byte[size];
+	_rdfSize = size;
 	rdfFile->read(_rdfData, size);
 	delete rdfFile;
 
@@ -279,7 +280,9 @@ Common::String Room::patchRoomMessage(const char *text) {
 
 void Room::loadOtherRoomMessages() {
 	uint16 startOffset = readRdfWord(14);
-	uint16 endOffset = readRdfWord(16);
+	// Some RDF files, lile MUDD0, contain text beyond the end offset,
+	// so we read up to the end of the file
+	uint16 endOffset = _rdfSize;	// readRdfWord(16);
 	uint16 offset = startOffset;
 	const char *validPrefixes[] = {
 		"BRI", "COM", "DEM", "FEA", "GEN", "LOV", "MUD", "SIN", "TRI", "TUG", "VEN"
@@ -751,6 +754,28 @@ void Room::mccoyScan(int direction, TextRef text, bool changeDirection, bool fro
 
 	if (text != -1)
 		showText(TX_SPEAKER_MCCOY, text, fromRDF);
+}
+
+bool Room::isPointInPolygon(int16 offset, int16 x, int16 y) {
+	int16 *data = (int16 *)(_rdfData + offset);
+	int16 numVertices = data[1];
+	int16 *vertData = &data[2];
+
+	for (int i = 0; i < numVertices; i++) {
+		Common::Point p1(vertData[0], vertData[1]);
+		Common::Point p2;
+		if (i == numVertices - 1) // Loop to 1st vertex
+			p2 = Common::Point(data[2], data[3]);
+		else
+			p2 = Common::Point(vertData[2], vertData[3]);
+
+		if ((p2.x - p1.x) * (y - p1.y) - (p2.y - p1.y) * (x - p1.x) < 0)
+			return false;
+
+		vertData += 2;
+	}
+
+	return true;
 }
 
 } // End of namespace StarTrek

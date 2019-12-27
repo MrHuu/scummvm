@@ -43,11 +43,9 @@
 // ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 // THIS SOFTWARE.
 
+#include "director/director.h"
 #include "director/lingo/lingo.h"
-#include "common/file.h"
-#include "audio/decoders/wave.h"
 
-#include "director/lingo/lingo-gr.h"
 #include "director/util.h"
 
 namespace Director {
@@ -214,12 +212,7 @@ void Lingo::cleanLocalVars() {
 	g_lingo->_localvars = 0;
 }
 
-Symbol *Lingo::define(Common::String &name, int start, int nargs, Common::String *prefix, int end, bool removeCode) {
-	if (prefix)
-		name = *prefix + "-" + name;
-
-	debugC(1, kDebugLingoCompile, "define(\"%s\"(len: %d), %d, %d, \"%s\", %d)", name.c_str(), _currentScript->size() - 1, start, nargs, (prefix ? prefix->c_str() : ""), end);
-
+Symbol *Lingo::define(Common::String &name, int nargs, ScriptData *code) {
 	Symbol *sym = getHandler(name);
 	if (sym == NULL) { // Create variable if it was not defined
 		sym = new Symbol;
@@ -239,18 +232,9 @@ Symbol *Lingo::define(Common::String &name, int start, int nargs, Common::String
 		delete sym->u.defn;
 	}
 
-	if (end == -1)
-		end = _currentScript->size();
-
-	sym->u.defn = new ScriptData(&(*_currentScript)[start], end - start);
+	sym->u.defn = code;
 	sym->nargs = nargs;
 	sym->maxArgs = nargs;
-
-	// Now remove all defined code from the _currentScript
-	if (removeCode)
-		for (int i = end - 1; i >= start; i--) {
-			_currentScript->remove_at(i);
-		}
 
 	if (debugChannelSet(1, kDebugLingoCompile)) {
 		uint pc = 0;
@@ -261,6 +245,30 @@ Symbol *Lingo::define(Common::String &name, int start, int nargs, Common::String
 		}
 		debugC(1, kDebugLingoCompile, "<end define code>");
 	}
+
+	return sym;
+}
+
+Symbol *Lingo::define(Common::String &name, int start, int nargs, Common::String *prefix, int end, bool removeCode) {
+	if (prefix)
+		name = *prefix + "-" + name;
+
+	debugC(1, kDebugLingoCompile, "define(\"%s\"(len: %d), %d, %d, \"%s\", %d) entity: %d",
+			name.c_str(), _currentScript->size() - 1, start, nargs, (prefix ? prefix->c_str() : ""),
+			end, _currentEntityId);
+
+	if (end == -1)
+		end = _currentScript->size();
+
+	ScriptData *code = new ScriptData(&(*_currentScript)[start], end - start);
+	Symbol *sym = define(name, nargs, code);
+
+	// Now remove all defined code from the _currentScript
+	if (removeCode)
+		for (int i = end - 1; i >= start; i--) {
+			_currentScript->remove_at(i);
+		}
+
 
 	return sym;
 }
@@ -315,24 +323,30 @@ int Lingo::codeArray(int arraySize) {
 	return _currentScript->size();
 }
 
+bool Lingo::isInArgStack(Common::String *s) {
+	for (uint i = 0; i < _argstack.size(); i++)
+		if (_argstack[i]->equalsIgnoreCase(*s))
+			return true;
+
+	return false;
+}
+
 void Lingo::codeArg(Common::String *s) {
-	_argstack.push_back(s);
+	_argstack.push_back(new Common::String(*s));
+}
+
+void Lingo::clearArgStack() {
+	for (uint i = 0; i < _argstack.size(); i++)
+		delete _argstack[i];
+
+	_argstack.clear();
 }
 
 void Lingo::codeArgStore() {
-	while (true) {
-		if (_argstack.empty()) {
-			break;
-		}
-
-		Common::String *arg = _argstack.back();
-		_argstack.pop_back();
-
+	for (int i = _argstack.size() - 1; i >= 0; i--) {
 		code1(c_varpush);
-		codeString(arg->c_str());
+		codeString(_argstack[i]->c_str());
 		code1(c_assign);
-
-		delete arg;
 	}
 }
 

@@ -142,6 +142,7 @@ public:
 	 * all rooms).
 	 */
 	Common::Point getBeamInPosition(int crewmanIndex);
+
 	/**
 	 * This is analagous to above, but instead of beaming in, they just appear in a spot.
 	 * Used sparingly, ie. in feather's serpent when appearing in cave after Quetzecoatl
@@ -149,10 +150,21 @@ public:
 	 */
 	Common::Point getSpawnPosition(int crewmanIndex);
 
-public:
+	/**
+	 * Returns true if the given position is contained in a polygon.
+	 *
+	 * The data passed contains the following words in this order:
+	 *   * Index of polygon (unused here)
+	 *   * Number of vertices in polygon
+	 *   * For each vertex: x and y coordinates.
+	 */
+	bool isPointInPolygon(int16 offset, int16 x, int16 y);
+
 	byte *_rdfData;
 
 private:
+	uint16 _rdfSize;
+
 	StarTrekEngine *_vm;
 	AwayMission *_awayMission;
 

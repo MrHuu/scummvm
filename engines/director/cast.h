@@ -23,31 +23,22 @@
 #ifndef DIRECTOR_CAST_H
 #define DIRECTOR_CAST_H
 
-#include "common/rect.h"
-#include "common/substream.h"
 #include "director/archive.h"
-#include "graphics/surface.h"
+#include "director/types.h"
+
+namespace Graphics {
+struct Surface;
+}
+
+namespace Common {
+class SeekableReadStream;
+class ReadStreamEndian;
+}
 
 namespace Director {
 
 class Stxt;
 class CachedMacText;
-
-enum CastType {
-	kCastTypeNull = 0,
-	kCastBitmap = 1,
-	kCastFilmLoop = 2,
-	kCastText = 3,
-	kCastPalette = 4,
-	kCastPicture = 5,
-	kCastSound = 6,
-	kCastButton = 7,
-	kCastShape = 8,
-	kCastMovie = 9,
-	kCastDigitalVideo = 10,
-	kCastLingoScript = 11,
-	kCastRTE = 12
-};
 
 class Cast {
 public:
@@ -63,30 +54,23 @@ public:
 
 class BitmapCast : public Cast {
 public:
-	BitmapCast(Common::ReadStreamEndian &stream, uint32 castTag, uint16 version = 2);
+	BitmapCast(Common::ReadStreamEndian &stream, uint32 castTag, uint16 version);
 
 	uint16 _pitch;
 	uint16 _regX;
 	uint16 _regY;
 	uint8 _flags;
-	uint16 _someFlaggyThing;
-	uint16 _unk1, _unk2;
+	uint16 _bytes;
+	uint16 _clut;
 
 	uint16 _bitsPerPixel;
 
 	uint32 _tag;
 };
 
-enum ShapeType {
-	kShapeRectangle,
-	kShapeRoundRect,
-	kShapeOval,
-	kShapeLine
-};
-
 class ShapeCast : public Cast {
 public:
-	ShapeCast(Common::ReadStreamEndian &stream, uint16 version = 2);
+	ShapeCast(Common::ReadStreamEndian &stream, uint16 version);
 
 	ShapeType _shapeType;
 	uint16 _pattern;
@@ -95,38 +79,12 @@ public:
 	byte _fillType;
 	byte _lineThickness;
 	byte _lineDirection;
-};
-
-enum TextType {
-	kTextTypeAdjustToFit,
-	kTextTypeScrolling,
-	kTextTypeFixed
-};
-
-enum TextAlignType {
-	kTextAlignRight = -1,
-	kTextAlignLeft,
-	kTextAlignCenter
-};
-
-enum TextFlag {
-	kTextFlagEditable,
-	kTextFlagAutoTab,
-	kTextFlagDoNotWrap
-};
-
-enum SizeType {
-	kSizeNone,
-	kSizeSmallest,
-	kSizeSmall,
-	kSizeMedium,
-	kSizeLarge,
-	kSizeLargest
+	InkType _ink;
 };
 
 class TextCast : public Cast {
 public:
-	TextCast(Common::ReadStreamEndian &stream, uint16 version = 2);
+	TextCast(Common::ReadStreamEndian &stream, uint16 version);
 
 	void setText(const char *text);
 
@@ -145,32 +103,25 @@ public:
 	uint16 _palinfo1, _palinfo2, _palinfo3;
 
 	Common::String _ftext;
+	Common::String _ptext;
 	void importStxt(const Stxt *stxt);
 	void importRTE(byte* text);
 	CachedMacText *_cachedMacText;
 };
 
-enum ButtonType {
-	kTypeButton,
-	kTypeCheckBox,
-	kTypeRadio
-};
-
 class ButtonCast : public TextCast {
 public:
-	ButtonCast(Common::ReadStreamEndian &stream, uint16 version = 2);
+	ButtonCast(Common::ReadStreamEndian &stream, uint16 version);
 
 	ButtonType _buttonType;
 };
 
 class ScriptCast : public Cast {
 public:
-	ScriptCast(Common::ReadStreamEndian &stream, uint16 version = 2);
+	ScriptCast(Common::ReadStreamEndian &stream, uint16 version);
 
 	uint32 _id;
 };
-
-
 
 struct CastInfo {
 	Common::String script;
