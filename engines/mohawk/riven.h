@@ -33,6 +33,10 @@
 
 #include "graphics/surface.h"
 
+namespace Common {
+class Keymap;
+}
+
 namespace Mohawk {
 
 struct MohawkGameDescription;
@@ -97,13 +101,15 @@ public:
 	// Display debug rectangles around the hotspots
 	bool _showHotspots;
 
-	GUI::Debugger *getDebugger() override;
-
 	bool canLoadGameStateCurrently() override;
 	bool canSaveGameStateCurrently() override;
 	Common::Error loadGameState(int slot) override;
-	Common::Error saveGameState(int slot, const Common::String &desc) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	Common::String getSaveStateName(int slot) const override {
+		return Common::String::format("riven-%03d.rvn", slot);
+	}
 	bool hasFeature(EngineFeature f) const override;
+	static Common::Array<Common::Keymap *> initKeymaps(const char *target);
 
 	void doFrame();
 	void processInput();
@@ -115,7 +121,6 @@ private:
 	void loadLanguageDatafile(char prefix, uint16 stackId);
 	bool checkDatafiles();
 
-	RivenConsole *_console;
 	RivenSaveLoad *_saveLoad;
 	RivenOptionsDialog *_optionsDialog;
 	InstallerArchive _installerArchive;
@@ -164,9 +169,8 @@ public:
 	// Save / Load
 	void runLoadDialog();
 	void runSaveDialog();
-	void tryAutoSaving();
+	virtual bool canSaveAutosaveCurrently() override;
 	void loadGameStateAndDisplayError(int slot);
-	Common::Error saveGameState(int slot, const Common::String &desc, bool autosave);
 	void saveGameStateAndDisplayError(int slot, const Common::String &desc);
 
 	/**

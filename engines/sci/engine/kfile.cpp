@@ -206,6 +206,9 @@ reg_t kCD(EngineState *s, int argc, reg_t *argv) {
 }
 
 reg_t kCheckCD(EngineState *s, int argc, reg_t *argv) {
+	// Mac interpreters would display a dialog prompting for the disc.
+	//  kCheckCD took an optional second boolean parameter, which we
+	//  ignore, that affected the dialog's text.
 	const int16 cdNo = argc > 0 ? argv[0].toSint16() : 0;
 
 	if (cdNo) {
@@ -584,17 +587,29 @@ reg_t kFileIOClose(EngineState *s, int argc, reg_t *argv) {
 
 reg_t kFileIOReadRaw(EngineState *s, int argc, reg_t *argv) {
 	uint16 handle = argv[0].toUint16();
+	reg_t dest = argv[1];
 	uint16 size = argv[2].toUint16();
 	int bytesRead = 0;
 	byte *buf = new byte[size];
 	debugC(kDebugLevelFile, "kFileIO(readRaw): %d, %d", handle, size);
 
 	FileHandle *f = getFileFromHandle(s, handle);
-	if (f)
+	if (f) {
+		SegmentRef destReference = s->_segMan->dereference(dest);
+		if (destReference.maxSize == size - 4) {
+			// This is an array structure, which starts with the number of
+			// elements in the array and the size of each element. Skip
+			// these bytes. These structures are stored in the ARC files of
+			// the Behind the Developer's Shield and Inside the Chest demos.
+			f->_in->skip(4);
+			size -= 4;
+		}
+
 		bytesRead = f->_in->read(buf, size);
+	}
 
 	if (bytesRead > 0)
-		s->_segMan->memcpy(argv[1], buf, bytesRead);
+		s->_segMan->memcpy(dest, buf, bytesRead);
 
 	delete[] buf;
 	return make_reg(0, bytesRead);
@@ -1319,12 +1334,29 @@ reg_t kGetSaveFiles(EngineState *s, int argc, reg_t *argv) {
 #ifdef ENABLE_SCI32
 
 reg_t kSaveGame32(EngineState *s, int argc, reg_t *argv) {
+	// fix bug #9752 - make sure that control panel (in case of QFG4),
+	// keyboard (in case of Shivers), or any other obstacle (in other unknown SCI32 games...)
+	// will be hidden before saving
+	kFrameOut(s, 0, NULL);
+
 	const Common::String gameName = s->_segMan->getString(argv[0]);
 	int16 saveNo = argv[1].toSint16();
-	const Common::String saveDescription = argv[2].isNull() ? "" : s->_segMan->getString(argv[2]);
+	Common::String saveDescription = argv[2].isNull() ? "" : s->_segMan->getString(argv[2]);
 	const Common::String gameVersion = (argc <= 3 || argv[3].isNull()) ? "" : s->_segMan->getString(argv[3]);
 
 	debugC(kDebugLevelFile, "Game name %s save %d desc %s ver %s", gameName.c_str(), saveNo, saveDescription.c_str(), gameVersion.c_str());
+
+	// Display the save prompt for Mac games with native dialogs. Passing
+	//  zero for the save number would trigger these, but we can't act solely
+	//  on that since we shift save numbers around to accommodate autosave
+	//  slots, causing some games to pass zero that normally wouldn't.
+	if (g_sci->hasMacSaveRestoreDialogs() && saveNo == 0) {
+		saveNo = g_sci->_guestAdditions->runSaveRestore(true, argv[2]);
+		if (saveNo == -1) {
+			return NULL_REG;
+		}
+		saveDescription = s->_segMan->getString(argv[2]);
+	}
 
 	// Auto-save system used by Torin and LSL7
 	if (gameName == "Autosave" || gameName == "Autosv") {
@@ -1389,6 +1421,17 @@ reg_t kRestoreGame32(EngineState *s, int argc, reg_t *argv) {
 	const Common::String gameName = s->_segMan->getString(argv[0]);
 	int16 saveNo = argv[1].toSint16();
 	const Common::String gameVersion = argv[2].isNull() ? "" : s->_segMan->getString(argv[2]);
+
+	// Display the restore prompt for Mac games with native dialogs. Passing
+	//  zero for the save number would trigger these, but we can't act solely
+	//  on that since we shift save numbers around to accommodate autosave
+	//  slots, causing some games to pass zero that normally wouldn't.
+	if (g_sci->hasMacSaveRestoreDialogs() && saveNo == 0) {
+		saveNo = g_sci->_guestAdditions->runSaveRestore(false, NULL_REG, s->_delayedRestoreGameId);
+		if (saveNo == -1) {
+			return NULL_REG;
+		}
+	}
 
 	if (gameName == "Autosave" || gameName == "Autosv") {
 		if (saveNo == 0) {

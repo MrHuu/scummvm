@@ -40,6 +40,7 @@
 #include "common/file.h"
 #include "common/fs.h"
 #include "common/system.h"
+#include "common/translation.h"
 #include "graphics/pixelformat.h"
 
 #include "engines/util.h"
@@ -96,6 +97,7 @@ GriffonEngine::GriffonEngine(OSystem *syst) : Engine(syst) {
 
 GriffonEngine::~GriffonEngine() {
 	delete _rnd;
+	//delete _console; Debugger is deleted by Engine
 }
 
 void GriffonEngine::syncSoundSettings() {
@@ -132,6 +134,7 @@ Common::Error GriffonEngine::run() {
 	_mixer = g_system->getMixer();
 
 	_console = new Console();
+	setDebugger(_console);
 
 	initialize();
 

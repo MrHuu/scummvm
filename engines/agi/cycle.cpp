@@ -322,13 +322,6 @@ int AgiEngine::playGame() {
 	_game.gfxMode = true;
 	_text->promptRow_Set(22);
 
-	// We run AGIMOUSE always as a side effect
-	//if (getFeatures() & GF_AGIMOUSE)
-		debug(1, "Using AGI Mouse 1.0 protocol");
-
-	if (getFeatures() & GF_AGIPAL)
-		debug(1, "Running AGIPAL game");
-
 	debug(0, "Running AGI script.\n");
 
 	setFlag(VM_FLAG_ENTERED_CLI, false);
@@ -454,10 +447,6 @@ int AgiEngine::playGame() {
 			setFlag(VM_FLAG_SAID_ACCEPTED_INPUT, false);
 			setVar(VM_VAR_WORD_NOT_FOUND, 0);
 			setVar(VM_VAR_KEY, 0);
-		}
-
-		if (shouldPerformAutoSave(_lastSaveTime)) {
-			saveGame(getSavegameFilename(0), "Autosave");
 		}
 
 	} while (!(shouldQuit() || _restartGame));

@@ -83,11 +83,13 @@ struct MacPlotData {
 	Graphics::ManagedSurface *surface;
 	MacPatterns *patterns;
 	uint fillType;
+	int fillOriginX;
+	int fillOriginY;
 	int thickness;
 	uint bgColor;
 
-	MacPlotData(Graphics::ManagedSurface *s, MacPatterns *p, int f, int t, uint bg) :
-		surface(s), patterns(p), fillType(f), thickness(t), bgColor(bg) {
+	MacPlotData(Graphics::ManagedSurface *s, MacPatterns *p, uint f, int fx, int fy, int t, uint bg) :
+		surface(s), patterns(p), fillType(f), fillOriginX(fx), fillOriginY(fy), thickness(t), bgColor(bg) {
 	}
 };
 
@@ -209,6 +211,7 @@ public:
 	void pushCrossHairCursor();
 	void pushCrossBarCursor();
 	void pushWatchCursor();
+	void pushCustomCursor(byte *data, int w, int h, int transcolor);
 	void popCursor();
 
 	void pauseEngine(bool pause);
@@ -219,6 +222,7 @@ public:
 	void setEngineRedrawCallback(void *engine, void (*redrawCallback)(void *engine));
 
 	void passPalette(const byte *palette, uint size);
+	uint findBestColor(byte cr, byte cg, byte cb);
 
 public:
 	MacFontManager *_fontMan;
@@ -255,6 +259,8 @@ private:
 	bool _fullRefresh;
 
 	MacPatterns _patterns;
+	byte *_palette;
+	uint _paletteSize;
 
 	MacMenu *_menu;
 	uint32 _menuDelay;

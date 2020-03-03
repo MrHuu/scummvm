@@ -62,18 +62,21 @@ Graphics::Graphics(StarTrekEngine *vm) : _vm(vm), _egaMode(false) {
 
 	_paletteFadeLevel = 0;
 	_lockedMousePos = Common::Point(-1, -1);
+	_backgroundImage = nullptr;
 }
 
 Graphics::~Graphics() {
 	delete[] _egaData;
 	delete[] _palData;
 	delete[] _lutData;
+	delete _backgroundImage;
 
 	delete _font;
 }
 
-void Graphics::setBackgroundImage(Bitmap *bitmap) {
-	_backgroundImage = SharedPtr<Bitmap>(bitmap);
+void Graphics::setBackgroundImage(Common::String imageName) {
+	delete _backgroundImage;
+	_backgroundImage = new Bitmap(_vm->loadBitmapFile(imageName));
 }
 
 void Graphics::drawBitmapToBackground(const Common::Rect &origRect, const Common::Rect &drawRect, Bitmap *bitmap) {
@@ -238,15 +241,13 @@ byte Graphics::getPriValue(int x, int y) {
 		return b >> 4;
 }
 
-Bitmap *Graphics::loadBitmap(Common::String basename) {
-	return new Bitmap(SharedPtr<Common::MemoryReadStreamEndian>(_vm->loadFile(basename + ".BMP")));
-}
-
 Common::Point Graphics::getMousePos() {
 	return _vm->_system->getEventManager()->getMousePos();
 }
 
-void Graphics::setMouseBitmap(Bitmap *bitmap) {
+void Graphics::setMouseBitmap(Common::String bitmapName) {
+	Bitmap *bitmap = new Bitmap(_vm->loadBitmapFile(bitmapName));
+
 	CursorMan.pushCursor(
 		bitmap->pixels,
 		bitmap->width,
@@ -255,6 +256,8 @@ void Graphics::setMouseBitmap(Bitmap *bitmap) {
 		bitmap->yoffset,
 		0
 	);
+
+	delete bitmap;
 }
 
 void Graphics::popMouseBitmap() {
@@ -591,7 +594,6 @@ void Graphics::updateScreen() {
 	if (_lockedMousePos.x != -1)
 		_vm->_system->warpMouse(_lockedMousePos.x, _lockedMousePos.y);
 
-	_vm->_console->onFrame();
 	_vm->_system->updateScreen();
 	_vm->_system->delayMillis(10);
 }

@@ -36,6 +36,7 @@
 #include "common/system.h"
 #include "common/translation.h"
 
+#include "backends/keymapper/action.h"
 #include "backends/keymapper/keymapper.h"
 
 namespace Kyra {
@@ -366,8 +367,7 @@ Common::Error LoLEngine::init() {
 	assert(_screen);
 	_screen->setResolution();
 
-	_debugger = new Debugger_LoL(this);
-	assert(_debugger);
+	setDebugger(new Debugger_LoL(this));
 
 	KyraEngine_v1::init();
 	initStaticResource();
@@ -457,46 +457,36 @@ Common::Error LoLEngine::init() {
 	_spellProcs.push_back(new SpellProc(this, 0));
 	_spellProcs.push_back(new SpellProc(this, &LoLEngine::castGuardian));
 
-#ifdef ENABLE_KEYMAPPER
-	_eventMan->getKeymapper()->pushKeymap(kKeymapName, true);
-#endif
-
 	return Common::kNoError;
 }
 
-void LoLEngine::initKeymap() {
-#ifdef ENABLE_KEYMAPPER
-	Common::Keymapper *const mapper = _eventMan->getKeymapper();
-
-	// Do not try to recreate same keymap over again
-	if (mapper->getKeymap(kKeymapName) != 0)
-		return;
-
-	Common::Keymap *const engineKeyMap = new Common::Keymap(kKeymapName);
+Common::KeymapArray LoLEngine::initKeymaps() {
+	Common::Keymap *engineKeyMap = new Common::Keymap(Common::Keymap::kKeymapTypeGame, kKeymapName, "Lands of Lore");
 
 	const Common::KeyActionEntry keyActionEntries[] = {
-		{Common::KeyState(Common::KEYCODE_F1, Common::ASCII_F1), "AT1", _("Attack 1")},
-		{Common::KeyState(Common::KEYCODE_F2, Common::ASCII_F2), "AT2", _("Attack 2")},
-		{Common::KeyState(Common::KEYCODE_F3, Common::ASCII_F3), "AT3", _("Attack 3")},
-		{Common::KeyState(Common::KEYCODE_UP), "MVF", _("Move Forward")},
-		{Common::KeyState(Common::KEYCODE_DOWN), "MVB", _("Move Back")},
-		{Common::KeyState(Common::KEYCODE_LEFT), "SLL", _("Slide Left")},
-		{Common::KeyState(Common::KEYCODE_RIGHT), "SLR", _("Slide Right")},
-		{Common::KeyState(Common::KEYCODE_HOME), "TL", _("Turn Left")},
-		{Common::KeyState(Common::KEYCODE_PAGEUP), "TR", _("Turn Right")},
-		{Common::KeyState(Common::KEYCODE_r), "RST", _("Rest")},
-		{Common::KeyState(Common::KEYCODE_o), "OPT", _("Options")},
-		{Common::KeyState(Common::KEYCODE_SLASH), "SPL", _("Choose Spell")},
-		{Common::KeyState(), 0, 0}
+		{ "AT1", Common::KeyState(Common::KEYCODE_F1, Common::ASCII_F1), "F1",     _("Attack 1")     },
+		{ "AT2", Common::KeyState(Common::KEYCODE_F2, Common::ASCII_F2), "F2",     _("Attack 2")     },
+		{ "AT3", Common::KeyState(Common::KEYCODE_F3, Common::ASCII_F3), "F3",     _("Attack 3")     },
+		{ "MVF", Common::KeyState(Common::KEYCODE_UP),                   "UP",     _("Move Forward") },
+		{ "MVB", Common::KeyState(Common::KEYCODE_DOWN),                 "DOWN",   _("Move Back")    },
+		{ "SLL", Common::KeyState(Common::KEYCODE_LEFT),                 "LEFT",   _("Slide Left")   },
+		{ "SLR", Common::KeyState(Common::KEYCODE_RIGHT),                "RIGHT",  _("Slide Right")  },
+		{ "TL",  Common::KeyState(Common::KEYCODE_HOME),                 "HOME",   _("Turn Left")    },
+		{ "TR",  Common::KeyState(Common::KEYCODE_PAGEUP),               "PAGEUP", _("Turn Right")   },
+		{ "RST", Common::KeyState(Common::KEYCODE_r),                    "r",      _("Rest")         },
+		{ "OPT", Common::KeyState(Common::KEYCODE_o),                    "o",      _("Options")      },
+		{ "SPL", Common::KeyState(Common::KEYCODE_SLASH),                "SLASH",  _("Choose Spell") },
+		{ 0,     Common::KeyState(),                                     0,        0                 }
 	};
 
 	for (const Common::KeyActionEntry *entry = keyActionEntries; entry->id; ++entry) {
-		Common::Action *const act = new Common::Action(engineKeyMap, entry->id, entry->description);
-		act->addKeyEvent(entry->ks);
+		Common::Action *const act = new Common::Action(entry->id, entry->description);
+		act->setKeyEvent(entry->ks);
+		act->addDefaultInputMapping(entry->defaultHwId);
+		engineKeyMap->addAction(act);
 	}
 
-	mapper->addGameKeymap(engineKeyMap);
-#endif
+	return Common::Keymap::arrayOf(engineKeyMap);
 }
 
 void LoLEngine::pauseEngineIntern(bool pause) {
@@ -866,7 +856,7 @@ void LoLEngine::startupNew() {
 
 void LoLEngine::runLoop() {
 	// Initialize debugger since how it should be fully usable
-	_debugger->initialize();
+	static_cast<Debugger_LoL *>(getDebugger())->initialize();
 
 	enableSysTimer(2);
 

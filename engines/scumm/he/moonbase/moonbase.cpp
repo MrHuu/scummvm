@@ -20,6 +20,8 @@
  *
  */
 
+#include "common/winexe_pe.h"
+
 #include "scumm/he/intern_he.h"
 #include "scumm/he/moonbase/moonbase.h"
 #include "scumm/he/moonbase/ai_main.h"
@@ -30,6 +32,8 @@
 namespace Scumm {
 
 Moonbase::Moonbase(ScummEngine_v100he *vm) : _vm(vm) {
+	_exe = new Common::PEResources();
+
 	initFOW();
 
 	_ai = new AI(_vm);
@@ -39,6 +43,7 @@ Moonbase::Moonbase(ScummEngine_v100he *vm) : _vm(vm) {
 }
 
 Moonbase::~Moonbase() {
+	delete _exe;
 	delete _ai;
 #ifdef USE_LIBCURL
 	delete _net;

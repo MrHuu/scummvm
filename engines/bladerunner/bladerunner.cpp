@@ -116,6 +116,7 @@ BladeRunnerEngine::BladeRunnerEngine(OSystem *syst, const ADGameDescription *des
 	_shortyMode                   = false;
 	_noDelayMillisFramelimiter    = false;
 	_framesPerSecondMax           = false;
+	_disableStaminaDrain          = false;
 	_cutContent                   = Common::String(desc->gameId).contains("bladerunner-final");
 
 	_playerLosesControlCounter = 0;
@@ -283,7 +284,7 @@ bool BladeRunnerEngine::canSaveGameStateCurrently() {
 		!_elevator->isOpen();
 }
 
-Common::Error BladeRunnerEngine::saveGameState(int slot, const Common::String &desc) {
+Common::Error BladeRunnerEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	Common::OutSaveFile *saveFile = BladeRunner::SaveFileManager::openForSaving(_targetName, slot);
 	if (saveFile == nullptr || saveFile->err()) {
 		delete saveFile;
@@ -393,7 +394,6 @@ Common::Error BladeRunnerEngine::run() {
 		//  else {
 		// 	newGame(kGameDifficultyMedium);
 		// }
-
 		gameLoop();
 
 		_mouse->disable();
@@ -466,7 +466,7 @@ bool BladeRunnerEngine::checkFiles(Common::Array<Common::String> &missingFiles) 
 }
 
 bool BladeRunnerEngine::startup(bool hasSavegames) {
-		// Assign default values to the ScummVM configuration manager, in case settings are missing
+	// Assign default values to the ScummVM configuration manager, in case settings are missing
 	ConfMan.registerDefault("subtitles", "true");
 	ConfMan.registerDefault("sfx_volume", 192);
 	ConfMan.registerDefault("music_volume", 192);
@@ -477,11 +477,13 @@ bool BladeRunnerEngine::startup(bool hasSavegames) {
 	ConfMan.registerDefault("shorty", "false");
 	ConfMan.registerDefault("nodelaymillisfl", "false");
 	ConfMan.registerDefault("frames_per_secondfl", "false");
+	ConfMan.registerDefault("disable_stamina_drain", "false");
 
 	_sitcomMode                = ConfMan.getBool("sitcom");
 	_shortyMode                = ConfMan.getBool("shorty");
 	_noDelayMillisFramelimiter = ConfMan.getBool("nodelaymillisfl");
 	_framesPerSecondMax        = ConfMan.getBool("frames_per_secondfl");
+	_disableStaminaDrain       = ConfMan.getBool("disable_stamina_drain");
 
 	// These are static objects in original game
 	_screenEffects = new ScreenEffects(this, 0x8000);
@@ -503,6 +505,7 @@ bool BladeRunnerEngine::startup(bool hasSavegames) {
 	_sceneScript = new SceneScript(this);
 
 	_debugger = new Debugger(this);
+	setDebugger(_debugger);
 
 	// This is the original startup in the game
 
@@ -511,7 +514,7 @@ bool BladeRunnerEngine::startup(bool hasSavegames) {
 
 	_time = new Time(this);
 
-	debug("_framesPerSecondMax:: %s", _framesPerSecondMax? "true" : "false");
+//	debug("_framesPerSecondMax:: %s", _framesPerSecondMax? "true" : "false");
 	_framelimiter = new Framelimiter(this, _framesPerSecondMax? 120 : 60);
 
 	// Try to load the SUBTITLES.MIX first, before Startup.MIX
@@ -609,8 +612,16 @@ bool BladeRunnerEngine::startup(bool hasSavegames) {
 	_actors[kActorVoiceOver] = new Actor(this, kActorVoiceOver);
 	_playerActor = _actors[_gameInfo->getPlayerId()];
 
-	_playerActor->setFPS(15);
+	_playerActor->setFPS(15); // this seems redundant
+#if BLADERUNNER_ORIGINAL_BUGS
 	_playerActor->timerStart(kActorTimerRunningStaminaFPS, 200);
+#else
+	// Make code here similar to the bugfix in newGame in that
+	// we only start the timer in vanilla game mode (not Restored Content mode)
+	if (!_cutContent) {
+		_playerActor->timerStart(kActorTimerRunningStaminaFPS, 200);
+	}
+#endif // BLADERUNNER_ORIGINAL_BUGS
 
 	_policeMaze = new PoliceMaze(this);
 
@@ -695,7 +706,6 @@ bool BladeRunnerEngine::startup(bool hasSavegames) {
 	_aiScripts = new AIScripts(this, actorCount);
 
 	initChapterAndScene();
-
 	return true;
 }
 
@@ -927,7 +937,7 @@ void BladeRunnerEngine::shutdown() {
 
 	// These are static objects in original game
 
-	delete _debugger;
+	//delete _debugger;	Debugger deletion is handled by Engine
 	_debugger = nullptr;
 
 	delete _sceneScript;
@@ -1113,7 +1123,17 @@ void BladeRunnerEngine::gameTick() {
 	}
 
 	if (_debugger->_viewZBuffer) {
-		_surfaceFront.copyRectToSurface(_zbuffer->getData(), 1280, 0, 0, 640, 480);
+		// The surface front pixel format is 32 bit now,
+		// but the _zbuffer->getData() still returns 16bit pixels
+		// We need to copy pixel by pixel, converting each pixel from 16 to 32bit
+		for (int y = 0; y < 480; ++y) {
+			for (int x = 0; x < 640; ++x) {
+				uint8 a, r, g, b;
+				getGameDataColor(_zbuffer->getData()[y*640 + x], a, r, g, b);
+				void   *dstPixel = _surfaceFront.getBasePtr(x, y);
+				drawPixel(_surfaceFront, dstPixel, _surfaceFront.format.ARGBToColor(a, r, g, b));
+			}
+		}
 	}
 
 	_mouse->tick(p.x, p.y);
@@ -1145,8 +1165,8 @@ void BladeRunnerEngine::actorsUpdate() {
 #if BLADERUNNER_ORIGINAL_BUGS
 #else
 	uint32 timeNow = _time->current();
-	// Don't update actors more than 60 times per second
-	if (timeNow - _actorUpdateTimeLast < 1000 / 60) {
+	// Don't update actors more than 60 or 120 times per second
+	if (timeNow - _actorUpdateTimeLast < 1000 / ( _framesPerSecondMax? 120 : 60)) {
 		return;
 	}
 	_actorUpdateTimeLast = timeNow;
@@ -1164,7 +1184,7 @@ void BladeRunnerEngine::actorsUpdate() {
 		return;
 	}
 
-	for (int i = 0; i < actorCount; i++) {
+	for (int i = 0; i < actorCount; ++i) {
 		Actor *actor = _actors[i];
 		if (actor->getSetId() == setId || i == _actorUpdateCounter) {
 			_aiScripts->update(i);
@@ -1263,12 +1283,6 @@ void BladeRunnerEngine::handleKeyUp(Common::Event &event) {
 }
 
 void BladeRunnerEngine::handleKeyDown(Common::Event &event) {
-	if ((event.kbd.keycode == Common::KEYCODE_d) && (event.kbd.flags & Common::KBD_CTRL)) {
-		getDebugger()->attach();
-		getDebugger()->onFrame();
-		return;
-	}
-
 	if (_vqaIsPlaying && (event.kbd.keycode == Common::KEYCODE_ESCAPE || event.kbd.keycode == Common::KEYCODE_RETURN)) {
 		_vqaStopIsRequested = true;
 		_vqaIsPlaying = false;
@@ -1673,7 +1687,7 @@ void BladeRunnerEngine::handleMouseClickEmpty(int x, int y, Vector3 &scenePositi
 		}
 
 		bool shouldRun = _playerActor->isRunning();
-		if (_mouseClickTimeDiff <= 10000 && xDist < 10 && yDist < 10) {
+		if (_mouseClickTimeDiff <= 10000 && xDist <= 10 && yDist <= 10) {
 			shouldRun = true;
 		}
 
@@ -2212,6 +2226,17 @@ void BladeRunnerEngine::newGame(int difficulty) {
 	}
 	_actors[kActorVoiceOver]->setup(kActorVoiceOver);
 
+#if BLADERUNNER_ORIGINAL_BUGS
+#else
+	// Special settings for McCoy that are in BladeRunnerEngine::startup()
+	// but are overridden here, resulting to the stamina counter
+	// never being initialized in the original game
+	_playerActor->setFPS(15); // this seems redundant
+	if (!_cutContent) {
+		_playerActor->timerStart(kActorTimerRunningStaminaFPS, 200);
+	}
+#endif // BLADERUNNER_ORIGINAL_BUGS
+
 	for (uint i = 0; i < _gameInfo->getSuspectCount(); ++i) {
 		_suspectsDatabase->get(i)->reset();
 	}
@@ -2300,10 +2325,6 @@ Graphics::Surface BladeRunnerEngine::generateThumbnail() const {
 	}
 
 	return thumbnail;
-}
-
-GUI::Debugger *BladeRunnerEngine::getDebugger() {
-	return _debugger;
 }
 
 Common::String BladeRunnerEngine::getTargetName() const {

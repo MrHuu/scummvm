@@ -35,6 +35,7 @@
 #include "sci/parser/vocabulary.h"
 #include "sci/resource.h"
 #include "sci/resource_intern.h"
+#include "sci/resource_patcher.h"
 #include "sci/util.h"
 
 namespace Sci {
@@ -419,6 +420,9 @@ void ResourceManager::disposeVolumeFileStream(Common::SeekableReadStream *fileSt
 
 void ResourceManager::loadResource(Resource *res) {
 	res->_source->loadResource(this, res);
+	if (_patcher) {
+		_patcher->applyPatch(*res);
+	};
 }
 
 
@@ -805,7 +809,7 @@ void ResourceManager::addScriptChunkSources() {
 #endif
 }
 
-extern void showScummVMDialog(const Common::String &message);
+extern int showScummVMDialog(const Common::String& message, const char* altButton = nullptr, bool alignCenter = true);
 
 void ResourceManager::scanNewSources() {
 	_hasBadResources = false;
@@ -978,6 +982,13 @@ void ResourceManager::init() {
 #ifdef ENABLE_SCI32
 	_currentDiscNo = 1;
 #endif
+	if (g_sci) {
+		_patcher = new ResourcePatcher(g_sci->getGameId(), g_sci->getLanguage());
+		addSource(_patcher);
+	} else {
+		_patcher = NULL;
+	};
+
 	// FIXME: put this in an Init() function, so that we can error out if detection fails completely
 
 	_mapVersion = detectMapVersion();
@@ -991,6 +1002,11 @@ void ResourceManager::init() {
 	if ((_mapVersion == kResVersionUnknown) && (_volVersion != kResVersionUnknown)) {
 		warning("Map version not detected, but volume version has been detected. Setting map version to volume version");
 		_mapVersion = _volVersion;
+	}
+
+	if ((_volVersion == kResVersionSci3) && (_mapVersion < kResVersionSci2)) {
+		warning("Detected volume version is too high for detected map version. Setting volume version to map version");
+		_volVersion = _mapVersion;
 	}
 
 	debugC(1, kDebugLevelResMan, "resMan: Detected resource map version %d: %s", _mapVersion, versionDescription(_mapVersion));
@@ -1133,6 +1149,17 @@ Common::List<ResourceId> ResourceManager::listResources(ResourceType type, int m
 	}
 
 	return resources;
+}
+
+bool ResourceManager::hasResourceType(ResourceType type) {
+	ResourceMap::iterator itr = _resMap.begin();
+	while (itr != _resMap.end()) {
+		if (itr->_value->getType() == type) {
+			return true;
+		}
+		++itr;
+	}
+	return false;
 }
 
 Resource *ResourceManager::findResource(ResourceId id, bool lock) {

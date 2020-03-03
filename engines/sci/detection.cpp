@@ -563,11 +563,11 @@ public:
 		_matchFullPaths = true;
 	}
 
-	const char *getEngineId() const {
+	const char *getEngineId() const override {
 		return "sci";
 	}
 
-	virtual const char *getName() const {
+	const char *getName() const override {
 		return "SCI ["
 #ifdef ENABLE_SCI32
 			"all games"
@@ -577,17 +577,17 @@ public:
 			"]";
 	}
 
-	virtual const char *getOriginalCopyright() const {
+	const char *getOriginalCopyright() const override {
 		return "Sierra's Creative Interpreter (C) Sierra Online";
 	}
 
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const;
+	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const override;
 	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const override;
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual SaveStateList listSaves(const char *target) const;
-	virtual int getMaximumSaveSlot() const;
-	virtual void removeSaveState(const char *target, int slot) const;
-	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const;
+	bool hasFeature(MetaEngineFeature f) const override;
+	SaveStateList listSaves(const char *target) const override;
+	int getMaximumSaveSlot() const override;
+	void removeSaveState(const char *target, int slot) const override;
+	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
 };
 
 Common::Language charToScummVMLanguage(const char c) {
@@ -937,7 +937,7 @@ Common::Error SciEngine::loadGameState(int slot) {
 	return Common::kNoError;
 }
 
-Common::Error SciEngine::saveGameState(int slot, const Common::String &desc) {
+Common::Error SciEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	Common::String fileName = Common::String::format("%s.%03d", _targetName.c_str(), slot);
 	Common::SaveFileManager *saveFileMan = g_engine->getSaveFileManager();
 	Common::OutSaveFile *out = saveFileMan->openForSaving(fileName);

@@ -99,7 +99,7 @@ enum ZVisionFeatures {
 class ZVision : public Engine {
 public:
 	ZVision(OSystem *syst, const ZVisionGameDescription *gameDesc);
-	~ZVision();
+	~ZVision() override;
 
 public:
 	/**
@@ -112,7 +112,6 @@ public:
 	const Graphics::PixelFormat _screenPixelFormat;
 
 private:
-	Console *_console;
 	const ZVisionGameDescription *_gameDescription;
 
 	const int _desiredFrameTime;
@@ -151,8 +150,8 @@ private:
 	uint8 _cheatBuffer[KEYBUF_SIZE];
 
 public:
-	Common::Error run();
-	void pauseEngineIntern(bool pause);
+	Common::Error run() override;
+	void pauseEngineIntern(bool pause) override;
 
 	ZVisionGameId getGameId() const;
 	Common::Language getLanguage() const;
@@ -221,8 +220,6 @@ public:
 	void playVideo(Video::VideoDecoder &videoDecoder, const Common::Rect &destRect = Common::Rect(0, 0, 0, 0), bool skippable = true, Subtitle *sub = NULL);
 	Video::VideoDecoder *loadAnimation(const Common::String &fileName);
 
-	Common::String generateSaveFileName(uint slot);
-
 	void setRenderDelay(uint);
 	bool canRender();
 	static void fpsTimerCallback(void *refCon);
@@ -231,8 +228,7 @@ public:
 		return _fps;
 	}
 
-	GUI::Debugger *getDebugger();
-	void syncSoundSettings();
+	void syncSoundSettings() override;
 
 	void loadSettings();
 	void saveSettings();
@@ -240,11 +236,11 @@ public:
 	bool ifQuit();
 
 	// Engine features
-	bool hasFeature(EngineFeature f) const;
-	bool canLoadGameStateCurrently();
-	bool canSaveGameStateCurrently();
-	Common::Error loadGameState(int slot);
-	Common::Error saveGameState(int slot, const Common::String &desc);
+	bool hasFeature(EngineFeature f) const override;
+	bool canLoadGameStateCurrently() override;
+	bool canSaveGameStateCurrently() override;
+	Common::Error loadGameState(int slot) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
 
 private:
 	void initialize();

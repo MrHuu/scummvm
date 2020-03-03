@@ -25,6 +25,7 @@
 
 #include "common/scummsys.h"
 #include "common/noncopyable.h"
+#include "common/array.h" // For OSystem::getGlobalKeymaps()
 #include "common/list.h" // For OSystem::getSupportedFormats()
 #include "graphics/pixelformat.h"
 #include "graphics/mode.h"
@@ -58,12 +59,12 @@ class DialogManager;
 class TimerManager;
 class SeekableReadStream;
 class WriteStream;
-#ifdef ENABLE_KEYMAPPER
 class HardwareInputSet;
 class Keymap;
 class KeymapperDefaultBindings;
-#endif
 class Encoding;
+
+typedef Array<Keymap *> KeymapArray;
 }
 
 class AudioCDManager;
@@ -1139,11 +1140,8 @@ public:
 		return _eventManager;
 	}
 
-#ifdef ENABLE_KEYMAPPER
 	/**
 	 * Register hardware inputs with keymapper
-	 * IMPORTANT NOTE: This is part of the WIP Keymapper. If you plan to use
-	 * this, please talk to tsoliman and/or LordHoto.
 	 *
 	 * @return HardwareInputSet with all keys and recommended mappings
 	 *
@@ -1153,8 +1151,6 @@ public:
 
 	/**
 	 * Return a platform-specific global keymap
-	 * IMPORTANT NOTE: This is part of the WIP Keymapper. If you plan to use
-	 * this, please talk to tsoliman and/or LordHoto.
 	 *
 	 * @return Keymap with actions appropriate for the platform
 	 *
@@ -1162,19 +1158,16 @@ public:
 	 *
 	 * See keymapper documentation for further reference.
 	 */
-	virtual Common::Keymap *getGlobalKeymap() { return nullptr; }
+	virtual Common::KeymapArray getGlobalKeymaps() { return Common::KeymapArray(); }
 
 	/**
 	 * Return platform-specific default keybindings
-	 * IMPORTANT NOTE: This is part of the WIP Keymapper. If you plan to use
-	 * this, please talk to tsoliman and/or LordHoto.
 	 *
 	 * @return KeymapperDefaultBindings populated with keybindings
 	 *
 	 * See keymapper documentation for further reference.
 	 */
 	virtual Common::KeymapperDefaultBindings *getKeymapperDefaultBindings() { return nullptr; }
-#endif
 	//@}
 
 

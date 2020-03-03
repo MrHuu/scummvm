@@ -44,19 +44,28 @@
 // THIS SOFTWARE.
 
 #include "director/director.h"
+#include "director/cast.h"
+#include "director/score.h"
 #include "director/lingo/lingo.h"
+#include "director/lingo/lingo-builtins.h"
+#include "director/lingo/lingo-code.h"
 
 #include "director/util.h"
 
 namespace Director {
 
 void Lingo::execute(uint pc) {
-	for (_pc = pc; !_returning && (*_currentScript)[_pc] != STOP;) {
+	for (_pc = pc; !_returning && (*_currentScript)[_pc] != STOP && !_nextRepeat;) {
 		Common::String instr = decodeInstruction(_currentScript, _pc);
 		uint current = _pc;
 
 		if (debugChannelSet(5, kDebugLingoExec))
 			printStack("Stack before: ", current);
+
+		if (debugChannelSet(9, kDebugLingoExec)) {
+			debug("Vars before");
+			printAllVars();
+		}
 
 		debugC(1, kDebugLingoExec, "[%3d]: %s", current, instr.c_str());
 
@@ -65,6 +74,11 @@ void Lingo::execute(uint pc) {
 
 		if (debugChannelSet(5, kDebugLingoExec))
 			printStack("Stack after: ", current);
+
+		if (debugChannelSet(9, kDebugLingoExec)) {
+			debug("Vars after");
+			printAllVars();
+		}
 
 		if (_pc >= (*_currentScript).size()) {
 			warning("Lingo::execute(): Bad PC (%d)", _pc);
@@ -130,6 +144,22 @@ Common::String Lingo::decodeInstruction(ScriptData *sd, uint pc, uint *newPc) {
 					res += Common::String::format(" \"%s\"", s);
 					break;
 				}
+			case 'E':
+				{
+					i = (*sd)[pc++];
+					int v = READ_UINT32(&i);
+
+					res += Common::String::format(" %s", entity2str(v));
+					break;
+				}
+			case 'F':
+				{
+					i = (*sd)[pc++];
+					int v = READ_UINT32(&i);
+
+					res += Common::String::format(" %s", field2str(v));
+					break;
+				}
 			default:
 				warning("decodeInstruction: Unknown parameter type: %c", pars[-1]);
 			}
@@ -169,7 +199,7 @@ Symbol *Lingo::lookupVar(const char *name, bool create, bool putInGlobalList) {
 
 	if (!_localvars || !_localvars->contains(name)) { // Create variable if it was not defined
 		// Check if it is a global symbol
-		if (_globalvars.contains(name) && _globalvars[name]->type == SYMBOL)
+		if (_globalvars.contains(name))
 			return _globalvars[name];
 
 		if (!create)
@@ -180,10 +210,11 @@ Symbol *Lingo::lookupVar(const char *name, bool create, bool putInGlobalList) {
 		sym->type = VOID;
 		sym->u.i = 0;
 
-		if (_localvars)
-			(*_localvars)[name] = sym;
+		if (!putInGlobalList) {
+			if (_localvars)
+				(*_localvars)[name] = sym;
 
-		if (putInGlobalList) {
+		} else {
 			sym->global = true;
 			_globalvars[name] = sym;
 		}
@@ -229,12 +260,22 @@ Symbol *Lingo::define(Common::String &name, int nargs, ScriptData *code) {
 		// we don't want to be here. The getHandler call should have used the EntityId and the result
 		// should have been unique!
 		warning("Redefining handler '%s'", name.c_str());
-		delete sym->u.defn;
+
+		// Do not attempt to remove code from built-ins
+		if (sym->type == HANDLER)
+			delete sym->u.defn;
+		else
+			sym->type = HANDLER;
 	}
 
 	sym->u.defn = code;
 	sym->nargs = nargs;
 	sym->maxArgs = nargs;
+	// TODO: Assign these properties from here
+	sym->argNames = NULL;
+	sym->varNames = NULL;
+	sym->ctx = NULL;
+	sym->archiveIndex = _archiveIndex;
 
 	if (debugChannelSet(1, kDebugLingoCompile)) {
 		uint pc = 0;
@@ -315,14 +356,6 @@ int Lingo::codeInt(int val) {
 	return _currentScript->size();
 }
 
-int Lingo::codeArray(int arraySize) {
-	inst i = 0;
-	WRITE_UINT32(&i, arraySize);
-	g_lingo->code1(i);
-
-	return _currentScript->size();
-}
-
 bool Lingo::isInArgStack(Common::String *s) {
 	for (uint i = 0; i < _argstack.size(); i++)
 		if (_argstack[i]->equalsIgnoreCase(*s))
@@ -344,16 +377,16 @@ void Lingo::clearArgStack() {
 
 void Lingo::codeArgStore() {
 	for (int i = _argstack.size() - 1; i >= 0; i--) {
-		code1(c_varpush);
+		code1(LC::c_varpush);
 		codeString(_argstack[i]->c_str());
-		code1(c_assign);
+		code1(LC::c_assign);
 	}
 }
 
 int Lingo::codeSetImmediate(bool state) {
 	g_lingo->_immediateMode = state;
 
-	int res = g_lingo->code1(g_lingo->c_setImmediate);
+	int res = g_lingo->code1(LC::c_setImmediate);
 	inst i = 0;
 	WRITE_UINT32(&i, state);
 	g_lingo->code1(i);
@@ -362,7 +395,7 @@ int Lingo::codeSetImmediate(bool state) {
 }
 
 int Lingo::codeFunc(Common::String *s, int numpar) {
-	int ret = g_lingo->code1(g_lingo->c_call);
+	int ret = g_lingo->code1(LC::c_call);
 
 	g_lingo->codeString(s->c_str());
 
@@ -376,13 +409,13 @@ int Lingo::codeFunc(Common::String *s, int numpar) {
 int Lingo::codeMe(Common::String *method, int numpar) {
 	// Check if need to encode reference to the factory
 	if (method == nullptr) {
-		int ret = g_lingo->code1(g_lingo->c_factory);
+		int ret = g_lingo->code1(LC::c_factory);
 		g_lingo->codeString(g_lingo->_currentFactory.c_str());
 
 		return ret;
 	}
 
-	int ret = g_lingo->code1(g_lingo->c_call);
+	int ret = g_lingo->code1(LC::c_call);
 
 	Common::String m(g_lingo->_currentFactory);
 
@@ -452,6 +485,146 @@ void Lingo::processIf(int startlabel, int endlabel, int finalElse) {
 	}
 }
 
+void Lingo::varAssign(Datum &var, Datum &value) {
+	if (var.type != VAR && var.type != REFERENCE) {
+		warning("varAssign: assignment to non-variable");
+		return;
+	}
+
+	if (var.type == VAR) {
+		Symbol *sym = var.u.sym;
+		if (!sym) {
+			warning("varAssign: symbol not defined");
+			return;
+		}
+
+		if (sym->type != INT && sym->type != VOID &&
+				sym->type != FLOAT && sym->type != STRING && sym->type != ARRAY) {
+			warning("varAssign: assignment to non-variable '%s'", sym->name.c_str());
+			return;
+		}
+
+		if ((sym->type == STRING || sym->type == VOID) && sym->u.s) // Free memory if needed
+			delete var.u.sym->u.s;
+
+		if (sym->type == POINT || sym->type == RECT || sym->type == ARRAY)
+			delete var.u.sym->u.farr;
+
+		sym->type = value.type;
+		if (value.type == INT) {
+			sym->u.i = value.u.i;
+		} else if (value.type == FLOAT) {
+			sym->u.f = value.u.f;
+		} else if (value.type == STRING) {
+			sym->u.s = new Common::String(*value.u.s);
+			delete value.u.s;
+		} else if (value.type == POINT || value.type == ARRAY) {
+			sym->u.farr = new DatumArray(*value.u.farr);
+			delete value.u.farr;
+		} else if (value.type == SYMBOL) {
+			sym->u.i = value.u.i;
+		} else if (value.type == OBJECT) {
+			sym->u.s = value.u.s;
+		} else if (value.type == VOID) {
+			sym->u.i = 0;
+		} else {
+			warning("varAssign: unhandled type: %s", value.type2str());
+			sym->u.s = value.u.s;
+		}
+	} else if (var.type == REFERENCE) {
+		Score *score = g_director->getCurrentScore();
+		if (!score) {
+			warning("varAssign: Assigning to a reference to an empty score");
+			return;
+		}
+		if (!score->_loadedCast->contains(var.u.i)) {
+			if (!score->_loadedCast->contains(var.u.i - score->_castIDoffset)) {
+				warning("varAssign: Unknown REFERENCE %d", var.u.i);
+				return;
+			} else {
+				var.u.i -= score->_castIDoffset;
+			}
+		}
+		Cast *cast = score->_loadedCast->getVal(var.u.i);
+		if (cast) {
+			switch (cast->_type) {
+			case kCastText:
+				value.toString();
+				((TextCast *)cast)->setText(value.u.s->c_str());
+				delete value.u.s;
+				break;
+			default:
+				warning("varAssign: Unhandled cast type %s", tag2str(cast->_type));
+				break;
+			}
+		}
+	}
+}
+
+Datum Lingo::varFetch(Datum &var) {
+	Datum result;
+	result.type = VOID;
+	if (var.type != VAR && var.type != REFERENCE) {
+		warning("varFetch: fetch from non-variable");
+		return result;
+	}
+
+	if (var.type == VAR) {
+		Symbol *sym = var.u.sym;
+		if (!sym) {
+			warning("varFetch: symbol not defined");
+			return result;
+		}
+
+		result.type = sym->type;
+
+		if (sym->type == INT)
+			result.u.i = sym->u.i;
+		else if (sym->type == FLOAT)
+			result.u.f = sym->u.f;
+		else if (sym->type == STRING)
+			result.u.s = new Common::String(*sym->u.s);
+		else if (sym->type == POINT)
+			result.u.farr = sym->u.farr;
+		else if (sym->type == SYMBOL)
+			result.u.i = var.u.sym->u.i;
+		else if (sym->type == VOID)
+			result.u.i = 0;
+		else if (sym->type == ARRAY) {
+			result.u.farr = sym->u.farr;
+		} else {
+			warning("varFetch: unhandled type: %s", var.type2str());
+			result.type = VOID;
+		}
+
+	} else if (var.type == REFERENCE) {
+		Score *score = g_director->getCurrentScore();
+		if (!score->_loadedCast->contains(var.u.i)) {
+			if (!score->_loadedCast->contains(var.u.i - score->_castIDoffset)) {
+				warning("varFetch: Unknown REFERENCE %d", var.u.i);
+				return result;
+			} else {
+				var.u.i -= score->_castIDoffset;
+			}
+		}
+		Cast *cast = score->_loadedCast->getVal(var.u.i);
+		if (cast) {
+			switch (cast->_type) {
+			case kCastText:
+				result.type = STRING;
+				result.u.s = new Common::String(((TextCast *)cast)->_ptext);
+				break;
+			default:
+				warning("varFetch: Unhandled cast type %s", tag2str(cast->_type));
+				break;
+			}
+		}
+
+	}
+
+	return result;
+}
+
 void Lingo::codeFactory(Common::String &name) {
 	_currentFactory = name;
 
@@ -462,7 +635,7 @@ void Lingo::codeFactory(Common::String &name) {
 	sym->nargs = -1;
 	sym->maxArgs = 0;
 	sym->parens = true;
-	sym->u.bltin = g_lingo->b_factory;
+	sym->u.bltin = LB::b_factory;
 
 	_handlers[ENTITY_INDEX(_eventHandlerTypeIds[name.c_str()], _currentEntityId)] = sym;
 }

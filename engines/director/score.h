@@ -81,6 +81,8 @@ public:
 	void loadCastDataVWCR(Common::SeekableSubReadStreamEndian &stream);
 	void loadCastData(Common::SeekableSubReadStreamEndian &stream, uint16 id, Resource *res);
 	void loadCastInfo(Common::SeekableSubReadStreamEndian &stream, uint16 id);
+	void loadLingoNames(Common::SeekableSubReadStreamEndian &stream);
+	void loadLingoContext(Common::SeekableSubReadStreamEndian &stream);
 	void setCurrentFrame(uint16 frameId) { _nextFrame = frameId; }
 	uint16 getCurrentFrame() { return _currentFrame; }
 	Common::String getMacName() const { return _macName; }
@@ -102,6 +104,8 @@ public:
 	void renderZoomBox(bool redraw = false);
 	bool haveZoomBox() { return !_zoomBoxes.empty(); }
 
+	int32 getStageColor() { return _stageColor; }
+
 private:
 	void update();
 	void readVersion(uint32 rid);
@@ -109,8 +113,6 @@ private:
 	void loadFrames(Common::SeekableSubReadStreamEndian &stream);
 	void loadLabels(Common::SeekableSubReadStreamEndian &stream);
 	void loadActions(Common::SeekableSubReadStreamEndian &stream);
-	void loadLingoNames(Common::SeekableSubReadStreamEndian &stream);
-	void loadLingoContext(Common::SeekableSubReadStreamEndian &stream);
 	void loadScriptText(Common::SeekableSubReadStreamEndian &stream);
 	void loadFileInfo(Common::SeekableSubReadStreamEndian &stream);
 	void loadFontMap(Common::SeekableSubReadStreamEndian &stream);
@@ -122,9 +124,8 @@ private:
 
 public:
 	Common::Array<Frame *> _frames;
-	Common::HashMap<int, CastType> _castTypes;
 	Common::HashMap<uint16, CastInfo *> _castsInfo;
-	Common::HashMap<Common::String, int> _castsNames;
+	Common::HashMap<Common::String, int, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> _castsNames;
 	Common::SortedArray<Label *> *_labels;
 	Common::HashMap<uint16, Common::String> _actions;
 	Common::HashMap<uint16, bool> _immediateActions;
@@ -137,19 +138,18 @@ public:
 	Archive *_movieArchive;
 	Common::Rect _movieRect;
 	uint16 _currentMouseDownSpriteId;
+	bool _mouseIsDown;
 
 	bool _stopPlay;
 	uint32 _nextFrameTime;
 
-	Common::HashMap<int, ButtonCast *> *_loadedButtons;
-	Common::HashMap<int, TextCast *> *_loadedText;
-	//Common::HashMap<int, SoundCast *> _loadedSound;
-	Common::HashMap<int, BitmapCast *> *_loadedBitmaps;
-	Common::HashMap<int, ShapeCast *> *_loadedShapes;
-	Common::HashMap<int, ScriptCast *> *_loadedScripts;
+	Common::HashMap<int, Cast *> *_loadedCast;
+
 	Common::HashMap<int, const Stxt *> *_loadedStxts;
 
 	uint16 _castIDoffset;
+
+	int _numChannelsDisplayed;
 
 private:
 	uint16 _versionMinor;

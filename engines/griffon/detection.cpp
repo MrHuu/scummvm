@@ -21,6 +21,7 @@
  */
 
 #include "base/plugins.h"
+#include "common/config-manager.h"
 #include "engines/advancedDetector.h"
 
 #include "griffon/griffon.h"
@@ -39,7 +40,7 @@ static const ADGameDescription gameDescriptions[] = {
 		Common::EN_ANY,
 		Common::kPlatformWindows,
 		ADGF_UNSTABLE | ADGF_DROPPLATFORM,
-		GUIO1(GUIO_NONE)
+		GUIO1(GUIO_NOMIDI)
 	},
 
 	AD_TABLE_END_MARKER
@@ -51,35 +52,28 @@ public:
 	GriffonMetaEngine() : AdvancedMetaEngine(Griffon::gameDescriptions, sizeof(ADGameDescription), griffonGames) {
 	}
 
-	virtual const char *getEngineId() const {
+	const char *getEngineId() const override {
 		return "griffon";
 	}
 
-	virtual const char *getName() const {
+	const char *getName() const override {
 		return "Griffon Engine";
 	}
 
-	virtual int getMaximumSaveSlot() const { return 3; }
+	int getMaximumSaveSlot() const override {
+		return ConfMan.getInt("autosave_period") ? 4 : 3;
+	}
 
-	virtual const char *getOriginalCopyright() const {
+	const char *getOriginalCopyright() const override {
 		return "The Griffon Legend (c) 2005 Syn9 (Daniel Kennedy)";
 	}
 
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
-};
+	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
 
-bool GriffonMetaEngine::hasFeature(MetaEngineFeature f) const {
-	return
-		(f == kSupportsListSaves) ||
-		(f == kSupportsDeleteSave) ||
-		(f == kSavesSupportMetaInfo) ||
-		(f == kSavesSupportThumbnail) ||
-		(f == kSavesSupportCreationDate) ||
-		(f == kSavesSupportPlayTime) ||
-		(f == kSupportsLoadingDuringStartup) ||
-		(f == kSavesUseExtendedFormat);
-}
+	virtual int getAutosaveSlot() const override {
+		return 4;
+	}
+};
 
 bool Griffon::GriffonEngine::hasFeature(EngineFeature f) const {
 	return

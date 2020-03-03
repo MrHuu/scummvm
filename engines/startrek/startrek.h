@@ -63,8 +63,6 @@ class Room;
 class Console;
 
 typedef String(StarTrekEngine::*TextGetterFunc)(int, uintptr, String *);
-// FIXME: Eventually get rid of Common::SharedPtr and dispose of file streams properly
-typedef Common::SharedPtr<Common::MemoryReadStreamEndian> FileStream;
 
 const int SAVEGAME_DESCRIPTION_LEN = 30;
 
@@ -229,11 +227,11 @@ protected:
 	// startrek.cpp
 public:
 	StarTrekEngine(OSystem *syst, const StarTrekGameDescription *gamedesc);
-	virtual ~StarTrekEngine();
+	~StarTrekEngine() override;
 
 	friend class Console;
 
-	Common::Error run();
+	Common::Error run() override;
 	Common::Error runGameMode(int mode, bool resume);
 
 	// Transporter room
@@ -244,6 +242,8 @@ public:
 	void cleanupBridge() {}; // TODO
 
 	Common::MemoryReadStreamEndian *loadFile(Common::String filename, int fileIndex = 0);
+	Common::MemoryReadStreamEndian *loadBitmapFile(Common::String baseName);
+
 	/**
 	 * TODO: Figure out what the extra parameters are, and if they're important.
 	 */
@@ -366,7 +366,7 @@ public:
 	 * "renderBanAboveSprites()" redraws sprites above them if necessary.
 	 */
 	void renderBanBelowSprites();
-	void renderBan(byte *pixelDest, FileStream file);
+	void renderBan(byte *screenPixels, byte *bgPixels, int banFileIndex);
 	void renderBanAboveSprites();
 	void removeActorFromScreen(int actorIndex);
 	void actorFunc1();
@@ -477,7 +477,7 @@ public:
 	 * Draw a line of text to a standard bitmap (NOT a "TextBitmap", whose pixel array is
 	 * an array of characters, but an actual standard bitmap).
 	 */
-	void drawTextLineToBitmap(const char *text, int textLen, int x, int y, SharedPtr<Bitmap> bitmap);
+	void drawTextLineToBitmap(const char *text, int textLen, int x, int y, Bitmap *bitmap);
 
 	String centerTextboxHeader(String headerText);
 	void getTextboxHeader(String *headerTextOutput, String speakerText, int choiceIndex);
@@ -549,8 +549,6 @@ private:
 	char _textInputBuffer[TEXT_INPUT_BUFFER_SIZE];
 	int16 _textInputCursorPos;
 	char _textInputCursorChar;
-	SharedPtr<Bitmap> _textInputBitmapSkeleton;
-	SharedPtr<Bitmap> _textInputBitmap;
 	Sprite _textInputSprite;
 
 	// menu.cpp
@@ -572,7 +570,7 @@ public:
 	 * Draws or removes the outline on menu buttons when the cursor hovers on them, or leaves
 	 * them.
 	 */
-	void drawMenuButtonOutline(SharedPtr<Bitmap> bitmap, byte color);
+	void drawMenuButtonOutline(Bitmap *bitmap, byte color);
 	void showOptionsMenu(int x, int y);
 	/**
 	 * Show the "action selection" menu, ie. look, talk, etc.
@@ -706,7 +704,7 @@ public:
 
 	// ".BAN" files provide extra miscellaneous animations in the room, ie. flashing
 	// pixels on computer consoles, or fireflies in front of the screen.
-	FileStream _banFiles[MAX_BAN_FILES];
+	Common::MemoryReadStreamEndian *_banFiles[MAX_BAN_FILES];
 	uint16 _banFileOffsets[MAX_BAN_FILES];
 
 	Sprite _inventoryIconSprite;
@@ -765,7 +763,6 @@ public:
 
 	Graphics *_gfx;
 	Sound *_sound;
-	Console *_console;
 	IWFile *_iwFile;
 
 private:

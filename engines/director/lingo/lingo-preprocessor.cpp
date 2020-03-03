@@ -26,7 +26,7 @@
 namespace Director {
 
 bool isspec(char c) {
-	return strchr("-+*/%%^:,()><&[]", c) != NULL;
+	return strchr("-+*/%%^:,()><&[]=", c) != NULL;
 }
 
 static Common::String nexttok(const char *s, const char **newP = nullptr) {
@@ -56,11 +56,21 @@ static Common::String prevtok(const char *s, const char *lineStart, const char *
 
 	// Scan first non-whitespace
 	while (s >= lineStart && (*s == ' ' || *s == '\t')) // If we see a whitespace
-		s--;
+		if (s > lineStart) {
+			s--;
+		} else {
+			break;
+		}
 
 	// Now copy everything till whitespace
-	while (s >= lineStart && *s != ' ' && *s != '\t')
-		res = *s-- + res;
+	if (Common::isAlnum(*s)) {
+		// Now copy everything till whitespace
+		while (s >= lineStart && (Common::isAlnum(*s) || *s == '.'))
+			res = *s-- + res;
+	} else {
+		while (s >= lineStart && isspec(*s))
+			res = *s-- + res;
+	}
 
 	if (newP)
 		*newP = s;
@@ -83,7 +93,8 @@ Common::String Lingo::codePreprocessor(const char *s, bool simple) {
 		else if (*s)
 			res += *s;
 
-		s++;
+		if (*s)
+			s++;
 	}
 
 	Common::String tmp(res);
@@ -339,8 +350,10 @@ Common::String Lingo::preprocessReturn(Common::String in) {
 
 		next = nexttok(ptr + 6); // end of 'return'
 
-		if (prev.equals("&") || prev.equals("&&") || prev.equals("=") ||
-				next.equals("&") || next.equals("&&")) {
+		debugC(2, kDebugLingoParse, "RETURN: prevtok: %s nexttok: %s", prev.c_str(), next.c_str());
+
+		if (prev.hasSuffix("&") || prev.hasSuffix("&&") || prev.hasSuffix("=") ||
+				next.hasPrefix("&") || next.hasPrefix("&&")) {
 			res += "scummvm_"; // Turn it into scummvm_return
 		}
 

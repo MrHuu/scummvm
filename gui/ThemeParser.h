@@ -34,7 +34,7 @@ class ThemeParser : public Common::XMLParser {
 public:
 	ThemeParser(ThemeEngine *parent);
 
-	virtual ~ThemeParser();
+	~ThemeParser() override;
 
 	bool getPaletteColor(const Common::String &name, int &r, int &g, int &b) {
 		if (!_palette.contains(name))
@@ -183,13 +183,14 @@ protected:
 			XML_KEY(dialog)
 				XML_PROP(name, true)
 				XML_PROP(overlays, true)
+				XML_PROP(size, false)
 				XML_PROP(shading, false)
 				XML_PROP(enabled, false)
 				XML_PROP(resolution, false)
 				XML_PROP(inset, false)
 				XML_KEY(layout)
 					XML_PROP(type, true)
-					XML_PROP(center, false)
+					XML_PROP(align, false)
 					XML_PROP(padding, false)
 					XML_PROP(spacing, false)
 
@@ -244,11 +245,11 @@ protected:
 	bool parserCallback_space(ParserNode *node);
 	bool parserCallback_import(ParserNode *node);
 
-	bool closedKeyCallback(ParserNode *node);
+	bool closedKeyCallback(ParserNode *node) override;
 
 	bool resolutionCheck(const Common::String &resolution);
 
-	void cleanup();
+	void cleanup() override;
 
 	Graphics::DrawStep *newDrawStep();
 	Graphics::DrawStep *defaultDrawStep();

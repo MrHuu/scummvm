@@ -2580,10 +2580,10 @@ void GUI_EoB::updateBoxFrameHighLight(int box) {
 }
 
 int GUI_EoB::getTextInput(char *dest, int x, int y, int destMaxLen, int textColor1, int textColor2, int cursorColor) {
-#ifdef ENABLE_KEYMAPPER
-	Common::Keymapper *const keymapper = _vm->getEventManager()->getKeymapper();
-	keymapper->pushKeymap(Common::kGlobalKeymapName);
-#endif
+	// Disable the keymap during text input
+	Common::Keymapper *const mapper = _vm->_eventMan->getKeymapper();
+	Common::Keymap *const lolKeymap = mapper->getKeymap(EoBCoreEngine::kKeymapName);
+	lolKeymap->setEnabled(false);
 
 	uint8 cursorState = 1;
 	char sufx[3] = " \0";
@@ -2759,9 +2759,7 @@ int GUI_EoB::getTextInput(char *dest, int x, int y, int destMaxLen, int textColo
 
 	} while (_keyPressed.keycode != Common::KEYCODE_RETURN && _keyPressed.keycode != Common::KEYCODE_ESCAPE && !_vm->shouldQuit());
 
-#ifdef ENABLE_KEYMAPPER
-	keymapper->popKeymap(Common::kGlobalKeymapName);
-#endif
+	lolKeymap->setEnabled(true);
 
 	return _keyPressed.keycode == Common::KEYCODE_ESCAPE ? -1 : len;
 }

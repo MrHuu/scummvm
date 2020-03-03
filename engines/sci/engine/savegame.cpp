@@ -421,6 +421,12 @@ void EngineState::saveLoadWithSerializer(Common::Serializer &s) {
 	if (getSciVersion() >= SCI_VERSION_2) {
 		g_sci->_video32->beforeSaveLoadWithSerializer(s);
 	}
+
+	if (getSciVersion() >= SCI_VERSION_2 &&
+		s.isLoading() &&
+		g_sci->getPlatform() == Common::kPlatformMacintosh) {
+		g_sci->_gfxFrameout->deletePlanesForMacRestore();
+	}
 #endif
 
 	_segMan->saveLoadWithSerializer(s);
@@ -1190,7 +1196,7 @@ bool gamestate_save(EngineState *s, Common::WriteStream *fh, const Common::Strin
 	return true;
 }
 
-extern void showScummVMDialog(const Common::String &message);
+extern int showScummVMDialog(const Common::String& message, const char* altButton = nullptr, bool alignCenter = true);
 
 void gamestate_afterRestoreFixUp(EngineState *s, int savegameId) {
 	switch (g_sci->getGameId()) {

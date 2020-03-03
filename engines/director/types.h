@@ -42,20 +42,21 @@ enum CastType {
 };
 
 enum ScriptType {
+	kNoneScript = -1,
 	kMovieScript = 0,
 	kSpriteScript = 1,
 	kFrameScript = 2,
 	kCastScript = 3,
 	kGlobalScript = 4,
-	kNoneScript = -1,
-	kMaxScriptType = 4	// Sync with score.cpp:45, array scriptTypes[]
+	kScoreScript = 5,
+	kMaxScriptType = 5	// Sync with score.cpp:45, array scriptTypes[]
 };
 
 enum ShapeType {
-	kShapeRectangle,
-	kShapeRoundRect,
-	kShapeOval,
-	kShapeLine
+	kShapeRectangle = 1,
+	kShapeRoundRect = 2,
+	kShapeOval = 3,
+	kShapeLine = 4
 };
 
 enum TextType {
@@ -71,9 +72,9 @@ enum TextAlignType {
 };
 
 enum TextFlag {
-	kTextFlagEditable,
-	kTextFlagAutoTab,
-	kTextFlagDoNotWrap
+	kTextFlagEditable	= (1 << 0),
+	kTextFlagAutoTab	= (1 << 1),
+	kTextFlagDoNotWrap	= (1 << 2)
 };
 
 enum SizeType {
@@ -134,6 +135,104 @@ enum InkType {
 	kInkTypeSub,
 	kInkTypeDark
 };
+
+enum LEvent {
+	kEventPrepareMovie,
+	kEventStartMovie,
+	kEventStepMovie,
+	kEventStopMovie,
+
+	kEventNew,
+	kEventBeginSprite,
+	kEventEndSprite,
+
+	kEventNone,
+	kEventEnterFrame,
+	kEventPrepareFrame,
+	kEventIdle,
+	kEventStepFrame,
+	kEventExitFrame,
+	kEventTimeout,
+
+	kEventActivateWindow,
+	kEventDeactivateWindow,
+	kEventMoveWindow,
+	kEventResizeWindow,
+	kEventOpenWindow,
+	kEventCloseWindow,
+
+	kEventKeyUp,
+	kEventKeyDown,
+	kEventMouseUp,
+	kEventMouseDown,
+	kEventRightMouseUp,
+	kEventRightMouseDown,
+	kEventMouseEnter,
+	kEventMouseLeave,
+	kEventMouseUpOutSide,
+	kEventMouseWithin,
+
+	kEventStart
+};
+
+enum TransitionType {
+	kTransNone,
+	kTransWipeRight,
+	kTransWipeLeft,
+	kTransWipeDown,
+	kTransWipeUp,
+	kTransCenterOutHorizontal,
+	kTransEdgesInHorizontal,
+	kTransCenterOutVertical,
+	kTransEdgesInVertical,
+	kTransCenterOutSquare,
+	kTransEdgesInSquare,
+	kTransPushLeft,
+	kTransPushRight,
+	kTransPushDown,
+	kTransPushUp,
+	kTransRevealUp,
+	kTransRevealUpRight,
+	kTransRevealRight,
+	kTransRevealDown,
+	kTransRevealDownRight,
+	kTransRevealDownLeft,
+	kTransRevealLeft,
+	kTransRevealUpLeft,
+	kTransDissolvePixelsFast,
+	kTransDissolveBoxyRects,
+	kTransDissolveBoxySquares,
+	kTransDissolvePatterns,
+	kTransRandomRows,
+	kTransRandomColumns,
+	kTransCoverDown,
+	kTransCoverDownLeft,
+	kTransCoverDownRight,
+	kTransCoverLeft,
+	kTransCoverRight,
+	kTransCoverUp,
+	kTransCoverUpLeft,
+	kTransCoverUpRight,
+	kTransTypeVenitianBlind,
+	kTransTypeCheckerboard,
+	kTransTypeStripsBottomBuildLeft,
+	kTransTypeStripsBottomBuildRight,
+	kTransTypeStripsLeftBuildDown,
+	kTransTypeStripsLeftBuildUp,
+	kTransTypeStripsRightBuildDown,
+	kTransTypeStripsRightBuildUp,
+	kTransTypeStripsTopBuildLeft,
+	kTransTypeStripsTopBuildRight,
+	kTransZoomOpen,
+	kTransZoomClose,
+	kTransVerticalBinds,
+	kTransDissolveBitsTrans,
+	kTransDissolvePixels,
+	kTransDissolveBits
+};
+
+struct Datum;
+typedef Common::Array<Datum> DatumArray;
 
 const char *scriptType2str(ScriptType scr);
 

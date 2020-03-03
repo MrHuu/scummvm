@@ -23,9 +23,13 @@
 #include "common/config-manager.h"
 #include "common/debug-channels.h"
 #include "common/events.h"
+#include "common/gui_options.h"
 #include "common/keyboard.h"
 #include "common/translation.h"
 #include "common/system.h"
+#include "backends/keymapper/action.h"
+#include "backends/keymapper/keymapper.h"
+#include "backends/keymapper/standard-actions.h"
 #include "graphics/scaler.h"
 #include "gui/saveload.h"
 #include "gui/message.h"
@@ -67,7 +71,6 @@ MohawkEngine_Riven::MohawkEngine_Riven(OSystem *syst, const MohawkGameDescriptio
 	_sound = nullptr;
 	_rnd = nullptr;
 	_scriptMan = nullptr;
-	_console = nullptr;
 	_saveLoad = nullptr;
 	_optionsDialog = nullptr;
 	_card = nullptr;
@@ -100,7 +103,6 @@ MohawkEngine_Riven::~MohawkEngine_Riven() {
 	delete _sound;
 	delete _video;
 	delete _gfx;
-	delete _console;
 	delete _extrasFile;
 	delete _saveLoad;
 	delete _scriptMan;
@@ -109,10 +111,6 @@ MohawkEngine_Riven::~MohawkEngine_Riven() {
 	delete _rnd;
 
 	DebugMan.clearAllDebugChannels();
-}
-
-GUI::Debugger *MohawkEngine_Riven::getDebugger() {
-	return _console;
 }
 
 Common::Error MohawkEngine_Riven::run() {
@@ -134,7 +132,7 @@ Common::Error MohawkEngine_Riven::run() {
 	_gfx = new RivenGraphics(this);
 	_video = new RivenVideoManager(this);
 	_sound = new RivenSoundManager(this);
-	_console = new RivenConsole(this);
+	setDebugger(new RivenConsole(this));
 	_saveLoad = new RivenSaveLoad(this, _saveFileMan);
 	_optionsDialog = new RivenOptionsDialog();
 	_scriptMan = new RivenScriptManager(this);
@@ -218,7 +216,7 @@ void MohawkEngine_Riven::doFrame() {
 	_video->updateMovies();
 
 	if (!_scriptMan->hasQueuedScripts()) {
-		_stack->keyResetAction();
+		_stack->resetAction();
 	}
 
 	processInput();
@@ -229,10 +227,6 @@ void MohawkEngine_Riven::doFrame() {
 		// Don't run queued scripts if we are calling from a queued script
 		// otherwise infinite looping will happen.
 		_scriptMan->runQueuedScripts();
-	}
-
-	if (shouldPerformAutoSave(_lastSaveTime)) {
-		tryAutoSaving();
 	}
 
 	_inventory->onFrame();
@@ -253,84 +247,70 @@ void MohawkEngine_Riven::processInput() {
 		case Common::EVENT_MOUSEMOVE:
 			_stack->onMouseMove(event.mouse);
 			break;
-		case Common::EVENT_LBUTTONDOWN:
-			_stack->onMouseDown(_eventMan->getMousePos());
-			break;
-		case Common::EVENT_LBUTTONUP:
-			_stack->onMouseUp(_eventMan->getMousePos());
-			_inventory->checkClick(_eventMan->getMousePos());
-			break;
-		case Common::EVENT_KEYUP:
-			_stack->keyResetAction();
-			break;
-		case Common::EVENT_KEYDOWN:
-			switch (event.kbd.keycode) {
-			case Common::KEYCODE_d:
-				if (event.kbd.flags & Common::KBD_CTRL) {
-					_console->attach();
-					_console->onFrame();
-				}
+		case Common::EVENT_CUSTOM_ENGINE_ACTION_END:
+			switch ((RivenAction)event.customType) {
+			case kRivenActionInteract:
+				_stack->onMouseUp(_eventMan->getMousePos());
+				_inventory->checkClick(_eventMan->getMousePos());
 				break;
-			case Common::KEYCODE_SPACE:
+			default:
+				_stack->resetAction();
+				break;
+			}
+			break;
+		case Common::EVENT_CUSTOM_ENGINE_ACTION_START:
+			switch ((RivenAction)event.customType) {
+			case kRivenActionInteract:
+				_stack->onMouseDown(_eventMan->getMousePos());
+				break;
+			case kRivenActionPause:
 				pauseGame();
 				break;
-			case Common::KEYCODE_F5:
+			case kRivenActionOpenOptionsDialog:
 				runOptionsDialog();
 				break;
-			case Common::KEYCODE_r:
-				// Return to the main menu in the demo on ctrl+r
-				if (event.kbd.flags & Common::KBD_CTRL && getFeatures() & GF_DEMO) {
+			case kRivenActionOpenMainMenu:
+				if (getFeatures() & GF_DEMO) {
+					// Return to the main menu in the demo
 					if (_stack->getId() != kStackAspit)
 						changeToStack(kStackAspit);
 					changeToCard(1);
-				}
-				break;
-			case Common::KEYCODE_p:
-				// Play the intro videos in the demo on ctrl+p
-				if (event.kbd.flags & Common::KBD_CTRL && getFeatures() & GF_DEMO) {
-					if (_stack->getId() != kStackAspit)
-						changeToStack(kStackAspit);
-					changeToCard(6);
-				}
-				break;
-			case Common::KEYCODE_o:
-				if (event.kbd.flags & Common::KBD_CTRL) {
-					if (canLoadGameStateCurrently()) {
-						runLoadDialog();
-					}
-				}
-				break;
-			case Common::KEYCODE_s:
-				if (event.kbd.flags & Common::KBD_CTRL) {
-					if (canSaveGameStateCurrently()) {
-						runSaveDialog();
-					}
-				}
-				break;
-			case Common::KEYCODE_ESCAPE:
-				if (!_scriptMan->hasQueuedScripts() && getFeatures() & GF_25TH) {
+				} else if (!_scriptMan->hasQueuedScripts() && getFeatures() & GF_25TH) {
 					// Check if we haven't jumped to menu
 					if (_menuSavedStack == -1) {
 						goToMainMenu();
 					} else {
 						resumeFromMainMenu();
 					}
-				} else {
-					_stack->onKeyPressed(event.kbd);
+				}
+				break;
+			case kRivenActionPlayIntroVideos:
+				// Play the intro videos in the demo
+				if (getFeatures() & GF_DEMO) {
+					if (_stack->getId() != kStackAspit)
+						changeToStack(kStackAspit);
+					changeToCard(6);
+				}
+				break;
+			case kRivenActionLoadGameState:
+				if (canLoadGameStateCurrently()) {
+					runLoadDialog();
+				}
+				break;
+			case kRivenActionSaveGameState:
+				if (canSaveGameStateCurrently()) {
+					runSaveDialog();
 				}
 				break;
 			default:
-				if (event.kbdRepeat) {
-					continue;
-				}
-				_stack->onKeyPressed(event.kbd);
+				_stack->onAction((RivenAction)event.customType);
 				break;
 			}
 			break;
 		case Common::EVENT_QUIT:
 		case Common::EVENT_RTL:
 			// Attempt to autosave before exiting
-			tryAutoSaving();
+			saveAutosaveIfEnabled();
 			break;
 		default:
 			break;
@@ -739,18 +719,14 @@ void MohawkEngine_Riven::loadGameStateAndDisplayError(int slot) {
 	}
 }
 
-Common::Error MohawkEngine_Riven::saveGameState(int slot, const Common::String &desc) {
-	return saveGameState(slot, desc, false);
-}
-
-Common::Error MohawkEngine_Riven::saveGameState(int slot, const Common::String &desc, bool autosave) {
+Common::Error MohawkEngine_Riven::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	if (_menuSavedStack != -1) {
 		_vars["CurrentStackID"] = _menuSavedStack;
 		_vars["CurrentCardID"] = _menuSavedCard;
 	}
 
 	const Graphics::Surface *thumbnail = _menuSavedStack != -1 ? _menuThumbnail.get() : nullptr;
-	Common::Error error = _saveLoad->saveGame(slot, desc, thumbnail, autosave);
+	Common::Error error = _saveLoad->saveGame(slot, desc, thumbnail, isAutosave);
 
 	if (_menuSavedStack != -1) {
 		_vars["CurrentStackID"] = 1;
@@ -771,22 +747,9 @@ void MohawkEngine_Riven::saveGameStateAndDisplayError(int slot, const Common::St
 	}
 }
 
-void MohawkEngine_Riven::tryAutoSaving() {
-	if (!canSaveGameStateCurrently() || _gameEnded) {
-		return; // Can't save right now, try again on the next frame
-	}
-
-	_lastSaveTime = _system->getMillis();
-
-	if (!_saveLoad->isAutoSaveAllowed()) {
-		return; // Can't autosave ever, try again after the next autosave delay
-	}
-
-	Common::Error saveError = saveGameState(RivenSaveLoad::kAutoSaveSlot, "Autosave", true);
-	if (saveError.getCode() != Common::kNoError)
-		warning("Attempt to autosave has failed.");
+bool MohawkEngine_Riven::canSaveAutosaveCurrently() {
+	return canSaveGameStateCurrently() && !_gameEnded;
 }
-
 
 void MohawkEngine_Riven::addZipVisitedCard(uint16 cardId, uint16 cardNameId) {
 	Common::String cardName = getStack()->getName(kCardNames, cardNameId);
@@ -864,11 +827,115 @@ void MohawkEngine_Riven::runOptionsDialog() {
 
 	if (hasGameEnded()) {
 		// Attempt to autosave before exiting
-		tryAutoSaving();
+		saveAutosaveIfEnabled();
 	}
 
 	_gfx->setTransitionMode((RivenTransitionMode) _vars["transitionmode"]);
 	_card->initializeZipMode();
+}
+
+Common::KeymapArray MohawkEngine_Riven::initKeymaps(const char *target) {
+	using namespace Common;
+
+	Keymap *engineKeyMap = new Keymap(Keymap::kKeymapTypeGame, "riven", "Riven");
+
+	Action *act;
+
+	if (checkGameGUIOption(GAMEOPTION_25TH, ConfMan.get("guioptions", target))) {
+		act = new Action(kStandardActionOpenMainMenu, _("Open main menu"));
+		act->setCustomEngineActionEvent(kRivenActionOpenMainMenu);
+		act->addDefaultInputMapping("ESCAPE");
+		act->addDefaultInputMapping("JOY_X");
+		engineKeyMap->addAction(act);
+	}
+
+	act = new Action(kStandardActionSkip, _("Skip"));
+	act->setCustomEngineActionEvent(kRivenActionSkip);
+	act->addDefaultInputMapping("ESCAPE");
+	act->addDefaultInputMapping("JOY_Y");
+	engineKeyMap->addAction(act);
+
+	act = new Action(kStandardActionInteract, _("Interact"));
+	act->setCustomEngineActionEvent(kRivenActionInteract);
+	act->addDefaultInputMapping("MOUSE_LEFT");
+	act->addDefaultInputMapping("JOY_A");
+	engineKeyMap->addAction(act);
+
+	act = new Action(kStandardActionLoad, _("Load game state"));
+	act->setCustomEngineActionEvent(kRivenActionLoadGameState);
+	act->addDefaultInputMapping("C+o");
+	engineKeyMap->addAction(act);
+
+	act = new Action(kStandardActionSave, _("Save game state"));
+	act->setCustomEngineActionEvent(kRivenActionSaveGameState);
+	act->addDefaultInputMapping("C+s");
+	engineKeyMap->addAction(act);
+
+	act = new Action(kStandardActionOpenSettings, _("Show options menu"));
+	act->setCustomEngineActionEvent(kRivenActionOpenOptionsDialog);
+	act->addDefaultInputMapping("F5");
+	engineKeyMap->addAction(act);
+
+	act = new Action(kStandardActionPause, _("Pause"));
+	act->setCustomEngineActionEvent(kRivenActionPause);
+	act->addDefaultInputMapping("SPACE");
+	engineKeyMap->addAction(act);
+
+	act = new Action(kStandardActionMoveUp, _("Move forward"));
+	act->setCustomEngineActionEvent(kRivenActionMoveForward);
+	act->addDefaultInputMapping("UP");
+	act->addDefaultInputMapping("JOY_UP");
+	engineKeyMap->addAction(act);
+
+	act = new Action("FWDL", _("Move forward left"));
+	act->setCustomEngineActionEvent(kRivenActionMoveForwardLeft);
+	engineKeyMap->addAction(act);
+
+	act = new Action("FWDR", _("Move forward right"));
+	act->setCustomEngineActionEvent(kRivenActionMoveForwardRight);
+	engineKeyMap->addAction(act);
+
+	act = new Action(kStandardActionMoveDown, _("Move backwards"));
+	act->setCustomEngineActionEvent(kRivenActionMoveBack);
+	act->addDefaultInputMapping("DOWN");
+	act->addDefaultInputMapping("JOY_DOWN");
+	engineKeyMap->addAction(act);
+
+	act = new Action(kStandardActionMoveLeft, _("Turn left"));
+	act->setCustomEngineActionEvent(kRivenActionMoveLeft);
+	act->addDefaultInputMapping("LEFT");
+	act->addDefaultInputMapping("JOY_LEFT");
+	engineKeyMap->addAction(act);
+
+	act = new Action(kStandardActionMoveRight, _("Turn right"));
+	act->setCustomEngineActionEvent(kRivenActionMoveRight);
+	act->addDefaultInputMapping("RIGHT");
+	act->addDefaultInputMapping("JOY_RIGHT");
+	engineKeyMap->addAction(act);
+
+	act = new Action("LKUP", _("Look up"));
+	act->setCustomEngineActionEvent(kRivenActionLookUp);
+	act->addDefaultInputMapping("PAGEUP");
+	engineKeyMap->addAction(act);
+
+	act = new Action("LKDN", _("Look down"));
+	act->setCustomEngineActionEvent(kRivenActionLookDown);
+	act->addDefaultInputMapping("PAGEDOWN");
+	engineKeyMap->addAction(act);
+
+	if (checkGameGUIOption(GAMEOPTION_DEMO, ConfMan.get("guioptions", target))) {
+		act = new Action(kStandardActionOpenMainMenu, _("Return to main menu"));
+		act->setCustomEngineActionEvent(kRivenActionOpenMainMenu);
+		act->addDefaultInputMapping("C+r");
+		engineKeyMap->addAction(act);
+
+		act = new Action("INTV", _("Play intro videos"));
+		act->setCustomEngineActionEvent(kRivenActionPlayIntroVideos);
+		act->addDefaultInputMapping("C+p");
+		engineKeyMap->addAction(act);
+	}
+
+	return Keymap::arrayOf(engineKeyMap);
 }
 
 bool ZipMode::operator== (const ZipMode &z) const {

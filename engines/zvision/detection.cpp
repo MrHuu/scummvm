@@ -63,24 +63,24 @@ public:
 		_directoryGlobs = ZVision::directoryGlobs;
 	}
 
-	const char *getEngineId() const {
+	const char *getEngineId() const override {
 		return "zvision";
 	}
 
-	virtual const char *getName() const {
+	const char *getName() const override {
 		return "Z-Vision";
 	}
 
-	virtual const char *getOriginalCopyright() const {
+	const char *getOriginalCopyright() const override {
 		return "Z-Vision (C) 1996 Activision";
 	}
 
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
-	SaveStateList listSaves(const char *target) const;
-	virtual int getMaximumSaveSlot() const;
-	void removeSaveState(const char *target, int slot) const;
-	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const;
+	bool hasFeature(MetaEngineFeature f) const override;
+	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	SaveStateList listSaves(const char *target) const override;
+	int getMaximumSaveSlot() const override;
+	void removeSaveState(const char *target, int slot) const override;
+	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
 };
 
 bool ZVisionMetaEngine::hasFeature(MetaEngineFeature f) const {
@@ -106,7 +106,7 @@ Common::Error ZVision::ZVision::loadGameState(int slot) {
 	return _saveManager->loadGame(slot);
 }
 
-Common::Error ZVision::ZVision::saveGameState(int slot, const Common::String &desc) {
+Common::Error ZVision::ZVision::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	_saveManager->saveGame(slot, desc, false);
 	return Common::kNoError;
 }

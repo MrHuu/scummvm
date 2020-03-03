@@ -71,6 +71,7 @@ bool DirectorEngine::hasFeature(EngineFeature f) const {
 static const PlainGameDescriptor directorGames[] = {
 	{ "director",	"Macromedia Director Game" },
 	{ "directortest",	"Macromedia Director Test Target" },
+	{ "directortest-all",	"Macromedia Director All Movies Test Target" },
 	{ "theapartment",	"The Apartment, Interactive demo" },
 	{ "gundam0079",	"Gundam 0079: The War for Earth" },
 	{ "jewels",		"Jewels of the Oracle" },
@@ -113,20 +114,20 @@ public:
 		_directoryGlobs = directoryGlobs;
 	}
 
-	virtual const char *getEngineId() const {
+	const char *getEngineId() const override {
 		return "director";
 	}
 
-	virtual const char *getName() const {
+	const char *getName() const override {
 		return "Macromedia Director";
 	}
 
-	virtual const char *getOriginalCopyright() const {
-		return "Macromedia Director (C) Macromedia";
+	const char *getOriginalCopyright() const override {
+		return "Macromedia Director (C) 1990-1995 Macromedia";
 	}
 
 	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const override;
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
+	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
 };
 
 bool DirectorMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {

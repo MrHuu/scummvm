@@ -331,10 +331,10 @@ enum {
 class GriffonEngine : public Engine {
 public:
 	GriffonEngine(OSystem *syst);
-	~GriffonEngine();
+	~GriffonEngine() override;
 
-	virtual Common::Error run();
-	virtual void syncSoundSettings();
+	Common::Error run() override;
+	void syncSoundSettings() override;
 
 private:
 	Common::RandomSource *_rnd;
@@ -413,10 +413,12 @@ private:
 	void loadObjectDB();
 
 	// saveload.cpp
-	Common::String makeSaveGameName(int slot);
-	int loadState(int slotnum);
+	Common::String getSaveStateName(int slot) const override;
 	int loadPlayer(int slotnum);
-	int saveState(int slotnum);
+	Common::Error loadGameState(int slot) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	Common::Error loadGameStream(Common::SeekableReadStream *file) override;
+	Common::Error saveGameStream(Common::WriteStream *file, bool isAutosave) override;
 
 	// sound.cpp
 	void setChannelVolume(int channel, int volume);
@@ -429,16 +431,10 @@ private:
 	void setupAudio();
 	void updateMusic();
 
-	Common::Error loadGameState(int slot) {
-		return loadState(slot) ? Common::kNoError : Common::kUnknownError;
-	}
-	Common::Error saveGameState(int slot, const Common::String &description) {
-		return saveState(slot) ? Common::kNoError : Common::kUnknownError;
-	}
-
-	virtual bool canLoadGameStateCurrently() { return true; }
-	virtual bool canSaveGameStateCurrently() { return _gameMode == kGameModePlay; }
-	virtual bool hasFeature(EngineFeature f) const;
+	bool canLoadGameStateCurrently() override { return true; }
+	bool canSaveGameStateCurrently() override { return _gameMode == kGameModePlay; }
+	int getAutosaveSlot() const override { return 4; }
+	bool hasFeature(EngineFeature f) const override;
 
 private:
 	Graphics::TransparentSurface *_video, *_videoBuffer, *_videoBuffer2, *_videoBuffer3;

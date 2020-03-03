@@ -132,24 +132,24 @@ public:
 	FullpipeMetaEngine() : AdvancedMetaEngine(Fullpipe::gameDescriptions, sizeof(ADGameDescription), fullpipeGames) {
 	}
 
-	const char *getEngineId() const {
+	const char *getEngineId() const override {
 		return "fullpipe";
 	}
 
-	virtual const char *getName() const {
+	const char *getName() const override {
 		return "Full Pipe";
 	}
 
-	virtual const char *getOriginalCopyright() const {
+	const char *getOriginalCopyright() const override {
 		return "Full Pipe (C) Pipe Studio";
 	}
 
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual int getMaximumSaveSlot() const { return 99; }
-	virtual SaveStateList listSaves(const char *target) const;
-	virtual void removeSaveState(const char *target, int slot) const;
-	virtual SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const;
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
+	bool hasFeature(MetaEngineFeature f) const override;
+	int getMaximumSaveSlot() const override { return 99; }
+	SaveStateList listSaves(const char *target) const override;
+	void removeSaveState(const char *target, int slot) const override;
+	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
+	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
 };
 
 bool FullpipeMetaEngine::hasFeature(MetaEngineFeature f) const {

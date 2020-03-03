@@ -70,6 +70,7 @@
 #include "sci/graphics/controls32.h"
 #include "sci/graphics/cursor32.h"
 #include "sci/graphics/frameout.h"
+#include "sci/graphics/maccursor32.h"
 #include "sci/graphics/palette32.h"
 #include "sci/graphics/remap32.h"
 #include "sci/graphics/text32.h"
@@ -129,7 +130,7 @@ SciEngine::SciEngine(OSystem *syst, const ADGameDescription *desc, SciGameId gam
 	DebugMan.addDebugChannel(kDebugLevelDclInflate, "DCL", "DCL inflate debugging");
 	DebugMan.addDebugChannel(kDebugLevelVM, "VM", "VM debugging");
 	DebugMan.addDebugChannel(kDebugLevelScripts, "Scripts", "Notifies when scripts are unloaded");
-	DebugMan.addDebugChannel(kDebugLevelScriptPatcher, "ScriptPatcher", "Notifies when scripts are patched");
+	DebugMan.addDebugChannel(kDebugLevelPatcher, "Patcher", "Notifies when scripts or resources are patched");
 	DebugMan.addDebugChannel(kDebugLevelWorkarounds, "Workarounds", "Notifies when workarounds are triggered");
 	DebugMan.addDebugChannel(kDebugLevelVideo, "Video", "Video (SEQ, VMD, RBT) debugging");
 	DebugMan.addDebugChannel(kDebugLevelGame, "Game", "Debug calls from game scripts");
@@ -239,7 +240,7 @@ SciEngine::~SciEngine() {
 	delete _soundCmd;
 	delete _kernel;
 	delete _vocabulary;
-	delete _console;
+	//_console deleted by Engine
 	delete _guestAdditions;
 	delete _features;
 	delete _gfxMacIconBar;
@@ -255,7 +256,7 @@ SciEngine::~SciEngine() {
 	g_sci = 0;
 }
 
-extern void showScummVMDialog(const Common::String &message);
+extern int showScummVMDialog(const Common::String& message, const char* altButton = nullptr, bool alignCenter = true);
 
 Common::Error SciEngine::run() {
 	_resMan = new ResourceManager();
@@ -330,6 +331,7 @@ Common::Error SciEngine::run() {
 
 	// Create debugger console. It requires GFX and _gamestate to be initialized
 	_console = new Console(this);
+	setDebugger(_console);
 
 	// The game needs to be initialized before the graphics system is initialized, as
 	// the graphics code checks parts of the seg manager upon initialization (e.g. for
@@ -433,6 +435,10 @@ Common::Error SciEngine::run() {
 		                  "having unexpected errors and/or issues later on."));
 	}
 
+	if (getGameId() == GID_GK2 && ConfMan.getBool("subtitles") && !_resMan->testResource(ResourceId(kResourceTypeSync, 10))) {
+		suggestDownloadGK2SubTitlesPatch();
+	}
+
 	runGame();
 
 	ConfMan.flushToDisk();
@@ -501,6 +507,36 @@ bool SciEngine::gameHasFanMadePatch() {
 	}
 
 	return false;
+}
+
+void SciEngine::suggestDownloadGK2SubTitlesPatch() {
+	const char* altButton;
+	Common::String downloadMessage;
+
+	if (g_system->hasFeature(OSystem::kFeatureOpenUrl)) {
+		altButton = _("Download patch");
+		downloadMessage = _("(or click 'Download patch' button. But note - it only downloads, you will have to continue from there)\n");
+	}
+	else {
+		altButton = nullptr;
+		downloadMessage = "";
+	}
+
+	int result = showScummVMDialog(_("GK2 has a fan made subtitles, available thanks to the good persons at SierraHelp.\n\n"
+		"Installation:\n"
+		"- download http://www.sierrahelp.com/Files/Patches/GabrielKnight/GK2Subtitles.zip\n" +
+		downloadMessage +
+		"- extract zip file\n"
+		"- no need to run the .exe file\n"
+		"- extract the .exe file with a file archiver, like 7-zip\n"
+		"- create a PATCHES subdirectory inside your GK2 directory\n"
+		"- copy the content of GK2Subtitles\\SUBPATCH to the PATCHES subdirectory\n"
+		"- replace files with similar names\n"
+		"- restart the game\n"), altButton, false);
+	if (!result) {
+		char url[] = "http://www.sierrahelp.com/Files/Patches/GabrielKnight/GK2Subtitles.zip";
+		g_system->openUrl(url);
+	}
 }
 
 bool SciEngine::initGame() {
@@ -602,7 +638,11 @@ void SciEngine::initGraphics() {
 #ifdef ENABLE_SCI32
 	if (getSciVersion() >= SCI_VERSION_2) {
 		// SCI32 graphic objects creation
-		_gfxCursor32 = new GfxCursor32();
+		if (g_sci->getPlatform() == Common::kPlatformMacintosh && _resMan->hasResourceType(kResourceTypeCursor)) {
+			_gfxCursor32 = new GfxMacCursor32();
+		} else {
+			_gfxCursor32 = new GfxCursor32();
+		}
 		_gfxCompare = new GfxCompare(_gamestate->_segMan, _gfxCache, nullptr, _gfxCoordAdjuster);
 		_gfxPaint32 = new GfxPaint32(_gamestate->_segMan);
 		_gfxTransitions32 = new GfxTransitions32(_gamestate->_segMan);
@@ -718,8 +758,8 @@ void SciEngine::exitGame() {
 	_gamestate->_fileHandles.resize(5);
 }
 
-// Invoked by error() when a severe error occurs
-GUI::Debugger *SciEngine::getDebugger() {
+// Invoked by debugger when a severe error occurs
+void SciEngine::severeError() {
 	if (_gamestate) {
 		ExecStack *xs = &(_gamestate->_executionStack.back());
 		if (xs) {
@@ -730,11 +770,8 @@ GUI::Debugger *SciEngine::getDebugger() {
 
 	_debugState.runningStep = 0; // Stop multiple execution
 	_debugState.seeking = kDebugSeekNothing; // Stop special seeks
-
-	return _console;
 }
 
-// Used to obtain the engine's console in order to print messages to it
 Console *SciEngine::getSciDebugger() {
 	return _console;
 }
@@ -783,6 +820,14 @@ bool SciEngine::hasParser() const {
 bool SciEngine::hasMacIconBar() const {
 	return _resMan->isSci11Mac() && getSciVersion() == SCI_VERSION_1_1 &&
 			(getGameId() == GID_KQ6 || getGameId() == GID_FREDDYPHARKAS);
+}
+
+bool SciEngine::hasMacSaveRestoreDialogs() const {
+    return _gameDescription->platform == Common::kPlatformMacintosh &&
+			(getSciVersion() <= SCI_VERSION_2_1_EARLY ||
+			 getGameId() == GID_GK2 ||
+			 getGameId() == GID_SQ6 ||
+			 getGameId() == GID_LIGHTHOUSE);
 }
 
 Common::String SciEngine::getSavegameName(int nr) const {

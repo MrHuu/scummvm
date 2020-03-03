@@ -52,107 +52,12 @@ static inline T scalef(T in, float numerator, float denominator) {
 
 static const int kQueuedInputEventDelay = 50;
 
-void OSystem_Android::setupKeymapper() {
-#ifdef ENABLE_KEYMAPPER
-	using namespace Common;
-
-	Keymapper *mapper = getEventManager()->getKeymapper();
-
-	HardwareInputSet *inputSet = new HardwareInputSet();
-
-	keySet->addHardwareInput(
-		new HardwareInput("n", KeyState(KEYCODE_n), "n (vk)"));
-
-	mapper->registerHardwareInputSet(inputSet);
-
-	Keymap *globalMap = new Keymap(kGlobalKeymapName);
-	Action *act;
-
-	act = new Action(globalMap, "VIRT", "Display keyboard");
-	act->addKeyEvent(KeyState(KEYCODE_F7, ASCII_F7, KBD_CTRL));
-
-	mapper->addGlobalKeymap(globalMap);
-
-	mapper->pushKeymap(kGlobalKeymapName);
-#endif
-}
-
 void OSystem_Android::pushEvent(int type, int arg1, int arg2, int arg3,
 								int arg4, int arg5, int arg6) {
 	Common::Event e;
 
 	switch (type) {
 	case JE_SYS_KEY:
-		switch (arg1) {
-		case JACTION_DOWN:
-			e.type = Common::EVENT_KEYDOWN;
-			break;
-		case JACTION_UP:
-			e.type = Common::EVENT_KEYUP;
-			break;
-		default:
-			LOGE("unhandled jaction on system key: %d", arg1);
-			return;
-		}
-
-		switch (arg2) {
-
-		// special case. we'll only get its key-up event
-		case JKEYCODE_BACK:
-			if (_swap_menu_and_back) {
-				e.type = Common::EVENT_MAINMENU;
-				pushEvent(e);
-			} else {
-				e.kbd.keycode = Common::KEYCODE_ESCAPE;
-				e.kbd.ascii = Common::ASCII_ESCAPE;
-				pushKeyPressEvent(e);
-			}
-			return;
-
-		// special case. we'll only get its key-up event
-		case JKEYCODE_MENU:
-			if (_swap_menu_and_back) {
-				e.kbd.keycode = Common::KEYCODE_ESCAPE;
-				e.kbd.ascii = Common::ASCII_ESCAPE;
-				pushKeyPressEvent(e);
-			} else {
-				e.type = Common::EVENT_MAINMENU;
-				pushEvent(e);
-			}
-
-			return;
-
-		case JKEYCODE_MEDIA_PAUSE:
-		case JKEYCODE_MEDIA_PLAY:
-		case JKEYCODE_MEDIA_PLAY_PAUSE:
-			if (arg1 == JACTION_DOWN) {
-				e.type = Common::EVENT_MAINMENU;
-
-				pushEvent(e);
-			}
-
-			return;
-
-		case JKEYCODE_CAMERA:
-		case JKEYCODE_SEARCH:
-			if (arg1 == JACTION_DOWN)
-				e.type = Common::EVENT_RBUTTONDOWN;
-			else
-				e.type = Common::EVENT_RBUTTONUP;
-
-			e.mouse = dynamic_cast<AndroidGraphicsManager *>(_graphicsManager)->getMousePosition();
-
-			pushEvent(e);
-
-			return;
-
-		default:
-			LOGW("unmapped system key: %d", arg2);
-			return;
-		}
-
-		break;
-
 	case JE_KEY:
 		switch (arg1) {
 		case JACTION_DOWN:
@@ -730,15 +635,6 @@ bool OSystem_Android::pollEvent(Common::Event &event) {
 
 void OSystem_Android::pushEvent(const Common::Event &event) {
 	lockMutex(_event_queue_lock);
-	_event_queue.push(event);
-	unlockMutex(_event_queue_lock);
-}
-
-void OSystem_Android::pushKeyPressEvent(Common::Event &event) {
-	lockMutex(_event_queue_lock);
-	event.type = Common::EVENT_KEYDOWN;
-	_event_queue.push(event);
-	event.type = Common::EVENT_KEYUP;
 	_event_queue.push(event);
 	unlockMutex(_event_queue_lock);
 }

@@ -2559,10 +2559,10 @@ int GUI_LoL::getInput() {
 	if (!_displayMenu)
 		return 0;
 
-#ifdef ENABLE_KEYMAPPER
-	Common::Keymapper *const keymapper = _vm->getEventManager()->getKeymapper();
-	keymapper->pushKeymap(Common::kGlobalKeymapName);
-#endif
+	// Disable the keymap during text input
+	Common::Keymapper *const mapper = _vm->_eventMan->getKeymapper();
+	Common::Keymap *const lolKeymap = mapper->getKeymap(LoLEngine::kKeymapName);
+	lolKeymap->setEnabled(false);
 
 	Common::Point p = _vm->getMousePos();
 	_vm->_mouseX = p.x;
@@ -2601,9 +2601,7 @@ int GUI_LoL::getInput() {
 
 	_vm->delay(8);
 
-#ifdef ENABLE_KEYMAPPER
-	keymapper->popKeymap(Common::kGlobalKeymapName);
-#endif
+	lolKeymap->setEnabled(true);
 
 	return inputFlag & 0x8000 ? 1 : 0;
 }

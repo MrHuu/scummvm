@@ -41,6 +41,7 @@
 
 #include "backends/events/default/default-events.h"
 #include "backends/events/sdl/sdl-events.h"
+#include "backends/keymapper/hardware-input.h"
 #include "backends/mutex/sdl/sdl-mutex.h"
 #include "backends/timer/sdl/sdl-timer.h"
 #include "backends/graphics/surfacesdl/surfacesdl-graphics.h"
@@ -206,9 +207,9 @@ void OSystem_SDL::initBackend() {
 
 	if (_eventManager == nullptr) {
 		DefaultEventManager *eventManager = new DefaultEventManager(_eventSource);
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-		// SDL 2 generates its own keyboard repeat events.
-		eventManager->setGenerateKeyRepeatEvents(false);
+#if !SDL_VERSION_ATLEAST(2, 0, 0)
+		// SDL 1 does not generate its own keyboard repeat events.
+		eventManager->setGenerateKeyRepeatEvents(true);
 #endif
 		_eventManager = eventManager;
 	}
@@ -389,6 +390,29 @@ void OSystem_SDL::fatalError() {
 	exit(1);
 }
 
+Common::KeymapArray OSystem_SDL::getGlobalKeymaps() {
+	Common::KeymapArray globalMaps = ModularBackend::getGlobalKeymaps();
+
+	SdlGraphicsManager *graphicsManager = dynamic_cast<SdlGraphicsManager *>(_graphicsManager);
+	globalMaps.push_back(graphicsManager->getKeymap());
+
+	return globalMaps;
+}
+
+Common::HardwareInputSet *OSystem_SDL::getHardwareInputSet() {
+	using namespace Common;
+
+	CompositeHardwareInputSet *inputSet = new CompositeHardwareInputSet();
+	inputSet->addHardwareInputSet(new MouseHardwareInputSet(defaultMouseButtons));
+	inputSet->addHardwareInputSet(new KeyboardHardwareInputSet(defaultKeys, defaultModifiers));
+
+	bool joystickSupportEnabled = ConfMan.getInt("joystick_num") >= 0;
+	if (joystickSupportEnabled) {
+		inputSet->addHardwareInputSet(new JoystickHardwareInputSet(defaultJoystickButtons, defaultJoystickAxes));
+	}
+
+	return inputSet;
+}
 
 void OSystem_SDL::logMessage(LogMessageType::Type type, const char *message) {
 	// First log to stdout/stderr

@@ -27,7 +27,8 @@ namespace Director {
 
 enum TheEntityType {
 	kTheNOEntity = 0,
-	kTheActorList = 1,
+	kTheObject = 1,
+	kTheActorList = 2,
 	kTheBeepOn,
 	kTheButtonStyle,
 	kTheCast,
@@ -52,6 +53,7 @@ enum TheEntityType {
 	kTheFrameLabel,
 	kTheFramePalette,
 	kTheFrameScript,
+	kTheFrameTempo,
 	kTheFreeBlock,
 	kTheFreeBytes,
 	kTheFullColorPermit,
@@ -98,6 +100,7 @@ enum TheEntityType {
 	kThePathName,
 	kThePauseState,
 	kThePerFrameHook,
+	kThePi,
 	kThePreloadEventAbort,
 	kThePreLoadRAM,
 	kTheQuickTimePresent,
@@ -112,6 +115,7 @@ enum TheEntityType {
 	kTheSelEnd,
 	kTheSelStart,
 	kTheShiftDown,
+	kTheSoundEntity,
 	kTheSoundEnabled,
 	kTheSoundLevel,
 	kTheSprite,
@@ -139,7 +143,8 @@ enum TheEntityType {
 	kTheUpdateMovieEnabled,
 	kTheWindow,
 	kTheWindowList,
-	kTheWords
+	kTheWords,
+	kTheMaxTheEntityType		// This must be always last
 };
 
 enum TheFieldType {
@@ -173,6 +178,7 @@ enum TheFieldType {
 	kTheLeft,
 	kTheLineSize,
 	kTheLoaded,
+	kTheLoc,
 	kTheLocH,
 	kTheLocV,
 	kTheLong,
@@ -218,22 +224,26 @@ enum TheFieldType {
 	kTheTrails,
 	kTheType,
 	kTheVideo,
+	kTheVisibility,
 	kTheVisible,
 	kTheVolume,
 	kTheWidth,
-	kTheWindowType
+	kTheWindowType,
+	kTheMaxTheFieldType		// This must be always last
 };
 
 struct TheEntity {
 	TheEntityType entity;
 	const char *name;
 	bool hasId;
+	int version;
 };
 
 struct TheEntityField {
 	TheEntityType entity;
 	const char *name;
 	TheFieldType field;
+	int version;
 };
 
 } // End of namespace Director

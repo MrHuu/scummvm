@@ -53,6 +53,7 @@ public:
 	virtual void close();
 
 	Common::String getFileName() const { return _fileName; }
+	void setFileName(const Common::String &name) { _fileName = name; }
 
 	bool isOpen() const { return _stream != 0; }
 
@@ -82,12 +83,12 @@ protected:
 class MacArchive : public Archive {
 public:
 	MacArchive();
-	~MacArchive();
+	~MacArchive() override;
 
-	void close();
-	bool openFile(const Common::String &fileName);
-	bool openStream(Common::SeekableReadStream *stream, uint32 startOffset = 0);
-	Common::SeekableSubReadStreamEndian *getResource(uint32 tag, uint16 id);
+	void close() override;
+	bool openFile(const Common::String &fileName) override;
+	bool openStream(Common::SeekableReadStream *stream, uint32 startOffset = 0) override;
+	Common::SeekableSubReadStreamEndian *getResource(uint32 tag, uint16 id) override;
 
 private:
 	Common::MacResManager *_resFork;
@@ -96,10 +97,10 @@ private:
 class RIFFArchive : public Archive {
 public:
 	RIFFArchive() : Archive() { _startOffset = 0; }
-	~RIFFArchive() {}
+	~RIFFArchive() override {}
 
-	bool openStream(Common::SeekableReadStream *stream, uint32 startOffset = 0);
-	Common::SeekableSubReadStreamEndian *getResource(uint32 tag, uint16 id);
+	bool openStream(Common::SeekableReadStream *stream, uint32 startOffset = 0) override;
+	Common::SeekableSubReadStreamEndian *getResource(uint32 tag, uint16 id) override;
 
 	uint32 _startOffset;
 };
@@ -107,11 +108,11 @@ public:
 class RIFXArchive : public Archive {
 public:
 	RIFXArchive() : Archive(){ _isBigEndian = true; }
-	~RIFXArchive() {}
+	~RIFXArchive() override {}
 
-	bool openStream(Common::SeekableReadStream *stream, uint32 startOffset = 0);
-	Common::SeekableSubReadStreamEndian *getResource(uint32 tag, uint16 id);
-	Resource getResourceDetail(uint32 tag, uint16 id);
+	bool openStream(Common::SeekableReadStream *stream, uint32 startOffset = 0) override;
+	Common::SeekableSubReadStreamEndian *getResource(uint32 tag, uint16 id) override;
+	Resource getResourceDetail(uint32 tag, uint16 id) override;
 };
 
 } // End of namespace Director

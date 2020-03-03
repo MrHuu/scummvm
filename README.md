@@ -140,7 +140,7 @@ its name to ScummVM ('VM' meaning Virtual Machine).
 
 Over time support for a lot of non-SCUMM games has been added, and
 ScummVM now also supports many of Sierra's AGI and SCI games (such as
-King's Quest 1-6, Space Quest 1-5, ...), Discworld 1 and 2, Simon the
+King's Quest 1-7, Space Quest 1-6, ...), Discworld 1 and 2, Simon the
 Sorcerer 1 and 2, Beneath A Steel Sky, Lure of the Temptress, Broken
 Sword I and II, Flight of the Amazon Queen, Gobliiins 1-3, The Legend of
 Kyrandia series, many of Humongous Entertainment's children's SCUMM
@@ -378,6 +378,7 @@ supported games can be found here:
 | Quest for Glory 1                          | \[qfg1vga\]          |
 | Quest for Glory 2                          | \[qfg2\]             |
 | Quest for Glory 3                          | \[qfg3\]             |
+| Quest for Glory 4                          | \[qfg4\]             |
 | RAMA                                       | \[rama\]             |
 | Slater & Charlie Go Camping                | \[slater\]           |
 | Shivers                                    | \[shivers\]          |
@@ -1427,6 +1428,8 @@ arguments -- see the next section.
                               supported by some MIDI drivers)
     --multi-midi             Enable combination of AdLib and native MIDI
     --native-mt32            True Roland MT-32 (disable GM emulation)
+    --dump-midi              Dumps MIDI events to 'dump.mid', until quitting from game
+                              (if file already exists, it will be overwritten)
     --enable-gs              Enable Roland GS mode for MIDI playback
     --output-rate=RATE       Select output sample rate in Hz (e.g. 22050)
     --opl-driver=DRIVER      Select AdLib (OPL) emulator (db, mame, nuked)
@@ -1618,6 +1621,9 @@ games and other games.
     Enter                  - Simulate left mouse button press
     Tab                    - Simulate right mouse button press
 
+  AGI/SCI (Sierra):
+    Ctrl-Shift-d           - Starts the debugger
+
   Beneath a Steel Sky:
     Ctrl-d                 - Starts the debugger
     Ctrl-f                 - Toggle fast mode
@@ -1750,6 +1756,8 @@ games and other games.
     Period (.)             - starmap move backward
     l                      - starmap lock coordinate
     d                      - starmap unlock coordinate
+	b                      - starmap show boundary sphere
+	c                      - starmap show constellations sphere
 
   The Feeble Files:
     Ctrl-d                 - Starts the debugger

@@ -25,7 +25,7 @@
 #include "kyra/engine/kyra_rpg.h"
 #include "kyra/resource/resource.h"
 #include "kyra/sound/sound_intern.h"
-#include "kyra/sound/sound_adlib.h"
+#include "kyra/sound/sound_pc_v1.h"
 #include "kyra/script/script_eob.h"
 #include "kyra/engine/timer.h"
 #include "kyra/gui/debugger.h"
@@ -35,6 +35,7 @@
 
 #include "gui/error.h"
 
+#include "backends/keymapper/action.h"
 #include "backends/keymapper/keymapper.h"
 
 namespace Kyra {
@@ -47,7 +48,6 @@ EoBCoreEngine::EoBCoreEngine(OSystem *system, const GameFlags &flags) : KyraRpgE
 
 	_screen = 0;
 	_gui = 0;
-	_debugger = 0;
 
 	_playFinale = false;
 	_runFlag = true;
@@ -336,54 +336,48 @@ EoBCoreEngine::~EoBCoreEngine() {
 	_inf = 0;
 	delete _timer;
 	_timer = 0;
-	delete _debugger;
-	_debugger = 0;
 	delete _txt;
 	_txt = 0;
 }
 
-void EoBCoreEngine::initKeymap() {
-#ifdef ENABLE_KEYMAPPER
-	Common::Keymapper *const mapper = _eventMan->getKeymapper();
-
-	// Do not try to recreate same keymap over again
-	if (mapper->getKeymap(kKeymapName) != 0)
-		return;
-
-	Common::Keymap *const engineKeyMap = new Common::Keymap(kKeymapName);
+Common::KeymapArray EoBCoreEngine::initKeymaps(const Common::String &gameId) {
+	Common::Keymap *const engineKeyMap = new Common::Keymap(Common::Keymap::kKeymapTypeGame, kKeymapName, "Eye of the Beholder");
 
 	const Common::KeyActionEntry keyActionEntries[] = {
-		{ Common::KeyState(Common::KEYCODE_UP), "MVF", _("Move Forward") },
-		{ Common::KeyState(Common::KEYCODE_DOWN), "MVB", _("Move Back") },
-		{ Common::KeyState(Common::KEYCODE_LEFT), "MVL", _("Move Left") },
-		{ Common::KeyState(Common::KEYCODE_RIGHT), "MVR", _("Move Right") },
-		{ Common::KeyState(Common::KEYCODE_HOME), "TL", _("Turn Left") },
-		{ Common::KeyState(Common::KEYCODE_PAGEUP), "TR", _("Turn Right") },
-		{ Common::KeyState(Common::KEYCODE_i), "INV", _("Open/Close Inventory") },
-		{ Common::KeyState(Common::KEYCODE_p), "SCE", _("Switch Inventory/Character screen") },
-		{ Common::KeyState(Common::KEYCODE_c), "CMP", _("Camp") },
-		{ Common::KeyState(Common::KEYCODE_SPACE), "CSP", _("Cast Spell") },
+		{ "MVF", Common::KEYCODE_UP,     "UP",     _("Move Forward")                      },
+		{ "MVB", Common::KEYCODE_DOWN,   "DOWN",   _("Move Back")                         },
+		{ "MVL", Common::KEYCODE_LEFT,   "LEFT",   _("Move Left")                         },
+		{ "MVR", Common::KEYCODE_RIGHT,  "RIGHT",  _("Move Right")                        },
+		{ "TL",  Common::KEYCODE_HOME,   "HOME",   _("Turn Left")                         },
+		{ "TR",  Common::KEYCODE_PAGEUP, "PAGEUP", _("Turn Right")                        },
+		{ "INV", Common::KEYCODE_i,      "i",      _("Open/Close Inventory")              },
+		{ "SCE", Common::KEYCODE_p,      "p",      _("Switch Inventory/Character screen") },
+		{ "CMP", Common::KEYCODE_c,      "c",      _("Camp")                              },
+		{ "CSP", Common::KEYCODE_SPACE,  "SPACE",  _("Cast Spell")                        },
 		// TODO: Spell cursor, but this needs more thought, since different
 		// game versions use different keycodes.
-		{ Common::KeyState(Common::KEYCODE_1), "SL1", _("Spell Level 1") },
-		{ Common::KeyState(Common::KEYCODE_2), "SL2", _("Spell Level 2") },
-		{ Common::KeyState(Common::KEYCODE_3), "SL3", _("Spell Level 3") },
-		{ Common::KeyState(Common::KEYCODE_4), "SL4", _("Spell Level 4") },
-		{ Common::KeyState(Common::KEYCODE_5), "SL5", _("Spell Level 5") }
+		{ "SL1", Common::KEYCODE_1,      "1",      _("Spell Level 1")                     },
+		{ "SL2", Common::KEYCODE_2,      "2",      _("Spell Level 2")                     },
+		{ "SL3", Common::KEYCODE_3,      "3",      _("Spell Level 3")                     },
+		{ "SL4", Common::KEYCODE_4,      "4",      _("Spell Level 4")                     },
+		{ "SL5", Common::KEYCODE_5,      "5",      _("Spell Level 5")                     }
 	};
 
 	for (uint i = 0; i < ARRAYSIZE(keyActionEntries); ++i) {
-		Common::Action *const act = new Common::Action(engineKeyMap, keyActionEntries[i].id, keyActionEntries[i].description);
-		act->addKeyEvent(keyActionEntries[i].ks);
+		Common::Action *const act = new Common::Action(keyActionEntries[i].id, keyActionEntries[i].description);
+		act->setKeyEvent(keyActionEntries[i].ks);
+		act->addDefaultInputMapping(keyActionEntries[i].defaultHwId);
+		engineKeyMap->addAction(act);
 	}
 
-	if (_flags.gameID == GI_EOB2) {
-		Common::Action *const act = new Common::Action(engineKeyMap, "SL6", _("Spell Level 6"));
-		act->addKeyEvent(Common::KeyState(Common::KEYCODE_6));
+	if (gameId == "eob2") {
+		Common::Action *const act = new Common::Action("SL6", _("Spell Level 6"));
+		act->setKeyEvent(Common::KeyState(Common::KEYCODE_6));
+		act->addDefaultInputMapping("6");
+		engineKeyMap->addAction(act);
 	}
 
-	mapper->addGameKeymap(engineKeyMap);
-#endif
+	return Common::Keymap::arrayOf(engineKeyMap);
 }
 
 Common::Error EoBCoreEngine::init() {
@@ -409,27 +403,40 @@ Common::Error EoBCoreEngine::init() {
 	if (!_staticres->init())
 		error("_staticres->init() failed");
 
-	// SoundTowns_Darkmoon requires initialized _staticres
+	// We start the respective sound driver even if "No Music" has
+	// been selected, because we don't have a null driver class (and
+	// don't really need one). We just disable the sound in the settings.
+	MidiDriver::DeviceHandle dev = 0;
 	if (_flags.platform == Common::kPlatformDOS) {
-		//MidiDriverType midiDriver = MidiDriver::detectDevice(MDT_PCSPK | MDT_ADLIB);
-		_sound = new SoundAdLibPC(this, _mixer);
+		int flags = MDT_ADLIB | MDT_PCSPK;
+		dev = MidiDriver::detectDevice(_flags.gameID == GI_EOB1 ? flags | MDT_PCJR : flags);
+		MusicType type = MidiDriver::getMusicType(dev);
+		_sound = new SoundPC_v1(this, _mixer, type == MT_ADLIB ? Sound::kAdLib : type == MT_PCSPK ? Sound::kPCSpkr : Sound::kPCjr);
 	} else if (_flags.platform == Common::kPlatformFMTowns) {
+		dev = MidiDriver::detectDevice(MDT_TOWNS);
+		// SoundTowns_Darkmoon requires initialized _staticres
 		_sound = new SoundTowns_Darkmoon(this, _mixer);
 	} else if (_flags.platform == Common::kPlatformPC98) {
-		if (_flags.gameID == GI_EOB1)
+		if (_flags.gameID == GI_EOB1) {
+			dev = MidiDriver::detectDevice(MDT_PC98);
 			_sound = new SoundPC98_EoB(this, _mixer);
+		} else {
+			dev = MidiDriver::detectDevice(MDT_PC98 | MDT_MIDI);
+		}
 	} else if (_flags.platform == Common::kPlatformAmiga) {
+		dev = MidiDriver::detectDevice(MDT_AMIGA);
 		_sound = new SoundAmiga_EoB(this, _mixer);
 	}
 
 	assert(_sound);
 	_sound->init();
 
-	// This if for EOB1 PC-98 only
-	_sound->loadSfxFile("EFECT.OBJ");
+	if (_flags.platform == Common::kPlatformPC98)
+		_sound->loadSfxFile("EFECT.OBJ");
 
 	// Setup volume settings (and read in all ConfigManager settings)
-	syncSoundSettings();
+	_configNullSound = (MidiDriver::getMusicType(dev) == MT_NULL);
+	syncSoundSettings();	
 
 	if (!_screen->init())
 		error("screen()->init() failed");
@@ -448,8 +455,7 @@ Common::Error EoBCoreEngine::init() {
 	assert(_txt);
 	_inf = new EoBInfProcessor(this, _screen);
 	assert(_inf);
-	_debugger = new Debugger_EoB(this);
-	assert(_debugger);
+	setDebugger(new Debugger_EoB(this));
 	
 	if (_flags.platform == Common::kPlatformAmiga) {
 		if (_res->exists("EOBF6.FONT"))
@@ -554,18 +560,11 @@ Common::Error EoBCoreEngine::init() {
 	memset(_monsterStoneOverlay, (_flags.platform == Common::kPlatformAmiga) ? guiSettings()->colors.guiColorWhite : 0x0D, 16 * sizeof(uint8));
 	_monsterFlashOverlay[0] = _monsterStoneOverlay[0] = 0;
 
-	// Prevent autosave on game startup
-	_lastAutosave = _system->getMillis();
-
-#ifdef ENABLE_KEYMAPPER
-	_eventMan->getKeymapper()->pushKeymap(kKeymapName, true);
-#endif
-
 	return Common::kNoError;
 }
 
 Common::Error EoBCoreEngine::go() {
-	_debugger->initialize();
+	static_cast<Debugger_EoB *>(getDebugger())->initialize();
 	_txt->removePageBreakFlag();
 	_screen->setFont(_flags.platform == Common::kPlatformPC98 ? Screen::FID_SJIS_FNT : Screen::FID_8_FNT);
 	loadItemsAndDecorationsShapes();
@@ -640,8 +639,8 @@ void EoBCoreEngine::readSettings() {
 	_configMusic = (_flags.platform == Common::kPlatformPC98) ? (ConfMan.getBool("music_mute") ? 0 : 1) : (_configSounds ? 1 : 0);
 
 	if (_sound) {
-		_sound->enableMusic(_configMusic);
-		_sound->enableSFX(_configSounds);
+		_sound->enableMusic(_configNullSound ? false : _configMusic);
+		_sound->enableSFX(_configNullSound ? false : _configSounds);
 	}
 }
 
@@ -659,8 +658,8 @@ void EoBCoreEngine::writeSettings() {
 		} else if (!_configSounds) {
 			_sound->haltTrack();
 		}
-		_sound->enableMusic(_configMusic);
-		_sound->enableSFX(_configSounds);
+		_sound->enableMusic(_configNullSound ? false : _configMusic);
+		_sound->enableSFX(_configNullSound ? false : _configSounds);
 	}
 
 	ConfMan.flushToDisk();

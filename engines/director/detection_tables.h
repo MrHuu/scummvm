@@ -33,18 +33,34 @@ namespace Director {
 #define WINDEMO(t,e,f,m,s,v) 	GENGAME_(t,e,f,m,s,Common::EN_ANY,Common::kPlatformWindows,ADGF_DEMO,v)
 
 static const DirectorGameDescription gameDescriptions[] = {
+	// Execute all *.lingo files in game directory
 	{
 		{
 			"directortest",
 			"",
-			AD_ENTRY1("lingotests.lingo", 0),
+			AD_ENTRY1("lingotests", 0),
 			Common::EN_ANY,
 			Common::kPlatformWindows,
 			ADGF_NO_FLAGS,
 			GUIO1(GUIO_NOASPECT)
 		},
 		GID_TEST,
-		3
+		4
+	},
+
+	// Executa all movies in directory
+	{
+		{
+			"directortest-all",
+			"",
+			AD_ENTRY1("lingotests-all", 0),
+			Common::EN_ANY,
+			Common::kPlatformMacintosh,
+			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NOASPECT)
+		},
+		GID_TESTALL,
+		4
 	},
 
 	// Generic D3 Mac entry

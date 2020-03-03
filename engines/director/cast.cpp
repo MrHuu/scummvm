@@ -21,6 +21,7 @@
  */
 
 #include "common/substream.h"
+#include "graphics/surface.h"
 
 #include "director/director.h"
 #include "director/cachedmactext.h"
@@ -30,7 +31,20 @@
 
 namespace Director {
 
+Cast::Cast() {
+	_type = kCastTypeNull;
+	_surface = nullptr;
+
+	_modified = true;
+}
+
+Cast::~Cast() {
+	delete _surface;
+}
+
 BitmapCast::BitmapCast(Common::ReadStreamEndian &stream, uint32 castTag, uint16 version) {
+	_type = kCastBitmap;
+
 	if (version < 4) {
 		_pitch = 0;
 		_flags = stream.readByte();	// region: 0 - auto, 1 - matte, 2 - disabled
@@ -61,12 +75,15 @@ BitmapCast::BitmapCast(Common::ReadStreamEndian &stream, uint32 castTag, uint16 
 
 		_initialRect = Score::readRect(stream);
 		_boundingRect = Score::readRect(stream);
-		_regX = stream.readUint16();
 		_regY = stream.readUint16();
+		_regX = stream.readUint16();
 
 		_bitsPerPixel = stream.readUint16();
 		if (_bitsPerPixel == 0)
 			_bitsPerPixel = 1;
+
+		if (_bitsPerPixel == 1)
+			_pitch *= 8;
 
 		int tail = 0;
 
@@ -101,16 +118,19 @@ BitmapCast::BitmapCast(Common::ReadStreamEndian &stream, uint32 castTag, uint16 
 
 		stream.readUint32();
 	}
-	_modified = 0;
 	_tag = castTag;
 }
 
-TextCast::TextCast(Common::ReadStreamEndian &stream, uint16 version) {
+TextCast::TextCast(Common::ReadStreamEndian &stream, uint16 version, int32 bgcolor) {
+	_type = kCastText;
+
+	_bgcolor = bgcolor;
 	_borderSize = kSizeNone;
 	_gutterSize = kSizeNone;
 	_boxShadow = kSizeNone;
 
-	_flags1 = 0;
+	_flags = 0;
+	_textFlags = 0;
 	_fontId = 0;
 	_fontSize = 12;
 	_textType = kTextTypeFixed;
@@ -120,7 +140,7 @@ TextCast::TextCast(Common::ReadStreamEndian &stream, uint16 version) {
 	_palinfo1 = _palinfo2 = _palinfo3 = 0;
 
 	if (version <= 3) {
-		_flags1 = stream.readByte(); // region: 0 - auto, 1 - matte, 2 - disabled
+		_flags = stream.readByte(); // region: 0 - auto, 1 - matte, 2 - disabled
 		_borderSize = static_cast<SizeType>(stream.readByte());
 		_gutterSize = static_cast<SizeType>(stream.readByte());
 		_boxShadow = static_cast<SizeType>(stream.readByte());
@@ -134,7 +154,6 @@ TextCast::TextCast(Common::ReadStreamEndian &stream, uint16 version) {
 		uint16 pad3;
 		uint16 pad4 = 0;
 		uint16 totalTextHeight;
-		byte flags = 0;
 
 		if (version == 2) {
 			pad2 = stream.readUint16();
@@ -146,15 +165,9 @@ TextCast::TextCast(Common::ReadStreamEndian &stream, uint16 version) {
 			pad3 = stream.readUint16();
 
 			_textShadow = static_cast<SizeType>(stream.readByte());
-			flags = stream.readByte();
-			if (flags & 0x1)
-				_textFlags.push_back(kTextFlagEditable);
-			if (flags & 0x2)
-				_textFlags.push_back(kTextFlagAutoTab);
-			if (flags & 0x4)
-				_textFlags.push_back(kTextFlagDoNotWrap);
-			if (flags & 0xf8)
-				warning("Unprocessed text cast flags: %x", flags & 0xf8);
+			_textFlags = stream.readByte();
+			if (_textFlags & 0xf8)
+				warning("Unprocessed text cast flags: %x", _textFlags & 0xf8);
 
 			totalTextHeight = stream.readUint16();
 		} else {
@@ -166,9 +179,9 @@ TextCast::TextCast(Common::ReadStreamEndian &stream, uint16 version) {
 		}
 
 		debugC(2, kDebugLoading, "TextCast(): flags1: %d, border: %d gutter: %d shadow: %d pad1: %x align: %04x",
-				_flags1, _borderSize, _gutterSize, _boxShadow, pad1, _textAlign);
+				_flags, _borderSize, _gutterSize, _boxShadow, pad1, _textAlign);
 		debugC(2, kDebugLoading, "TextCast(): rgb: 0x%04x 0x%04x 0x%04x, pad2: %x pad3: %d pad4: %d shadow: %d flags: %d totHeight: %d",
-				_palinfo1, _palinfo2, _palinfo3, pad2, pad3, pad4, _textShadow, flags, totalTextHeight);
+				_palinfo1, _palinfo2, _palinfo3, pad2, pad3, pad4, _textShadow, _textFlags, totalTextHeight);
 		if (debugChannelSet(2, kDebugLoading)) {
 			_initialRect.debugPrint(2, "TextCast(): rect:");
 		}
@@ -222,10 +235,10 @@ TextCast::TextCast(Common::ReadStreamEndian &stream, uint16 version) {
 		stream.readUint16();
 	}
 
-	_modified = 0;
-
-	_cachedMacText = new CachedMacText(this, version, -1, g_director->_wm);
+	_cachedMacText = new CachedMacText(this, _bgcolor, version, -1, g_director->_wm);
 	// TODO Destroy me
+
+	_modified = false;
 }
 
 void TextCast::importStxt(const Stxt *stxt) {
@@ -260,6 +273,8 @@ void TextCast::setText(const char *text) {
 }
 
 ShapeCast::ShapeCast(Common::ReadStreamEndian &stream, uint16 version) {
+	_type = kCastShape;
+
 	byte flags, unk1;
 
 	_ink = kInkTypeCopy;
@@ -272,6 +287,18 @@ ShapeCast::ShapeCast(Common::ReadStreamEndian &stream, uint16 version) {
 		_pattern = stream.readUint16BE();
 		_fgCol = (127 - stream.readByte()) & 0xff; // -128 -> 0, 127 -> 256
 		_bgCol = (127 - stream.readByte()) & 0xff;
+		_fillType = stream.readByte();
+		_ink = static_cast<InkType>(_fillType & 0x3f);
+		_lineThickness = stream.readByte();
+		_lineDirection = stream.readByte();
+	} else if (version == 4) {
+		flags = 0;
+		unk1 = stream.readByte();
+		_shapeType = static_cast<ShapeType>(stream.readByte());
+		_initialRect = Score::readRect(stream);
+		_pattern = stream.readUint16BE();
+		_fgCol = 0xff - (uint8)stream.readByte();
+		_bgCol = 0xff - (uint8)stream.readByte();
 		_fillType = stream.readByte();
 		_ink = static_cast<InkType>(_fillType & 0x3f);
 		_lineThickness = stream.readByte();
@@ -290,7 +317,7 @@ ShapeCast::ShapeCast(Common::ReadStreamEndian &stream, uint16 version) {
 		_lineThickness = 1;
 		_lineDirection = 0;
 	}
-	_modified = 0;
+	_modified = false;
 
 	debugC(3, kDebugLoading, "ShapeCast: fl: %x unk1: %x type: %d pat: %d fg: %d bg: %d fill: %d thick: %d dir: %d",
 		flags, unk1, _shapeType, _pattern, _fgCol, _bgCol, _fillType, _lineThickness, _lineDirection);
@@ -299,7 +326,9 @@ ShapeCast::ShapeCast(Common::ReadStreamEndian &stream, uint16 version) {
 		_initialRect.debugPrint(0, "ShapeCast: rect:");
 }
 
-ButtonCast::ButtonCast(Common::ReadStreamEndian &stream, uint16 version) : TextCast(stream, version) {
+ButtonCast::ButtonCast(Common::ReadStreamEndian &stream, uint16 version) : TextCast(stream, version, 0xff) {
+	_type = kCastButton;
+
 	if (version < 4) {
 		_buttonType = static_cast<ButtonType>(stream.readUint16BE());
 	} else {
@@ -312,22 +341,35 @@ ButtonCast::ButtonCast(Common::ReadStreamEndian &stream, uint16 version) : TextC
 
 		_buttonType = static_cast<ButtonType>(stream.readUint16BE());
 	}
-	_modified = 0;
 }
 
 ScriptCast::ScriptCast(Common::ReadStreamEndian &stream, uint16 version) {
+	_type = kCastLingoScript;
+	_scriptType = kNoneScript;
+
 	if (version < 4) {
 		error("Unhandled Script cast");
 	} else if (version == 4) {
-		stream.readByte();
-		stream.readByte();
+		byte unk1 = stream.readByte();
+		byte type = stream.readByte();
+
+		switch (type) {
+		case 1:
+			_scriptType = kScoreScript;
+			break;
+		case 3:
+			_scriptType = kMovieScript;
+			break;
+		default:
+			error("ScriptCast: Unprocessed script type: %d", type);
+		}
 
 		_initialRect = Score::readRect(stream);
 		_boundingRect = Score::readRect(stream);
 
 		_id = stream.readUint32();
 
-		debugC(4, kDebugLoading, "CASt: Script id: %d", _id);
+		debugC(4, kDebugLoading, "CASt: Script id: %d type: %s (%d) unk1: %d", _id, scriptType2str(_scriptType), type, unk1);
 
 		stream.readByte(); // There should be no more data
 		assert(stream.eos());
@@ -344,7 +386,23 @@ ScriptCast::ScriptCast(Common::ReadStreamEndian &stream, uint16 version) {
 
 		// WIP need to complete this!
 	}
-	_modified = 0;
+}
+
+RTECast::RTECast(Common::ReadStreamEndian &stream, uint16 version, int32 bgcolor) : TextCast(stream, version, bgcolor) {
+
+	_type = kCastRTE;
+}
+
+void RTECast::loadChunks() {
+	//TODO: Actually load RTEs correctly, don't just make fake STXT.
+#if 0
+	Common::SeekableReadStream *rte1 = _movieArchive->getResource(res->children[child].tag, res->children[child].index);
+	byte *buffer = new byte[rte1->size() + 2];
+	rte1->read(buffer, rte1->size());
+	buffer[rte1->size()] = '\n';
+	buffer[rte1->size() + 1] = '\0';
+	_loadedText->getVal(id)->importRTE(buffer);
+#endif
 }
 
 } // End of namespace Director

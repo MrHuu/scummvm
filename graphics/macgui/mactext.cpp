@@ -69,8 +69,7 @@ MacText::MacText(Common::U32String s, MacWindowManager *wm, const MacFont *macFo
 
 	_currentFormatting = _defaultFormatting;
 
-	if (!_str.empty())
-		splitString(_str);
+	splitString(_str);
 
 	recalcDims();
 
@@ -101,8 +100,7 @@ MacText::MacText(const Common::String &s, MacWindowManager *wm, const MacFont *m
 
 	_currentFormatting = _defaultFormatting;
 
-	if (!_str.empty())
-		splitString(_str);
+	splitString(_str);
 
 	recalcDims();
 
@@ -114,13 +112,11 @@ void MacText::setMaxWidth(int maxWidth) {
 
 	_textLines.clear();
 
-	if (!_str.empty()) {
-		splitString(_str);
+	splitString(_str);
 
-		recalcDims();
+	recalcDims();
 
-		_fullRefresh = true;
-	}
+	_fullRefresh = true;
 }
 
 static const Common::U32String::value_type *readHex(uint16 *res, const Common::U32String::value_type *s, int len) {
@@ -283,7 +279,10 @@ void MacText::splitString(Common::U32String &str) {
 
 		_currentFormatting.getFont()->wordWrapText(tmp, _maxWidth, text, w);
 
-		_textLines[curLine].chunks[curChunk].text = text[0];
+		if (text.size())
+			_textLines[curLine].chunks[curChunk].text = text[0];
+		else
+			warning("MacText::splitString(): Font resulted in 0 width for text '%s'", tmp.encode().c_str());
 
 		if (text.size() > 1) {
 			for (uint i = 1; i < text.size(); i++) {
@@ -395,7 +394,7 @@ int MacText::getLineWidth(int line, bool enforce) {
 		height = MAX(height, _textLines[line].chunks[i].getFont()->getFontHeight());
 	}
 
-	if (!hastext)
+	if (!hastext && _textLines.size() > 1)
 		height = height > 3 ? height - 3 : 0;
 
 	_textLines[line].width = width;

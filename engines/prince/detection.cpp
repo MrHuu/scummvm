@@ -152,24 +152,24 @@ public:
 		_directoryGlobs = directoryGlobs;
 	}
 
-        const char *getEngineId() const {
-                return "prince";
-        }
-
-	virtual const char *getName() const {
-                return "The Prince and the Coward";
+	const char *getEngineId() const override {
+		return "prince";
 	}
 
-	virtual const char *getOriginalCopyright() const {
+	const char *getName() const override {
+		return "The Prince and the Coward";
+	}
+
+	const char *getOriginalCopyright() const override {
 		return "The Prince and the Coward (C) 1996-97 Metropolis";
 	}
 
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual int getMaximumSaveSlot() const { return 99; }
-	virtual SaveStateList listSaves(const char *target) const;
-	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const;
-	virtual void removeSaveState(const char *target, int slot) const;
+	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	bool hasFeature(MetaEngineFeature f) const override;
+	int getMaximumSaveSlot() const override { return 99; }
+	SaveStateList listSaves(const char *target) const override;
+	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
+	void removeSaveState(const char *target, int slot) const override;
 };
 
 bool PrinceMetaEngine::hasFeature(MetaEngineFeature f) const {

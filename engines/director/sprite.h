@@ -54,7 +54,7 @@ enum MainChannelsPosition {
 	kBlendPosition,
 	kSound2Position,
 	kSound2TypePosition = 11,
-	kPaletePosition = 15
+	kPalettePosition = 15
 };
 
 class Sprite {
@@ -62,6 +62,9 @@ public:
 	Sprite();
 	Sprite(const Sprite &sprite);
 	~Sprite();
+
+	uint16 getPattern();
+	void setPattern(uint16 pattern);
 
 	uint16 _scriptId;
 	byte _flags2;  // x40 editable, 0x80 moveable
@@ -74,12 +77,7 @@ public:
 	InkType _ink;
 	uint16 _trails;
 
-	BitmapCast *_bitmapCast;
-	ShapeCast *_shapeCast;
-	//SoundCast *_soundCast;
-	TextCast *_textCast;
-	ButtonCast *_buttonCast;
-	//ScriptCast *_scriptCast;
+	Cast *_cast;
 
 	uint16 _flags;
 	Common::Point _startPoint;
@@ -91,6 +89,7 @@ public:
 	byte _moveable;
 	byte _backColor;
 	byte _foreColor;
+
 	uint16 _left;
 	uint16 _right;
 	uint16 _top;

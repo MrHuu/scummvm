@@ -84,27 +84,27 @@ static const ExtraGuiOption sword2ExtraGuiOption = {
 
 class Sword2MetaEngine : public MetaEngine {
 public:
-	virtual const char *getEngineId() const {
+	const char *getEngineId() const override {
 		return "sword2";
 	}
 
-	virtual const char *getName() const {
+	const char *getName() const override {
 		return "Broken Sword II: The Smoking Mirror";
 	}
-	virtual const char *getOriginalCopyright() const {
+	const char *getOriginalCopyright() const override {
 		return "Broken Sword II: The Smoking Mirror (C) Revolution";
 	}
 
-	virtual bool hasFeature(MetaEngineFeature f) const;
+	bool hasFeature(MetaEngineFeature f) const override;
 	PlainGameList getSupportedGames() const override;
-	virtual const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const;
+	const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const override;
 	PlainGameDescriptor findGame(const char *gameid) const override;
-	virtual DetectedGames detectGames(const Common::FSList &fslist) const;
-	virtual SaveStateList listSaves(const char *target) const;
-	virtual int getMaximumSaveSlot() const;
-	virtual void removeSaveState(const char *target, int slot) const;
+	DetectedGames detectGames(const Common::FSList &fslist) const override;
+	SaveStateList listSaves(const char *target) const override;
+	int getMaximumSaveSlot() const override;
+	void removeSaveState(const char *target, int slot) const override;
 
-	virtual Common::Error createInstance(OSystem *syst, Engine **engine) const;
+	Common::Error createInstance(OSystem *syst, Engine **engine) const override;
 };
 
 bool Sword2MetaEngine::hasFeature(MetaEngineFeature f) const {
@@ -349,7 +349,7 @@ Sword2Engine::Sword2Engine(OSystem *syst) : Engine(syst), _rnd("sword2") {
 }
 
 Sword2Engine::~Sword2Engine() {
-	delete _debugger;
+	//_debugger is deleted by Engine
 	delete _sound;
 	delete _fontRenderer;
 	delete _screen;
@@ -357,10 +357,6 @@ Sword2Engine::~Sword2Engine() {
 	delete _logic;
 	delete _resman;
 	delete _memory;
-}
-
-GUI::Debugger *Sword2Engine::getDebugger() {
-	return _debugger;
 }
 
 void Sword2Engine::registerDefaultSettings() {
@@ -458,6 +454,7 @@ Common::Error Sword2Engine::run() {
 	// visible to the user.
 
 	_debugger = new Debugger(this);
+	setDebugger(_debugger);
 
 	_memory = new MemoryManager();
 	_resman = new ResourceManager(this);
@@ -521,8 +518,6 @@ Common::Error Sword2Engine::run() {
 	_screen->initializeRenderCycle();
 
 	while (1) {
-		_debugger->onFrame();
-
 		// Handle GMM Loading
 		if (_gmmLoadSlot != -1) {
 
@@ -546,9 +541,7 @@ Common::Error Sword2Engine::run() {
 		KeyboardEvent *ke = keyboardEvent();
 
 		if (ke) {
-			if ((ke->kbd.hasFlags(Common::KBD_CTRL) && ke->kbd.keycode == Common::KEYCODE_d) || ke->kbd.ascii == '#' || ke->kbd.ascii == '~') {
-				_debugger->attach();
-			} else if (ke->kbd.hasFlags(0) || ke->kbd.hasFlags(Common::KBD_SHIFT)) {
+			if (ke->kbd.hasFlags(0) || ke->kbd.hasFlags(Common::KBD_SHIFT)) {
 				switch (ke->kbd.keycode) {
 				case Common::KEYCODE_p:
 					if (isPaused()) {
@@ -831,7 +824,7 @@ uint32 Sword2Engine::getMillis() {
 	return _system->getMillis();
 }
 
-Common::Error Sword2Engine::saveGameState(int slot, const Common::String &desc) {
+Common::Error Sword2Engine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	uint32 saveVal = saveGame(slot, (const byte *)desc.c_str());
 
 	if (saveVal == SR_OK)

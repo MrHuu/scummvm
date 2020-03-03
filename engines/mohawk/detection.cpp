@@ -22,6 +22,9 @@
 
 #include "base/plugins.h"
 
+#include "backends/keymapper/action.h"
+#include "backends/keymapper/keymap.h"
+
 #include "engines/advancedDetector.h"
 #include "common/config-manager.h"
 #include "common/savefile.h"
@@ -118,7 +121,7 @@ bool MohawkEngine_Myst::hasFeature(EngineFeature f) const {
 	return
 		MohawkEngine::hasFeature(f)
 		|| (f == kSupportsLoadingDuringRuntime)
-		|| (f == kSupportsSavingDuringRuntime);
+	        || (f == kSupportsSavingDuringRuntime);
 }
 
 #endif
@@ -204,7 +207,7 @@ public:
 		return detectGameFilebased(allFiles, fslist, Mohawk::fileBased);
 	}
 
-	const char *getEngineId() const {
+	const char *getEngineId() const override {
 		return "mohawk";
 	}
 
@@ -223,6 +226,7 @@ public:
 	int getMaximumSaveSlot() const override { return 999; }
 	void removeSaveState(const char *target, int slot) const override;
 	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
+	Common::KeymapArray initKeymaps(const char *target) const override;
 };
 
 bool MohawkMetaEngine::hasFeature(MetaEngineFeature f) const {
@@ -325,6 +329,23 @@ SaveStateDescriptor MohawkMetaEngine::querySaveMetaInfos(const char *target, int
 	{
 		return SaveStateDescriptor();
 	}
+}
+
+Common::KeymapArray MohawkMetaEngine::initKeymaps(const char *target) const {
+	Common::String gameId = ConfMan.get("gameid", target);
+
+#ifdef ENABLE_MYST
+	if (gameId == "myst" || gameId == "makingofmyst") {
+		return Mohawk::MohawkEngine_Myst::initKeymaps(target);
+	}
+#endif
+#ifdef ENABLE_RIVEN
+	if (gameId == "riven") {
+		return Mohawk::MohawkEngine_Riven::initKeymaps(target);
+	}
+#endif
+
+	return AdvancedMetaEngine::initKeymaps(target);
 }
 
 bool MohawkMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {

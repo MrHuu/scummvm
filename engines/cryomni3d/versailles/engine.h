@@ -226,29 +226,30 @@ protected:
 
 public:
 	CryOmni3DEngine_Versailles(OSystem *syst, const CryOmni3DGameDescription *gamedesc);
-	virtual ~CryOmni3DEngine_Versailles();
+	~CryOmni3DEngine_Versailles() override;
 
-	virtual void initializePath(const Common::FSNode &gamePath) override;
+	void initializePath(const Common::FSNode &gamePath) override;
 
 	bool hasFeature(EngineFeature f) const override;
-	virtual Common::Error loadGameState(int slot) override;
-	virtual Common::Error saveGameState(int slot, const Common::String &desc) override;
+	Common::Error loadGameState(int slot) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	Common::String getSaveStateName(int slot) const override;
 
 	Common::String prepareFileName(const Common::String &baseName, const char *extension) const {
 		const char *const extensions[] = { extension, nullptr };
 		return prepareFileName(baseName, extensions);
 	}
-	virtual Common::String prepareFileName(const Common::String &baseName,
+	Common::String prepareFileName(const Common::String &baseName,
 	                                       const char *const *extensions) const override;
 
 	void setupPalette(const byte *colors, uint start, uint num) override { setupPalette(colors, start, num, true); }
 	void makeTranslucent(Graphics::Surface &dst, const Graphics::Surface &src) const override;
 
-	virtual bool displayToolbar(const Graphics::Surface *original) override { return _toolbar.displayToolbar(original); };
-	virtual bool hasPlaceDocumentation() override;
-	virtual bool displayPlaceDocumentation() override;
-	virtual uint displayOptions() override;
-	virtual bool shouldAbort() override;
+	bool displayToolbar(const Graphics::Surface *original) override { return _toolbar.displayToolbar(original); };
+	bool hasPlaceDocumentation() override;
+	bool displayPlaceDocumentation() override;
+	uint displayOptions() override;
+	bool shouldAbort() override;
 
 private:
 	void setupFonts();
@@ -261,7 +262,7 @@ private:
 	void loadStaticData();
 
 	void syncOmni3DSettings();
-	void syncSoundSettings();
+	void syncSoundSettings() override;
 
 	void playTransitionEndLevel(int level);
 	void changeLevel(int level);

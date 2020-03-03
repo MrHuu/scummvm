@@ -24,7 +24,7 @@
 
 namespace Common {
 
-EventDispatcher::EventDispatcher() : _autoFreeMapper(false), _mapper(nullptr) {
+EventDispatcher::EventDispatcher() : _mapper(nullptr) {
 }
 
 EventDispatcher::~EventDispatcher() {
@@ -37,11 +37,6 @@ EventDispatcher::~EventDispatcher() {
 		if (i->autoFree)
 			delete i->observer;
 	}
-
-	if (_autoFreeMapper) {
-		delete _mapper;
-	}
-	_mapper = nullptr;
 }
 
 void EventDispatcher::dispatch() {
@@ -53,20 +48,27 @@ void EventDispatcher::dispatch() {
 		while (i->source->pollEvent(event)) {
 			// We only try to process the events via the setup event mapper, when
 			// we have a setup mapper and when the event source allows mapping.
-			assert(_mapper);
-			List<Event> mappedEvents = _mapper->mapEvent(event, i->source);
+			if (i->source->allowMapping()) {
+				assert(_mapper);
 
-			for (List<Event>::iterator j = mappedEvents.begin(); j != mappedEvents.end(); ++j) {
-				const Event mappedEvent = *j;
-				dispatchEvent(mappedEvent);
+				// Backends may not produce directly action event types, those are meant
+				// to be the output of the event mapper.
+				assert(event.type != EVENT_CUSTOM_BACKEND_ACTION_START);
+				assert(event.type != EVENT_CUSTOM_BACKEND_ACTION_END);
+				assert(event.type != EVENT_CUSTOM_ENGINE_ACTION_START);
+				assert(event.type != EVENT_CUSTOM_ENGINE_ACTION_END);
+
+
+				List<Event> mappedEvents = _mapper->mapEvent(event);
+
+				for (List<Event>::iterator j = mappedEvents.begin(); j != mappedEvents.end(); ++j) {
+					const Event mappedEvent = *j;
+					dispatchEvent(mappedEvent);
+				}
+			} else {
+				dispatchEvent(event);
 			}
 		}
-	}
-
-	List<Event> delayedEvents = _mapper->getDelayedEvents();
-	for (List<Event>::iterator k = delayedEvents.begin(); k != delayedEvents.end(); ++k) {
-		const Event delayedEvent = *k;
-		dispatchEvent(delayedEvent);
 	}
 }
 
@@ -79,12 +81,8 @@ void EventDispatcher::clearEvents() {
 }
 
 
-void EventDispatcher::registerMapper(EventMapper *mapper, bool autoFree) {
-	if (_autoFreeMapper) {
-		delete _mapper;
-	}
+void EventDispatcher::registerMapper(EventMapper *mapper) {
 	_mapper = mapper;
-	_autoFreeMapper = autoFree;
 }
 
 
@@ -148,9 +146,8 @@ void EventDispatcher::dispatchEvent(const Event &event) {
 
 void EventDispatcher::dispatchPoll() {
 	for (List<ObserverEntry>::iterator i = _observers.begin(); i != _observers.end(); ++i) {
-		if (i->poll == true)
-			if (i->observer->notifyPoll())
-				break;
+		if (i->poll)
+			i->observer->notifyPoll();
 	}
 }
 

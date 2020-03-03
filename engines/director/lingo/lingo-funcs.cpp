@@ -29,6 +29,7 @@
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
+#include "director/cast.h"
 #include "director/score.h"
 #include "director/sound.h"
 #include "director/util.h"
@@ -182,7 +183,7 @@ void Lingo::func_goto(Datum &frame, Datum &movie) {
 	if (movie.type != VOID) {
 		movie.toString();
 
-		Common::String movieFilename = convertPath(*movie.u.s);
+		Common::String movieFilename = pathMakeRelative(*movie.u.s);
 		Common::String cleanedFilename;
 
 		bool fileExists = false;
@@ -211,6 +212,9 @@ void Lingo::func_goto(Datum &frame, Datum &movie) {
 				fileExists = true;
 			}
 		}
+
+		debug(1, "func_goto: '%s' -> '%s' -> '%s' -> '%s'", movie.u.s->c_str(), convertPath(*movie.u.s).c_str(),
+				movieFilename.c_str(), cleanedFilename.c_str());
 
 		if (!fileExists) {
 			warning("Movie %s does not exist", movieFilename.c_str());
@@ -323,10 +327,68 @@ void Lingo::func_playdone() {
 	func_goto(f, m);
 }
 
-void Lingo::func_cursor(int c) {
+void Lingo::func_cursor(int c, int m) {
 	if (_cursorOnStack) {
 		// pop cursor
 		_vm->getMacWindowManager()->popCursor();
+	}
+
+	if (m != -1) {
+		Score *score = _vm->getCurrentScore();
+		if (!score->_loadedCast->contains(c) || !score->_loadedCast->contains(m)) {
+			warning("cursor: non-existent cast reference");
+			return;
+		}
+
+		if (score->_loadedCast->getVal(c)->_type != kCastBitmap || score->_loadedCast->getVal(m)->_type != kCastBitmap) {
+			warning("cursor: wrong cast reference type");
+			return;
+		}
+
+		if (score->_loadedCast->getVal(c)->_surface == nullptr) {
+			warning("cursor: empty sprite %d surface", c);
+			return;
+		}
+		if (score->_loadedCast->getVal(m)->_surface == nullptr) {
+			warning("cursor: empty sprite %d surface", m);
+			return;
+		}
+
+		byte *assembly = (byte *)malloc(16 * 16);
+		byte *dst = assembly;
+
+		for (int y = 0; y < 16; y++) {
+			const byte *cursor, *mask;
+			bool nocursor = false;
+
+			if (y >= score->_loadedCast->getVal(c)->_surface->h ||
+					y >= score->_loadedCast->getVal(m)->_surface->h )
+				nocursor = true;
+
+			if (!nocursor) {
+				cursor = (const byte *)score->_loadedCast->getVal(c)->_surface->getBasePtr(0, y);
+				mask = (const byte *)score->_loadedCast->getVal(m)->_surface->getBasePtr(0, y);
+			}
+
+			for (int x = 0; x < 16; x++) {
+				if (x >= score->_loadedCast->getVal(c)->_surface->w ||
+						x >= score->_loadedCast->getVal(m)->_surface->w )
+					nocursor = true;
+
+				if (nocursor) {
+					*dst = 3;
+				} else {
+					*dst = *mask ? 3 : (*cursor ? 1 : 0);
+					cursor++;
+					mask++;
+				}
+				dst++;
+			}
+		}
+
+		_vm->getMacWindowManager()->pushCustomCursor(assembly, 16, 16, 3);
+
+		return;
 	}
 
 	// and then push cursor.
@@ -351,8 +413,6 @@ void Lingo::func_cursor(int c) {
 	}
 
 	_cursorOnStack = true;
-
-	warning("STUB: func_cursor(%d)", c);
 }
 
 void Lingo::func_beep(int repeats) {

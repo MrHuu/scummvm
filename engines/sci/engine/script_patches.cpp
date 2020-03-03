@@ -146,26 +146,29 @@ static const char *const selectorNameTable[] = {
 	"handleEvent",  // EcoQuest 2, Shivers
 #ifdef ENABLE_SCI32
 	"newWith",      // SCI2 array script
-	"scrollSelections", // GK2
 	"posn",         // SCI2 benchmarking script
-	"detailLevel",  // GK2 benchmarking
+	"printLang",    // GK2
 	"view",         // RAMA benchmarking, GK1, QFG4
 	"fade",         // Shivers
 	"test",         // Torin
 	"get",          // Torin, GK1
 	"normalize",    // GK1
+	"setReal",      // GK1
 	"set",          // Torin
 	"clear",        // Torin
 	"masterVolume", // SCI2 master volume reset
 	"data",         // Phant2, QFG4
 	"format",       // Phant2
+	"mouseMoved",   // Phant2
 	"setSize",      // Phant2
 	"iconV",        // Phant2
+	"track",        // Phant2
 	"update",       // Phant2
 	"xOff",         // Phant2
 	"fore",         // KQ7
 	"back",         // KQ7
 	"font",         // KQ7
+	"setHeading",   // KQ7
 	"setScale",     // LSL6hires, QFG4
 	"setScaler",    // LSL6hires, QFG4
 	"readWord",     // LSL7, Phant1, Torin
@@ -261,26 +264,29 @@ enum ScriptPatcherSelectors {
 #ifdef ENABLE_SCI32
 	,
 	SELECTOR_newWith,
-	SELECTOR_scrollSelections,
 	SELECTOR_posn,
-	SELECTOR_detailLevel,
+	SELECTOR_printLang,
 	SELECTOR_view,
 	SELECTOR_fade,
 	SELECTOR_test,
 	SELECTOR_get,
 	SELECTOR_normalize,
+	SELECTOR_setReal,
 	SELECTOR_set,
 	SELECTOR_clear,
 	SELECTOR_masterVolume,
 	SELECTOR_data,
 	SELECTOR_format,
+	SELECTOR_mouseMoved,
 	SELECTOR_setSize,
 	SELECTOR_iconV,
+	SELECTOR_track,
 	SELECTOR_update,
 	SELECTOR_xOff,
 	SELECTOR_fore,
 	SELECTOR_back,
 	SELECTOR_font,
+	SELECTOR_setHeading,
 	SELECTOR_setScale,
 	SELECTOR_setScaler,
 	SELECTOR_readWord,
@@ -3278,6 +3284,84 @@ static const uint16 gk1RestartInventoryPatch[] = {
 	PATCH_END
 };
 
+// On day 6 in Jackson Square, if you never gave Madame Lorelei her veil on an
+//  earlier day, then looking at her empty booth says that she's sitting there.
+//  Clicking Operate also says the wrong message. The logic in the booth and
+//  chair doVerb methods doesn't consider that this optional action might not
+//  occur by day 6. We add the missing day check by overwriting a redundant
+//  local variable test.
+//
+// Applies to: All versions
+// Responsible methods: booth:doVerb, chair1:doVerb, chair2:doVerb
+static const uint16 gk1EmptyBoothMessageSignature[] = {
+	SIG_MAGICDWORD,
+	0x30, SIG_UINT16(0x001a),               // bnt 001a [ skip lorelei message ]
+	0x83, 0x01,                             // lal 01   [ always zero ]
+	0x18,                                   // not
+	0x30, SIG_UINT16(0x0014),               // bnt 0014 [ skip lorelei message ]
+	SIG_END
+};
+
+static const uint16 gk1EmptyBoothMessagePatch[] = {
+	0x31, 0x1b,                             // bnt 1b [ skip lorelei message ]
+	0x89, 0x7b,                             // lsg 7b
+	0x35, 0x05,                             // ldi 05
+	0x24,                                   // le?    [ day <= 5 ]
+	0x31, 0x14,                             // bnt 14 [ skip lorelei message ]
+	PATCH_END
+};
+
+// Madame Lorelei has an obscure timer bug that can cause events to repeat and
+//  award duplicate points. When exiting the conversation with her by selecting
+//  "Er...nothing.", fortuneTeller:cue resets the dance timer incorrectly.
+//  loreleiTimer's client is the room. When it fires, nwJackson:cue tests flags
+//  and room conditions before running the sLoreleiDance script, otherwise it
+//  resets the timer for 5 seconds. When fortuneTeller:cue resets the timer it
+//  changes the client to sLoreleiDance, bypassing the checks in nwJackson:cue.
+//  Madame Lorelei can then dance and drop her veil a second time while Gabriel
+//  already has it, among other edge cases.
+//
+// We fix this by setting the room as the client when resetting the timer. This
+//  requires calling dispose first since the timer is already running, which
+//  might have been what led to this script being written differently.
+//
+// Applies to: All versions
+// Responsible method: fortuneTeller:cue
+static const uint16 gk1LoreleiDanceTimerSignature[] = {
+	0x30, SIG_UINT16(0x0005),               // bnt 0005
+	0xc3, SIG_MAGICDWORD, 0x04,             // +al 04
+	0x32, SIG_UINT16(0x001f),               // jmp 001f
+	0x3c,                                   // dup
+	0x35, 0x10,                             // ldi 10 [ "Er...nothing." ]
+	0x1a,                                   // eq?
+	0x30, SIG_UINT16(0x0018),               // bnt 0018
+	0x38, SIG_SELECTOR16(setReal),          // pushi setReal
+	0x7a,                                   // push2
+	0x72, SIG_ADDTOOFFSET(+2),              // lofsa sLoreleiDance
+	0x36,                                   // push
+	SIG_ADDTOOFFSET(+13),
+	0x4a, SIG_UINT16(0x0008),               // send 08 [ loreleiTimer setReal: sLoreleiDance ... ]
+	SIG_END
+};
+
+static const uint16 gk1LoreleiDanceTimerPatch[] = {
+	0x30, PATCH_UINT16(0x0004),             // bnt 0004
+	PATCH_ADDTOOFFSET(+2),
+	0x33, 0x20,                             // jmp 20
+	0x3c,                                   // dup
+	0x35, 0x10,                             // ldi 10 [ "Er...nothing." ]
+	0x1a,                                   // eq?
+	0x31, 0x1a,                             // bnt 1a
+	0x38, PATCH_SELECTOR16(dispose),        // pushi dispose
+	0x76,                                   // push0
+	0x38, PATCH_SELECTOR16(setReal),        // pushi setReal
+	0x7a,                                   // push2
+	0x89, 0x02,                             // lsg 02
+	PATCH_ADDTOOFFSET(+13),
+	0x4a, PATCH_UINT16(0x000c),             // send 0c [ loreleiTimer dispose: setReal: nwJackson ... ]
+	PATCH_END
+};
+
 //          script, description,                                      signature                         patch
 static const SciScriptPatcherEntry gk1Signatures[] = {
 	{  true,     0, "remove alt+n syslogger hotkey",               1, gk1SysLoggerHotKeySignature,      gk1SysLoggerHotKeyPatch },
@@ -3299,6 +3383,8 @@ static const SciScriptPatcherEntry gk1Signatures[] = {
 	{  true,   280, "fix pathfinding in Madame Cazanoux's house",  1, gk1CazanouxPathfindingSignature,  gk1CazanouxPathfindingPatch },
 	{  true,   380, "fix Gran's room obstacles and ego flicker",   1, gk1GranRoomInitSignature,         gk1GranRoomInitPatch },
 	{  true,   410, "fix day 2 binoculars lockup",                 1, gk1Day2BinocularsLockupSignature, gk1Day2BinocularsLockupPatch },
+	{  true,   420, "fix day 6 empty booth message",               6, gk1EmptyBoothMessageSignature,    gk1EmptyBoothMessagePatch },
+	{  true,   420, "fix lorelei dance timer",                     1, gk1LoreleiDanceTimerSignature,    gk1LoreleiDanceTimerPatch },
 	{  true,   710, "fix day 9 vine swing speech playing",         1, gk1Day9VineSwingSignature,        gk1Day9VineSwingPatch },
 	{  true,   710, "fix day 9 mummy animation (floppy)",          1, gk1MummyAnimateFloppySignature,   gk1MummyAnimateFloppyPatch },
 	{  true,   710, "fix day 9 mummy animation (cd)",              1, gk1MummyAnimateCDSignature,       gk1MummyAnimateCDPatch },
@@ -3313,38 +3399,76 @@ static const SciScriptPatcherEntry gk1Signatures[] = {
 #pragma mark -
 #pragma mark Gabriel Knight 2
 
-// The down scroll button in GK2 jumps up a pixel on mousedown because there is
-// a send to scrollSelections using an immediate value 1, which means to scroll
-// up by 1 pixel. This patch fixes the send to scrollSelections by passing the
-// button's delta instead of 1 in 'ScrollButton::track'.
+// GK2's inventory scrolls smoothly when the mouse is held down in the original
+//  due to an inner loop in ScrollButton:track, but this causes slow scrolling
+//  in our interpreter since we throttle kFrameOut. The script's inner loop is
+//  itself throttled by ScrollButton:moveDelay, which is set to 25 and limits
+//  event processing to every 25th iteration. Removing this delay results in
+//  smooth scrolling as in the original.
 //
-// Applies to at least: English CD 1.00, English Steam 1.01
-// Fixes bug: #9648
-static const uint16 gk2InvScrollSignature[] = {
-	0x7e, SIG_ADDTOOFFSET(+2),              // line whatever
+// Applies to: All versions
+// Responsible method: ScrollButton:track
+static const uint16 gk2InventoryScrollSpeedSignature[] = {
 	SIG_MAGICDWORD,
-	0x38, SIG_SELECTOR16(scrollSelections), // pushi scrollSelections ($2c3)
-	0x78,                                   // push1
-	0x78,                                   // push1
-	0x63, 0x98,                             // pToa $98
-	0x4a, SIG_UINT16(0x06),                 // send 6
+	0x63, 0x9c,                 // pToa moveDelay [ 25 ]
+	0xa5, 0x02,                 // sat 02
 	SIG_END
 };
 
-static const uint16 gk2InvScrollPatch[] = {
-	0x38, PATCH_SELECTOR16(scrollSelections), // pushi scrollSelections ($2c3)
-	0x78,                                     // push1
-	0x67, 0x9a,                               // pTos $9a (delta)
-	0x63, 0x98,                               // pToa $98
-	0x4a, PATCH_UINT16(0x06),                 // send 6
-	0x18, 0x18,                               // (waste bytes)
+static const uint16 gk2InventoryScrollSpeedPatch[] = {
+	0x35, 0x01,                 // ldi 01
+	PATCH_END
+};
+
+// The down scroll button in GK2 jumps up a pixel on mousedown because there is
+//  a send to scrollSelections using an immediate value 1, which means to scroll
+//  up by 1 pixel. This patch fixes the send to scrollSelections by passing the
+//  button's delta instead of 1. The Italian version's vocab.997 is missing the
+//  scrollSelections selector so this patch avoids referencing it. Two versions
+//  are necessary to accomodate scripts compiled with and without line numbers.
+//
+// Applies to: All versions
+// Responsible method: ScrollButon:track
+// Fixes bug: #9648
+static const uint16 gk2InventoryScrollDirSignature1[] = {
+	SIG_MAGICDWORD,
+	0x78,                               // push1
+	0x63, 0x98,                         // pToa client
+	0x4a, SIG_UINT16(0x0006),           // send 06 [ client scrollSelections: 1 ]
+	0x7e,                               // line
+	SIG_END
+};
+
+static const uint16 gk2InventoryScrollDirPatch1[] = {
+	0x66, PATCH_UINT16(0x009a),         // pTos delta
+	0x62, PATCH_UINT16(0x0098),         // pToa client
+	0x4a, PATCH_UINT16(0x0006),         // send 06 [ client scrollSelections: delta ]
+	PATCH_END
+};
+
+static const uint16 gk2InventoryScrollDirSignature2[] = {
+	0x78,                               // push1
+	0x63, 0x98,                         // pToa client
+	0x4a, SIG_MAGICDWORD,               // send 06 [ client scrollSelections: 1 ]
+	      SIG_UINT16(0x0006),
+	0x35, 0x02,                         // ldi 02
+	0x65, 0x56,                         // aTop cel
+	SIG_END
+};
+
+static const uint16 gk2InventoryScrollDirPatch2[] = {
+	0x67, 0x9a,                         // pTos delta
+	0x63, 0x98,                         // pToa client
+	0x4a, PATCH_UINT16(0x0006),         // send 06 [ client scrollSelections: delta ]
+	0x7a,                               // push2
+	0x69, 0x56,                         // sTop cel
 	PATCH_END
 };
 
 // The init code 'GK2::init' that runs when GK2 starts up unconditionally resets
 // the music volume to 63, but the game should always use the volume stored in
 // ScummVM.
-// Applies to at least: English 1.00 CD
+// Applies to: All versions
 // Fixes bug: #9700
 static const uint16 gk2VolumeResetSignature[] = {
 	SIG_MAGICDWORD,
@@ -3358,44 +3482,378 @@ static const uint16 gk2VolumeResetPatch[] = {
 	PATCH_END
 };
 
-// GK2 has custom video benchmarking code that needs to be disabled in a subroutine
-// which is called from 'GK2::init'; see sci2BenchmarkSignature
-// TODO: Patch is not applied to localized versions and needs to get adjusted
+// GK2 has custom video benchmarking code that needs to be disabled in a local
+//  procedure called from GK2:init. It sets the game's detailLevel and returns
+//  a value which is assigned to GK2:speedRating and never used. The maximum
+//  detailLevel the game recognizes is six so we just set it to that.
+//
+// Applies to: All versions
+// Responsible method: GK2:init
 static const uint16 gk2BenchmarkSignature[] = {
-	0x7e, SIG_ADDTOOFFSET(+2), // line
-	0x38, SIG_SELECTOR16(new), // pushi new
-	0x76,                      // push0
-	0x51, SIG_ADDTOOFFSET(+1), // class Actor
-	0x4a, SIG_UINT16(0x04),    // send 4
-	0xa5, 0x00,                // sat temp[0]
-	0x7e, SIG_ADDTOOFFSET(+2), // line
-	0x7e, SIG_ADDTOOFFSET(+2), // line
-	0x39, SIG_SELECTOR8(view), // pushi view ($e)
-	SIG_MAGICDWORD,
-	0x78,                      // push1
-	0x38, SIG_UINT16(0xfdd4),  // pushi 64980
+	0x76,                       // push0
+	0x40, SIG_ADDTOOFFSET(+2),  // call speed test proc 
+	      SIG_MAGICDWORD,
+		  SIG_UINT16(0x0000),
+	0x65, 0x28,                 // aTop speedRating
 	SIG_END
 };
 
 static const uint16 gk2BenchmarkPatch[] = {
-	0x38, PATCH_SELECTOR16(detailLevel), // pushi detailLevel
-	0x78,                                // push1
-	0x38, PATCH_UINT16(399),             // pushi 399 (10000 / 25 - 1)
-	0x81, 0x01,                          // lag global[1]
-	0x4a, PATCH_UINT16(0x0006),          // send 6
-	0x34, PATCH_UINT16(10000),           // ldi 10000
-	0x48,                                // ret
+	0x35, 0x06,                 // ldi 06
+	0x65, 0x18,                 // aTop _detailLevel
+	0x33, 0x02,                 // jmp 02
+	PATCH_END
+};
+
+// GK2 has a complex sound bug which causes seemingly random lockups when
+//  changing rooms in many areas including the Herrenchiemse Museum, the Hunt 
+//  Club, and St. Georg Church. This also occurs in the original.
+//
+// SoundManager continuously plays an array of sounds provided to its play
+//  method. Sounds play in a random order with a random delay of five to ten
+//  seconds in between. SoundManager is attached to soundRegion and survives
+//  room changes. Rooms that set a new playlist call play on initialization.
+//  The problem is that SoundManager:play doesn't clear its delay timer. If play
+//  is called during a delay then the timer continues and expires during the
+//  next sound. This is noticeable throughout the game when background music is
+//  randomly interrupted by different music. Many room scripts change rooms by
+//  calling SoundManager:fade in handsOff mode and proceeding once they've been
+//  cued. If a stray SoundManager timer expires while a script is waiting for
+//  fade to complete then SoundManager:cue will play the next sound, overwrite
+//  gk2Music:client with itself, and the waiting script will never cue.
+//
+// We fix this by clearing SoundManager's timer state in SoundManager:play.
+//  This prevents the delay timer from ever running while music is playing.
+//
+// Applies to: All versions
+// Responsible method: SoundManager:play
+static const uint16 gk2SoundManagerLockupSignature1[] = {
+	0x7e, SIG_ADDTOOFFSET(+2),          // line
+	0x7e, SIG_ADDTOOFFSET(+2),          // line
+	SIG_MAGICDWORD,
+	0x35, 0x00,                         // ldi 00
+	0x65, 0x34,                         // aTop cleanup
+	SIG_END
+};
+
+static const uint16 gk2SoundManagerLockupPatch1[] = {
+	0x35, 0x00,                         // ldi 00
+	0x64, PATCH_UINT16(0x001e),         // aTop seconds
+	0x64, PATCH_UINT16(0x0012),         // aTop scratch
+	PATCH_END
+};
+
+static const uint16 gk2SoundManagerLockupSignature2[] = {
+	0x87, SIG_MAGICDWORD, 0x00,         // lap 00
+	0x18,                               // not
+	0x31, 0x10,                         // bnt 10 [ skip debug message ]
+	0x78,                               // push1
+	0x72,                               // lofsa "WARNING: 0 args passed to SoundManager!"
+	SIG_END
+};
+
+static const uint16 gk2SoundManagerLockupPatch2[] = {
+	0x35, 0x00,                         // ldi 00
+	0x65, 0x1e,                         // aTop seconds
+	0x65, 0x12,                         // aTop scratch
+	0x32, PATCH_UINT16(0x0014),         // jmp 0014 [ skip debug message ]
+	PATCH_END
+};
+
+// Clicking on Frau Miller in room 810 after exhausting her topics and then
+//  clicking on anything else can lockup or crash the game. rm810:newRoom fades
+//  the music before transitioning to room 8110, which takes several seconds.
+//  The game doesn't disable input during this period and if the player begins
+//  another action then rm810:cue can unexpectedly interrupt it. If Grace is
+//  walking then the room will reload in a handsOff state. Other edge cases
+//  include setting the room number to zero and subsequently crashing.
+//
+// We fix this by calling handsOff so that the player can't interrupt the Frau
+//  Miller room transition while waiting for the music to fade, which is
+//  consistent with the exit to the map.
+//
+// Applies to: All versions
+// Responsible method: rm810:newRoom
+static const uint16 gk2FrauMillerLockupSignature[] = {
+	SIG_MAGICDWORD,
+	0x39, 0x03,                         // pushi 03
+	0x8f, 0x01,                         // lsp 01
+	0x38, SIG_UINT16(0x1fae),           // pushi 1fae
+	0x38, SIG_UINT16(0x0320),           // pushi 0320
+	0x46, SIG_UINT16(0xfde7),           // calle proc64999_5 [ OneOf newRoomNumber 8110 800 ]
+	      SIG_UINT16(0x0005),
+	      SIG_UINT16(0x0006),
+	0x31,                               // bnt [ don't fade music ]
+	SIG_END
+};
+
+static const uint16 gk2FrauMillerLockupPatch[] = {
+	0x8f, 0x01,                         // lsp 01
+	0x34, PATCH_UINT16(0x1fae),         // ldi 1fae
+	0x24,                               // le? [ newRoomNumber <= 8110 ]
+	0x31, PATCH_GETORIGINALBYTEADJUST(+18, +11), // bnt [ don't fade music ]
+	0x38, PATCH_SELECTOR16(handsOff),   // pushi handsOff
+	0x39, 0x00,                         // pushi 00
+	0x80, PATCH_UINT16(0x0001),         // lag 0001
+	0x4a, PATCH_UINT16(0x0004),         // send 04 [ GK2 handsOff: ]
+	PATCH_END
+};
+
+// GK2 1.0 contains a deadend bug in chapter 3. Exhausting Leber's topics before
+//  reading Grace's letter prevents returning to the police station to ask about
+//  the Black Wolf, which is necessary to complete the chapter.
+//
+// We fix this as Sierra did by adding a flag 218 test so that the police
+//  station doesn't close before Leber has been asked about the Black Wolf.
+//
+// Applies to: English PC 1.0
+// Responsible method: rm3210:dispose
+static const uint16 gk2PoliceStationDeadendSignature[] = {
+	0x78,                               // push1
+	0x38, SIG_UINT16(0x00dd),           // pushi 00dd
+	0x47, 0x0b, 0x00, SIG_MAGICDWORD,   // calle proc11_0 [ is flag 221 set? ]
+	      SIG_UINT16(0x002),
+	0x31, 0x51,                         // bnt 51 [ skip closing police station ]
+	SIG_END
+};
+
+static const uint16 gk2PoliceStationDeadendPatch[] = {
+	0x80, PATCH_UINT16(0x00a3),         // lag 00a3 [ flags 208-223 ]
+	0x39, 0x24,                         // pushi 24
+	0x12,                               // and
+	0x39, 0x24,                         // pushi 24
+	0x1a,                               // eq? [ are flags 218 and 221 set? ]
+	PATCH_END
+};
+
+// In chapter 3, Xaver can be asked about the Black Wolf before learning about
+//  the Black Wolf from Grace's letter. The tBlackWolf topic in room 4320 is
+//  missing the readyFlagNum value of 514 that the other tBlackWolf topics in
+//  chapter 3 have, so we set it.
+//
+// Applies to: All versions
+// Responsible method: heap in script 4320
+static const uint16 gk2XaverBlackWolfSignature[] = {
+	SIG_MAGICDWORD,             // tBlackWolf
+	SIG_UINT16(0x010e),         // sceneNum = 270
+	SIG_UINT16(0x00f0),         // flagNum = 240
+	SIG_UINT16(0x0000),         // readyFlagNum = 0
+	SIG_END
+};
+
+static const uint16 gk2XaverBlackWolfkPatch[] = {
+	PATCH_ADDTOOFFSET(+4),
+	PATCH_UINT16(0x0202),       // readyFlagNum = 514
+	PATCH_END
+};
+
+// Chapter 4 has a bug in many versions of GK2 that is effectively a deadend.
+//  Asking Georg about "Ludwig's letter to the Conductor" is required to finish
+//  the chapter. This topic becomes available after looking at the "Ludwig and
+//  Wagner" plaque in Herrenchiemsee and then clicking again to read it aloud.
+//  The problem is that the rest of the game only cares about looking at the 
+//  plaque. If Herrenchiemsee is completed without reading the plaque then the
+//  Hint feature claims everything is done and the player appears to be stuck.
+//
+// We fix this as Sierra did by making Georg's letter topic available upon just
+//  looking at the plaque, which is consistent with the rest of the scripts.
+//  Although Sierra advertised this fix in the readme for GK2PAT 1.11, the patch
+//  file seems to be missing, but appears in later versions and the GOG release.
+//
+// Applies to: English PC 1.0, 1.1, 1.11 Patch, Mac
+// Responsible method: Heap in script 8520
+static const uint16 gk2GeorgLetterTopicSignature[] = {
+	SIG_MAGICDWORD,             // tLtr2Conductor
+	SIG_UINT16(0x0211),         // sceneNum = 529
+	SIG_UINT16(0x012a),         // flagNum = 298
+	SIG_UINT16(0x0283),         // readyFlagNum = 643
+	SIG_END
+};
+
+static const uint16 gk2GeorgLetterTopicPatch[] = {
+	PATCH_ADDTOOFFSET(+4),
+	PATCH_UINT16(0x026f),       // readyFlagNum = 623
+	PATCH_END
+};
+
+// In early versions of GK2, clicking on the holy water basket after using the
+//  holy water locks up the game. The script is supposed to test the flag that's
+//  set when getting the water but some code mistakenly tests inventory instead.
+//  We fix this as Sierra did by replacing the inventory tests with flag tests.
+//
+// Applies to: English PC 1.0, Mac
+// Responsible methods: waterBasket:handleEvent, waterBasket:doVerb
+static const uint16 gk2HolyWaterLockupSignature[] = {
+	SIG_MAGICDWORD,
+	0x38, SIG_SELECTOR16(has),  // pushi has
+	0x78,                       // push1
+	0x39, 0x3e,                 // pushi 3e
+	0x81, 0x00,                 // lag 00
+	0x4a, SIG_UINT16(0x0006),   // send 06 [ GraceEgo has: 62 (invBottleOfWater) ]
+	SIG_END
+};
+
+static const uint16 gk2HolyWaterLockupPatch[] = {
+	0x38, PATCH_UINT16(0x0001), // pushi 0001
+	0x38, PATCH_UINT16(0x0476), // pushi 0476
+	0x47, 0x0b, 0x00,           // calle proc11_0 [ is flag 1142 set? ]
+	      PATCH_UINT16(0x0002),
+	PATCH_END
+};
+
+// In early versions of GK2, Neuschwanstein castle can flash when clicking the
+//  Hint button even after completing everything. The Hint script tests too many
+//  flags including one whose value is random since it toggles back and forth
+//  between two tape messages. We remove these flag tests as Sierra did.
+//
+// Applies to: English PC 1.0, Mac
+// Responsible method: local procedure #0 in script 800
+static const uint16 gk2NeuschwansteinHintSignature1[] = {
+	SIG_MAGICDWORD,
+	0x78,                       // push1
+	0x38, SIG_UINT16(0x024d),   // pushi 024d
+	0x47, 0x0b, 0x00,           // calle proc11_0 [ is flag 589 set? ]
+	SIG_UINT16(0x0002),
+	SIG_END
+};
+
+static const uint16 gk2NeuschwansteinHintSignature2[] = {
+	SIG_MAGICDWORD,
+	0x78,                       // push1
+	0x38, SIG_UINT16(0x024e),   // pushi 024e
+	0x47, 0x0b, 0x00,           // calle proc11_0 [ is flag 590 set? ]
+	SIG_UINT16(0x0002),
+	SIG_END
+};
+
+static const uint16 gk2NeuschwansteinHintSignature3[] = {
+	SIG_MAGICDWORD,
+	0x78,                       // push1
+	0x38, SIG_UINT16(0x0250),   // pushi 0250
+	0x47, 0x0b, 0x00,           // calle proc11_0 [ is flag 592 set? ]
+	SIG_UINT16(0x0002),
+	SIG_END
+};
+
+static const uint16 gk2NeuschwansteinHintPatch[] = {
+	0x35, 0x01,                 // ldi 01
+	0x33, 0x05,                 // jmp 05
+	PATCH_END
+};
+
+// Clicking an inventory item on the Wagner paintings in rooms 8616 and 8617
+//  causes a missing message error. The paintings only have responses for the
+//  "Do" verb but painting:doVerb passes the incoming verb to gk2Messager:say
+//  without any filtering. We fix this by always playing the "Do" message.
+//
+// Applies to: All versions
+// Responsible methods: painting:doVerb in scripts 8616 and 8617
+static const uint16 gk2WagnerPaintingMessageSignature[] = {
+	SIG_MAGICDWORD,
+	0x38, SIG_SELECTOR16(say),  // pushi say
+	0x38, SIG_UINT16(0x0006),   // pushi 0006
+	0x67, SIG_ADDTOOFFSET(+1),  // pTos noun
+	0x8f, 0x01,                 // lsp 01 [ verb ]
+	SIG_END
+};
+
+static const uint16 gk2WagnerPaintingMessagePatch[] = {
+	PATCH_ADDTOOFFSET(+8),
+	0x39, 0x3e,                 // pushi 3e [ "Do" verb ]
+	PATCH_END
+};
+
+// The game-over rooms 665 and 666 draw a pic over everything by setting the
+//  default plane's priority to 202, but this is already inventoryBorderPlane's
+//  priority. In our interpreter this causes a border fragment to be drawn above
+//  the pics. This worked by luck in Sierra's interpreter because it sorts on
+//  memory ID when planes have the same priority. In ScummVM the renderer
+//  guarantees a sort order based on the creation order of the planes. The
+//  default plane is created first and drawn before inventoryBorderPlane.
+//
+// We fix this by increasing the plane priority in the game-over rooms.
+//
+// Applies to: All versions
+// Responsible methods: gabeNews:init, uDie:init
+// Fixes bug: #11298
+static const uint16 gk2GameOverPrioritySignature[] = {
+	0x39, SIG_SELECTOR8(priority),  // pushi priority
+	SIG_MAGICDWORD,
+	0x78,                           // push1
+	0x38, SIG_UINT16(0x00ca),       // pushi 00ca
+	0x81, 0x03,                     // lag 03
+	0x4a, SIG_UINT16(0x0012),       // send 12 [ Plane ... priority: 202 ]
+	SIG_END
+};
+
+static const uint16 gk2GameOverPriorityPatch[] = {
+	PATCH_ADDTOOFFSET(+3),
+	0x38, PATCH_UINT16(0x00cb),     // pushi 00cb [ priority: 203 ]
+	PATCH_END
+};
+
+// GK2 fans have created patches that add subtitles to the entire game. There
+//  are at least English and Spanish patch sets. Sierra added the subtitle
+//  feature solely for the Portuguese version. The fan patches include these
+//  subtitle scripts, replace the Portuguese resources and embedded script
+//  strings, and configure Sierra's interpreter to use the Portuguese language
+//  through RESOURCE.CFG. This sets GK2:printLang which the scripts test for
+//  Portuguese in order to activate subtitles.
+//
+// The subtitle patches are compatible with ScummVM except for the requirement
+//  that GK2:printLang equals Portuguese (351) since we don't use RESOURCE.CFG.
+//  We fix this by patching the GK2:printLang tests to always activate subtitles
+//  when a sync resource is present for synchronizing text to video playback.
+//
+// Applies to: PC versions with a subtitle fan-patch applied
+// Responsible methods: Any that test GK2:printLang for Portuguese
+// Fixes bugs: #9677, #11282
+static const uint16 gk2SubtitleCompatibilitySignature[] = {
+	SIG_MAGICDWORD,
+	0x39, SIG_SELECTOR8(printLang), // pushi printLang
+	0x76,                           // push0
+	0x81, 0x01,                     // lag 01
+	0x4a, SIG_UINT16(0x0004),       // send 04 [ GK2 printLang? ]
+	SIG_END
+};
+
+static const uint16 gk2SubtitleCompatibilityPatch[] = {
+	0x34, PATCH_UINT16(0x015f),     // ldi 015f [ K_LANG_PORTUGUESE ]
+	0x33, 0x03,                     // jmp 03
 	PATCH_END
 };
 
 //          script, description,                                              signature                         patch
 static const SciScriptPatcherEntry gk2Signatures[] = {
-	{  true,     0, "disable volume reset on startup",                     1, gk2VolumeResetSignature,          gk2VolumeResetPatch },
-	{  true,     0, "disable video benchmarking",                          1, gk2BenchmarkSignature,            gk2BenchmarkPatch },
-	{  true,    23, "fix inventory scroll start direction",                1, gk2InvScrollSignature,            gk2InvScrollPatch },
-	{  true, 64990, "increase number of save games (1/2)",                 1, sci2NumSavesSignature1,           sci2NumSavesPatch1 },
-	{  true, 64990, "increase number of save games (2/2)",                 1, sci2NumSavesSignature2,           sci2NumSavesPatch2 },
-	{  true, 64990, "disable change directory button",                     1, sci2ChangeDirSignature,           sci2ChangeDirPatch },
+	{  true,     0, "disable volume reset on startup",                     1, gk2VolumeResetSignature,           gk2VolumeResetPatch },
+	{  true,     0, "disable video benchmarking",                          1, gk2BenchmarkSignature,             gk2BenchmarkPatch },
+	{  true,    23, "fix inventory scroll speed",                          2, gk2InventoryScrollSpeedSignature,  gk2InventoryScrollSpeedPatch },
+	{  true,    23, "fix inventory scroll direction",                      1, gk2InventoryScrollDirSignature1,   gk2InventoryScrollDirPatch1 },
+	{  true,    23, "fix inventory scroll direction (no line numbers)",    1, gk2InventoryScrollDirSignature2,   gk2InventoryScrollDirPatch2 },
+	{  true,    37, "fix sound manager lockup",                            1, gk2SoundManagerLockupSignature1,   gk2SoundManagerLockupPatch1 },
+	{  true,    37, "fix sound manager lockup (no line numbers)",          1, gk2SoundManagerLockupSignature2,   gk2SoundManagerLockupPatch2 },
+	{  true,   665, "fix game-over priority",                              1, gk2GameOverPrioritySignature,      gk2GameOverPriorityPatch },
+	{  true,   666, "fix game-over priority",                              1, gk2GameOverPrioritySignature,      gk2GameOverPriorityPatch },
+	{  true,   800, "fix neuschwanstein hint (1/3)",                       1, gk2NeuschwansteinHintSignature1,   gk2NeuschwansteinHintPatch },
+	{  true,   800, "fix neuschwanstein hint (2/3)",                       1, gk2NeuschwansteinHintSignature2,   gk2NeuschwansteinHintPatch },
+	{  true,   800, "fix neuschwanstein hint (3/3)",                       1, gk2NeuschwansteinHintSignature3,   gk2NeuschwansteinHintPatch },
+	{  true,   810, "fix frau miller lockup",                              1, gk2FrauMillerLockupSignature,      gk2FrauMillerLockupPatch },
+	{  true,  1020, "fix holy water lockup",                               2, gk2HolyWaterLockupSignature,       gk2HolyWaterLockupPatch },
+	{  true,  3210, "fix police station deadend",                          1, gk2PoliceStationDeadendSignature,  gk2PoliceStationDeadendPatch },
+	{  true,  4320, "fix xaver black wolf topic",                          1, gk2XaverBlackWolfSignature,        gk2XaverBlackWolfkPatch },
+	{  true,  8520, "fix georg letter topic",                              1, gk2GeorgLetterTopicSignature,      gk2GeorgLetterTopicPatch },
+	{  true,  8616, "fix wagner painting message",                         2, gk2WagnerPaintingMessageSignature, gk2WagnerPaintingMessagePatch },
+	{  true,  8617, "fix wagner painting message",                         2, gk2WagnerPaintingMessageSignature, gk2WagnerPaintingMessagePatch },
+	{  true, 64990, "increase number of save games (1/2)",                 1, sci2NumSavesSignature1,            sci2NumSavesPatch1 },
+	{  true, 64990, "increase number of save games (2/2)",                 1, sci2NumSavesSignature2,            sci2NumSavesPatch2 },
+	{  true, 64990, "disable change directory button",                     1, sci2ChangeDirSignature,            sci2ChangeDirPatch },
+	{ false,     0, "subtitle patch compatibility",                        3, gk2SubtitleCompatibilitySignature, gk2SubtitleCompatibilityPatch },
+	{ false,    11, "subtitle patch compatibility",                        7, gk2SubtitleCompatibilitySignature, gk2SubtitleCompatibilityPatch },
+	{ false,    12, "subtitle patch compatibility",                        5, gk2SubtitleCompatibilitySignature, gk2SubtitleCompatibilityPatch },
+	{ false,    91, "subtitle patch compatibility",                        7, gk2SubtitleCompatibilitySignature, gk2SubtitleCompatibilityPatch },
+	{ false,   200, "subtitle patch compatibility",                        1, gk2SubtitleCompatibilitySignature, gk2SubtitleCompatibilityPatch },
+	{ false,  1300, "subtitle patch compatibility",                        1, gk2SubtitleCompatibilitySignature, gk2SubtitleCompatibilityPatch },
+	{ false, 64924, "subtitle patch compatibility",                        1, gk2SubtitleCompatibilitySignature, gk2SubtitleCompatibilityPatch },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -4040,6 +4498,65 @@ static const uint16 kq6CDPatchWallFlowerDanceFix[] = {
 	PATCH_END
 };
 
+// KQ6 truncates messages longer than 400 characters in the CD and Mac versions.
+//  This is most prominent when reading Cassima's letter to Alexander. When the
+//  Messager class was upgraded to support audio, a 400 character buffer was
+//  added to read messages into, but KQ6 has messages as long as 602 characters.
+//  This limitation is in other games with this same Messager class. LB2, for
+//  example, has the same class but no messages beyond 400 characters.
+//
+// We fix this by increasing the temporary variables in Messager:sayNext from
+//  202 to 303 to accommodate the longest message. This patch implicitly depends
+//  on the Audio+Subtitle patches below, as they coincidentally alter sayNext
+//  in a way that this patch would otherwise have to. The CD version uses
+//  temp201, which we would normally have to patch to temp302 since we're
+//  expanding the buffer before it, but the Audio+Subtitle patches happen to
+//  remove or disable all use of this variable.
+//
+// Applies to: PC CD, Macintosh
+// Responsible method: Messager:sayNext
+// Fixes bug: #10682
+static const uint16 kq6SignatureTruncatedMessagesFix[] = {
+	SIG_MAGICDWORD,
+	0x3f, 0xca,                         // link ca
+	0x87, 0x00,                         // lap 00
+	0x31, 0x18,                         // bnt 18
+	0x39, 0x07,                         // pushi 07
+	0x76,                               // push0
+	0x8f, 0x01,                         // lsp 01
+	0x8f, 0x02,                         // lsp 02
+	0x8f, 0x03,                         // lsp 03
+	0x8f, 0x04,                         // lsp 04
+	0x8f, 0x05,                         // lsp 05
+	0x5b, 0x04, 0x01,                   // lea 04 01
+	0x36,                               // push
+	0x43, 0x7c, 0x0e,                   // callk Message 0e
+	0xa5, 0x00,                         // sat 00
+	0x33, 0x0b,                         // jmp 0b
+	SIG_ADDTOOFFSET(+9),
+	0xa5, 0x00,                         // sat 00
+	SIG_END
+};
+
+static const uint16 kq6PatchTruncatedMessagesFix[] = {
+	0x3e, PATCH_UINT16(0x012f),         // link 012f
+	0x87, 0x00,                         // lap 00
+	0x31, 0x17,                         // bnt 17
+	0x39, 0x07,                         // pushi 07
+	0x76,                               // push0
+	0x8f, 0x01,                         // lsp 01
+	0x8f, 0x02,                         // lsp 02
+	0x8f, 0x03,                         // lsp 03
+	0x8f, 0x04,                         // lsp 04
+	0x8f, 0x05,                         // lsp 05
+	0x5b, 0x04, 0x01,                   // lea 04 01
+	0x36,                               // push
+	0x43, 0x7c, 0x0e,                   // callk Message 0e
+	0x32, PATCH_UINT16(0x0009),         // jmp 0009
+	PATCH_END
+};
+
+
 // Audio + subtitles support - SHARED! - used for King's Quest 6 and Laura Bow 2.
 //  This patch gets enabled when the user selects "both" in the ScummVM
 //  "Speech + Subtitles" menu. We currently use global[98d] to hold a kMemory
@@ -4462,6 +4979,7 @@ static const SciScriptPatcherEntry kq6Signatures[] = {
 	{  true,   640, "fix 'Tickets, only' message",                    1, kq6SignatureTicketsOnly,                  kq6PatchTicketsOnly },
 	{  true,   907, "fix inventory stack leak",                       1, kq6SignatureInventoryStackFix,            kq6PatchInventoryStackFix },
 	{  true,   907, "fix hair detection for ribbon's look msg",       1, kq6SignatureLookRibbonFix,                kq6PatchLookRibbonFix },
+	{  true,   924, "CD/Mac: fix truncated messages",                 1, kq6SignatureTruncatedMessagesFix,         kq6PatchTruncatedMessagesFix },
 	// King's Quest 6 and Laura Bow 2 share basic patches for audio + text support
 	// *** King's Quest 6 audio + text support ***
 	{ false,   924, "CD: audio + text support KQ6&LB2 1",             1, kq6laurabow2CDSignatureAudioTextSupport1,     kq6laurabow2CDPatchAudioTextSupport1 },
@@ -4690,10 +5208,48 @@ static const uint16 kq7ExtraAmbrosiaPatch[] = {
 	PATCH_END
 };
 
+// In KQ7 1.4, after giving the statue to the snake oil salesman, the curtain is
+//  drawn on top of ego when walking in front of the wagon. The script doesn't
+//  dispose of the salesman and this leaves his final cel stuck on the screen.
+//  We add the missing call to snakeSalesman:dispose.
+//
+// Applies to: English PC 1.4
+// Responsible method: giveStatue:changeState
+// Fixes bug: #10221
+static const uint16 kq7SnakeOilSalesmanSignature[] = {
+	0x38, SIG_SELECTOR16(setHeading),   // pushi setHeading
+	SIG_ADDTOOFFSET(+0x281),
+	0x72, SIG_UINT16(0x15b4),           // lofsa snakeSalesman
+	SIG_ADDTOOFFSET(+0x3f),
+	0x3c,                               // dup
+	0x35, SIG_MAGICDWORD, 0x0c,         // ldi 0c
+	0x1a,                               // eq?
+	0x30, SIG_UINT16(0x0010),           // bnt 0010 [ state 13 ]
+	0x38, SIG_SELECTOR16(setHeading),   // pushi setHeading
+	0x7a,                               // pushi2
+	0x38, SIG_UINT16(0x00b4),           // pushi 00b4
+	0x7c,                               // pushSelf
+	0x81, 0x00,                         // lag 00
+	0x4a, SIG_UINT16(0x0008),           // send 08  [ KQEgo setHeading: 180 self ]
+	0x32, SIG_UINT16(0x0017),           // jmp 0017 [ end of method ]
+	SIG_END
+};
+
+static const uint16 kq7SnakeOilSalesmanPatch[] = {
+	PATCH_ADDTOOFFSET(+0x02cd),
+	0x38, PATCH_SELECTOR16(dispose),    // pushi dispose
+	0x76,                               // push0
+	0x72, PATCH_UINT16(0x15b4),         // lofsa snakeSalesman
+	0x4a, PATCH_UINT16(0x0004),         // send 04  [ snakeSalesman: dispose ]
+	0x32, PATCH_UINT16(0xfd26),         // jmp fd26 [ KQEgo setHeading and end of method ] 
+	PATCH_END
+};
+
 //          script, description,                                      signature                                 patch
 static const SciScriptPatcherEntry kq7Signatures[] = {
 	{  true,     0, "disable video benchmarking",                  1, kq7BenchmarkSignature,                    kq7BenchmarkPatch },
 	{  true,     0, "remove hardcoded spin loop",                  1, kq7PragmaFailSpinSignature,               kq7PragmaFailSpinPatch },
+	{  true,  5300, "fix snake oil salesman disposal",             1, kq7SnakeOilSalesmanSignature,             kq7SnakeOilSalesmanPatch },
 	{  true,  6100, "fix extra ambrosia",                          1, kq7ExtraAmbrosiaSignature,                kq7ExtraAmbrosiaPatch },
 	{  true,    31, "enable subtitles (1/3)",                      1, kq7SubtitleFixSignature1,                 kq7SubtitleFixPatch1 },
 	{  true, 64928, "enable subtitles (2/3)",                      1, kq7SubtitleFixSignature2,                 kq7SubtitleFixPatch2 },
@@ -7794,7 +8350,7 @@ static const uint16 phant1ResetStabDonFlagSignature[] = {
 	0x34, SIG_UINT16(0x0384),       // ldi 0384
 	0x1a,                           // eq?
 	0x18,                           // not
-	SIG_END,
+	SIG_END
 };
 
 static const uint16 phant1ResetStabDonFlagPatch[] = {
@@ -7870,8 +8426,33 @@ static const uint16 phant1Video2020CensorPatch[] = {
 	PATCH_END
 };
 
+// The Mac version is hard-coded to use a low video speed value. This defaults
+//  the video size to half-screen and causes low frame-rate versions of several
+//  videos to play, even though better versions are included. PC versions read
+//  config values written by a benchmark in the game's installer. We address
+//  that by returning a high video speed value of 500 in kGetSierraProfileInt
+//  and kGetConfig, and so we patch the Mac value to 500 as well.
+//
+// Applies to: Mac version only
+// Responsible method: Scary:init
+static const uint16 phant1MacVideoQualitySignature[] = {
+	0x34, SIG_UINT16(0x0190),       // ldi 0190
+	SIG_MAGICDWORD,
+	0xa1, 0xb2,                     // sag b2 [ video speed = 400 ]
+	0x36,                           // push
+	0x34, SIG_UINT16(0x01a9),       // ldi 01a9
+	0x1e,                           // gt?
+	SIG_END
+};
+
+static const uint16 phant1MacVideoQualityPatch[] = {
+	0x34, PATCH_UINT16(0x01f4),     // ldi 01f4 [ 500 ]
+	PATCH_END
+};
+
 //          script, description,                                      signature                        patch
 static const SciScriptPatcherEntry phantasmagoriaSignatures[] = {
+	{  true,     0, "mac: set high video quality",                 1, phant1MacVideoQualitySignature,  phant1MacVideoQualityPatch },
 	{  true,    23, "make cursor red after clicking quit",         1, phant1RedQuitCursorSignature,    phant1RedQuitCursorPatch },
 	{  true,    26, "fix video 1920 censorship",                   1, phant1Video1920CensorSignature,  phant1Video1920CensorPatch },
 	{  true,    26, "fix video 2020 censorship",                   1, phant1Video2020CensorSignature,  phant1Video2020CensorPatch },
@@ -8297,6 +8878,91 @@ static const uint16 phant2DocuStoreEmailPlacementPatch[] = {
 	PATCH_END
 };
 
+// The scrollbars in the DocuStore computer crash when clicking on the thumb,
+//  dragging the cursor off of the scrollbar, and then releasing. This calls
+//  Thumb:action with no event parameter, which Thumb:action expects, but after
+//  handling this it proceeds to use the uninitialized parameter anyway.
+//  DItem:track then errors by sending a message to this non-object.
+//
+// We fix this by passing the current event instead of the potentially
+//  nonexistent event parameter to DItem:track. This bug also occurs in the
+//  volume scrollbars in the control panel, which this patch also fixes.
+//
+// Applies to at least: English PC, French PC, probably all versions
+// Responsible method: Thumb:action
+// Fixes bug: #10391
+static const uint16 phant2ComputerScrollbarCrashSignature[] = {
+	0x7e, SIG_ADDTOOFFSET(+2),          // line
+	0x38, SIG_SELECTOR16(track),        // pushi track
+	0x78,                               // push1
+	0x8f, 0x01,                         // lsp 01
+	0x54, SIG_UINT16(0x0006),           // self 06 [ self track: param1 ]
+	0x7e, SIG_ADDTOOFFSET(+2),          // line
+	SIG_MAGICDWORD,
+	0x76,                               // push0
+	0x43, 0x21, SIG_UINT16(0x0000),     // callk FrameOut
+	0x7e,                               // line
+	SIG_END
+};
+
+static const uint16 phant2ComputerScrollbarCrashPatch[] = {
+	0x38, PATCH_SELECTOR16(track),      // pushi track
+	0x78,                               // push1
+	0x38, PATCH_SELECTOR16(curEvent),   // pushi curEvent
+	0x76,                               // push0
+	0x80, PATCH_UINT16(0x0050),         // lag 0050
+	0x4a, PATCH_UINT16(0x0004),         // send 04 [ p2User curEvent? ]
+	0x36,                               // push
+	0x54, PATCH_UINT16(0x0006),         // self 06 [ self track: (p2User curEvent?) ]
+	0x76,                               // push0
+	0x43, 0x21, PATCH_UINT16(0x0000),   // callk FrameOut
+	PATCH_END
+};
+
+// The volume scrollbar arrows on the control panel don't respond to clicks.
+//  ScrollbarArrow:handleEvent only calls its action method if the selection
+//  flag (2) of its state property is set. DItem:track sets and clears this flag
+//  by calling DItem:hilite if the mouse has moved since the previous cycle.
+//  This normally works because Cast:handleEvent calls the track method of each
+//  member of its mouser collection, but User:doit only passes these events on
+//  if User:hogs is empty. Loading the control panel adds its button to the hogs
+//  stack which prevents DItem:track from being called and updating the flag.
+//  
+// We fix this by setting the global mouse-moved flag whenever a scrollbar arrow
+//  is pressed. ScrollbarArrow:handleEvent already calls DItem:track, so setting
+//  this flag before then causes it to always evaluate the incoming event and
+//  update the selection state flag accordingly.
+//
+// Applies to at least: English PC, French PC, probably all versions
+// Responsible method: ScrollbarArrow:handleEvent
+// Fixes bug: #10164
+static const uint16 phant2ScrollbarArrowSignature[] = {
+	0x7e, SIG_ADDTOOFFSET(+2),          // line
+	0x7e, SIG_ADDTOOFFSET(+2),          // line
+	0x67, SIG_SELECTOR8(state),         // pTos state
+	0x35, 0x20,                         // ldi 20
+	0x12,                               // and [ is arrow pressed? ]
+	SIG_MAGICDWORD,
+	0x18,                               // not
+	0x18,                               // not
+	0x31, 0x64,                         // bnt 64
+	0x7e,                               // line
+	SIG_END
+};
+
+static const uint16 phant2ScrollbarArrowPatch[] = {
+	0x67, PATCH_SELECTOR8(state),       // pTos state
+	0x35, 0x20,                         // ldi 20
+	0x12,                               // and [ is arrow pressed? ]
+	0x31, 0x6c,                         // bnt 6c
+	0x38, PATCH_SELECTOR16(mouseMoved), // pushi mouseMoved
+	0x78,                               // push1
+	0x78,                               // push1
+	0x80, PATCH_UINT16(0x0050),         // lag 0050
+	0x4a, PATCH_UINT16(0x0006),         // send 06 [ p2User mouseMoved: 1 ]
+	PATCH_END
+};
+
 //          script, description,                                      signature                                  patch
 static const SciScriptPatcherEntry phantasmagoria2Signatures[] = {
 	{  true,     0, "speed up interface fades",                    3, phant2SlowIFadeSignature,                  phant2SlowIFadePatch },
@@ -8314,6 +8980,8 @@ static const SciScriptPatcherEntry phantasmagoria2Signatures[] = {
 	{  true, 63019, "fix bad folder/doc icon refresh",             2, phant2BadIconSignature,                    phant2BadIconPatch },
 	{  true, 63019, "fix file and note content placement",         1, phant2DocuStoreFileNotePlacementSignature, phant2DocuStoreFileNotePlacementPatch },
 	{  true, 63019, "fix email content placement",                 1, phant2DocuStoreEmailPlacementSignature,    phant2DocuStoreEmailPlacementPatch },
+	{  true, 64926, "fix computer scrollbar crash",                1, phant2ComputerScrollbarCrashSignature,     phant2ComputerScrollbarCrashPatch },
+	{  true, 64926, "fix volume scrollbar arrows",                 1, phant2ScrollbarArrowSignature,             phant2ScrollbarArrowPatch },
 	{  true, 64990, "remove save game name mangling (1/2)",        1, phant2SaveNameSignature1,                  phant2SaveNamePatch1 },
 	{  true, 64990, "increase number of save games (1/2)",         1, phant2NumSavesSignature1,                  phant2NumSavesPatch1 },
 	{  true, 64990, "increase number of save games (2/2)",         2, phant2NumSavesSignature2,                  phant2NumSavesPatch2 },
@@ -8710,36 +9378,45 @@ static const uint16 pq4CdSpeechAndSubtitlesSignature[] = {
 	SIG_END
 };
 
+// Note: global 0x5a may contain the following values:
+// 1: subtitles
+// 2: speech
+// 3: both
 static const uint16 pq4CdSpeechAndSubtitlesPatch[] = {
 	// iconText::init
 	0x76,                           // push0
 	0x41, 0x02, PATCH_UINT16(0x00), // call [our new subroutine which sets view+loop+cel], 0
 	0x33, 0x40,                     // jmp [to original init, super GCItem call]
 	// new code for setting view+loop+cel
-	0x34, PATCH_UINT16(0x2aeb),     // ldi 10987
-	0x65, 0x78,                     // aTop mainView - always set this view, because it's used by 2 states
+	//
 	0x89, 0x5a,                     // lsg global[$5a]
 	0x35, 0x03,                     // ldi 3
 	0x1a,                           // eq?
-	0x31, 0x04,                     // bnt [skip over follow up code]
-	// speech+subtitles mode
-	0x78,                           // push1
-	0x69, 0x7a,                     // sTop mainLoop
-	0x48,                           // ret
-	0x89, 0x5a,                     // lsg global[$5a]
-	0x35, 0x01,                     // ldi 1
-	0x12,                           // and
-	0x31, 0x04,                     // bnt [skip over follow up code]
-	// subtitles mode
+	0x31, 0x05,                     // bnt [skip over the view modification code]
+	//
+	// Mode 3: speech+subtitles
+	0x34, PATCH_UINT16(0x2aec),     // ldi 10988 (our new injected view, speech + subtitles)
+	0x33, 0x03,                     // jmp [skip over the view modification code]
+	// Mode 1: subtitles
+	0x34, PATCH_UINT16(0x2aeb),     // ldi 10987 (subtitles view)
+	//
+	// common code for speech+subtitles / subtitles mode
+	0x65, 0x78,                     // aTop mainView
 	0x76,                           // push0
 	0x69, 0x7a,                     // sTop mainLoop
-	0x48,                           // ret
-	// speech mode
-	0x34, PATCH_UINT16(0x2ae6),     // ldi 10982
+	//
+	0x89, 0x5a,                     // lsg global[$5a]
+	0x35, 0x02,                     // ldi 2
+	0x1a,                           // eq?
+	0x31, 0x09,                     // bnt [skip over follow up code]
+	//
+	// Mode 2: speech
+	0x34, PATCH_UINT16(0x2ae6),     // ldi 10982 (speech view)
 	0x65, 0x78,                     // aTop mainView
 	0x35, 0x0f,                     // ldi 15
 	0x65, 0x7a,                     // aTop mainLoop
 	0x48,                           // ret
+	//
 	PATCH_ADDTOOFFSET(+38),         // skip to iconText::select
 
 	// iconText::select
@@ -16714,12 +17391,57 @@ static const uint16 sq1vgaPatchSpiderDroidTiming[] = {
 	PATCH_END
 };
 
+// The Russian version of SQ1VGA has mangled class names in its scripts. This
+//  isn't a problem in Sierra's interpreter since this is just metadata, but our
+//  feature detection code looks up several classes by name and requires them to
+//  exist. We fix this by patching the Motion, Rm, and Sound strings back to
+//  their original values.
+//
+// Applies to: Russian PC Floppy
+// Fixes bug: #10156
+static const uint16 sq1vgaSignatureRussianMotionName[] = {
+	SIG_MAGICDWORD,
+	0x2A, 0x4D, 0x6F, 0x74, 0x69,       // *Motion.
+	0x6F, 0x6E, 0x20,
+	SIG_END
+};
+
+static const uint16 sq1vgaPatchRussianMotionName[] = {
+	0x4D, 0x6F, 0x74, 0x69, 0x6F,       // Motion
+	0x6E, 0x00,
+	PATCH_END
+};
+static const uint16 sq1vgaSignatureRussianRmName[] = {
+	SIG_MAGICDWORD,
+	0x2a, 0x52, 0x6d, 0x00,             // *Rm
+	SIG_END
+};
+
+static const uint16 sq1vgaPatchRussianRmName[] = {
+	0x52, 0x6d, 0x00,                   // Rm
+	PATCH_END
+};
+
+static const uint16 sq1vgaSignatureRussianSoundName[] = {
+	SIG_MAGICDWORD,
+	0x87, 0xa2, 0xe3, 0xaa, 0x00, 0x00, // ....
+	SIG_END
+};
+
+static const uint16 sq1vgaPatchRussianSoundName[] = {
+	0x53, 0x6f, 0x75, 0x63, 0x64,       // Sound
+	PATCH_END
+};
+
 //          script, description,                                      signature                                   patch
 static const SciScriptPatcherEntry sq1vgaSignatures[] = {
 	{  true,    45, "Ulence Flats: timepod graphic glitch",        1, sq1vgaSignatureUlenceFlatsTimepodGfxGlitch, sq1vgaPatchUlenceFlatsTimepodGfxGlitch },
 	{  true,    45, "Ulence Flats: force field generator glitch",  1, sq1vgaSignatureUlenceFlatsGeneratorGlitch,  sq1vgaPatchUlenceFlatsGeneratorGlitch },
 	{  true,    58, "Sarien armory droid zapping ego first time",  1, sq1vgaSignatureEgoShowsCard,                sq1vgaPatchEgoShowsCard },
 	{  true,   704, "spider droid timing issue",                   1, sq1vgaSignatureSpiderDroidTiming,           sq1vgaPatchSpiderDroidTiming },
+	{  true,   989, "rename russian Sound class",                  1, sq1vgaSignatureRussianSoundName,            sq1vgaPatchRussianSoundName },
+	{  true,   992, "rename russian Motion class",                 1, sq1vgaSignatureRussianMotionName,           sq1vgaPatchRussianMotionName },
+	{  true,   994, "rename russian Rm class",                     1, sq1vgaSignatureRussianRmName,               sq1vgaPatchRussianRmName },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -17221,19 +17943,169 @@ static const uint16 sq6BenchmarkSignature[] = {
 	SIG_END
 };
 
+// SQ6 advertises a maximum score of 500 but the game is missing two points.
+//  The "Official Player's Guide" authorized by Sierra includes a point list
+//  that adds up to 500. It claims that three points should be awarded instead
+//  of two when untangling the hose and attaching the staple and celery.
+//
+// Since an official point list exists that adds up to the 500 points that the
+//  game advertises, we add the two missing points to the inventory actions.
+//  Two versions of this patch are necessary because the English PC versions
+//  were compiled with line number debugging instructions and the subsequent
+//  French, German, and Mac versions weren't.
+//
+// Applies to: All versions
+// Responsible methods: Hookah_Hose:cue, Staple:doVerb, Celery:doVerb
+// Fixes bug: #11275
+static const uint16 sq6MissingPointsSignature[] = {
+	0x7e, SIG_ADDTOOFFSET(+2),      // line
+	SIG_MAGICDWORD,
+	0x39, SIG_SELECTOR8(points),    // pushi points
+	0x78,                           // push1
+	0x7a,                           // push2
+	SIG_END
+};
+
+static const uint16 sq6MissingPointsPatch[] = {
+	0x39, PATCH_SELECTOR8(points),  // pushi points
+	0x39, 0x01,                     // pushi 01
+	0x38, PATCH_UINT16(0x0003),     // pushi 0003
+	PATCH_END
+};
+
+// French, German, and Mac versions don't include line number instructions
+//  and require specific patches.
+static const uint16 sq6StapleCeleryPointSignature[] = {
+	0x72, SIG_ADDTOOFFSET(+2),      // lofsa Grappling_Hook
+	0x36,                           // push
+	0x81, 0x09,                     // lag 09
+	0x4a, SIG_UINT16(0x0006),       // send 06
+	0x39, SIG_SELECTOR8(points),    // pushi points
+	SIG_MAGICDWORD,
+	0x78,                           // push1
+	0x7a,                           // push2
+	0x38, SIG_SELECTOR16(setCursor),// pushi setCursor
+	SIG_END
+};
+
+static const uint16 sq6StapleCeleryPointPatch[] = {
+	0x74, PATCH_ADDTOOFFSET(+2),    // lofss Grappling_Hook
+	0x81, 0x09,                     // lag 09
+	0x4a, PATCH_UINT16(0x0006),     // send 06
+	0x39, PATCH_SELECTOR8(points),  // pushi points
+	0x78,                           // push1
+	0x39, 0x03,                     // pushi 03
+	PATCH_END
+};
+
+static const uint16 sq6HookahHosePointSignature[] = {
+	0x30, SIG_UINT16(0x0054),       // bnt 0054
+	SIG_ADDTOOFFSET(+75),
+	0x72, SIG_ADDTOOFFSET(+2),      // lofsa Hookah_Connected
+	0x36,                           // push
+	0x81, 0x09,                     // lag 09
+	0x4a, SIG_UINT16(0x000c),       // send 0c
+	0x39, SIG_SELECTOR8(points),    // pushi points
+	SIG_MAGICDWORD,
+	0x78,                           // push1
+	0x7a,                           // push2
+	0x81, 0x01,                     // lag 01
+	SIG_END
+};
+
+static const uint16 sq6HookahHosePointPatch[] = {
+	0x30, PATCH_UINT16(0x0053),     // bnt 0053
+	PATCH_ADDTOOFFSET(+75),
+	0x74, PATCH_ADDTOOFFSET(+2),    // lofss Hookah_Connected
+	0x81, 0x09,                     // lag 09
+	0x4a, PATCH_UINT16(0x000c),     // send 0c
+	0x39, PATCH_SELECTOR8(points),  // pushi points
+	0x78,                           // push1
+	0x39, 0x03,                     // pushi 03
+	PATCH_END
+};
+
+// Filling the helmet in room 690 awards three points, but this happens every
+//  time the player returns to fill the helmet with no limit. We fix this by
+//  associating the points with flag 297 so that they're only awarded once, as
+//  Sierra did in the French, German, and Mac versions.
+//
+// Applies to: English PC
+// Responsible method: sGetStuff:changeState(8)
+static const uint16 sq6DuplicatePointsSignature[] = {
+	SIG_MAGICDWORD,
+	0x39, SIG_SELECTOR8(points),        // pushi points
+	0x78,                               // push1
+	0x39, 0x03,                         // pushi 03
+	0x81, 0x01,                         // lag 01
+	0x4a, SIG_UINT16(0x0006),           // send 06 [ SQ6 points: 3 ]
+	0x7e,                               // line
+	SIG_END
+};
+
+static const uint16 sq6DuplicatePointsPatch[] = {
+	PATCH_ADDTOOFFSET(+2),
+	0x7a,                               // push2
+	PATCH_ADDTOOFFSET(+4),
+	0x38, PATCH_UINT16(0x0129),         // pushi 0129
+	0x4a, PATCH_UINT16(0x0008),         // send 08 [ SQ6 points: 3 297 ]
+	PATCH_END
+};
+
+// When attempting to restore a game that was saved with a different version of
+//  the interpreter, SQ6 displays a standard error dialog but then crashes due
+//  to a script bug. This also occurs in the original. SQ6 has custom code in
+//  Game:restore to set and restore the cursor differently depending on the
+//  current room. If in room 100, the main menu, then it attempts to restore the
+//  cursor by sending a message to an uninitialized variable.
+//
+// We fix this by not restoring the cursor when temp1 is zero. This patch relies
+//  on an existing uninitialized read workaround for Game:restore. The dialog
+//  still renders poorly, as it does in the original, but that's unrelated.
+//
+// Applies to: All versions
+// Responsible method: Game:restore
+// Fixes bug: #9702
+static const uint16 sq6RestoreErrorDialogSignature[] = {
+	0x38, SIG_SELECTOR16(setCursor),    // pushi setCursor
+	SIG_MAGICDWORD,
+	0x7a,                               // push2
+	0x8d, 0x01,                         // lst 01
+	0x76,                               // push0
+	0x43, 0x54, SIG_UINT16(0x0000),     // callk HaveMouse 00
+	0x36,                               // push
+	0x54, SIG_UINT16(0x0008),           // self 0008 [ self setCursor: temp1 kHaveMouse ]
+	SIG_END
+};
+
+static const uint16 sq6RestoreErrorDialogPatch[] = {
+	0x85, 0x01,                         // lat 01
+	0x30, PATCH_UINT16(0x000a),         // bnt 000a [ skip setCursor if temp1 == 0 ]
+	0x38, PATCH_SELECTOR16(setCursor),  // pushi setCursor
+	0x7a,                               // push2
+	0x8d, 0x01,                         // lst 01
+	0x78,                               // push1
+	PATCH_END
+};
+
 //          script, description,                                      signature                        patch
 static const SciScriptPatcherEntry sq6Signatures[] = {
 	{  true,     0, "fix slow transitions",                        1, sq6SlowTransitionSignature2,     sq6SlowTransitionPatch2 },
+	{  true,    15, "fix english pc missing points",               3, sq6MissingPointsSignature,       sq6MissingPointsPatch },
+	{  true,    15, "fix staple/celery missing point",             2, sq6StapleCeleryPointSignature,   sq6StapleCeleryPointPatch },
+	{  true,    15, "fix hookah hose missing point",               1, sq6HookahHosePointSignature,     sq6HookahHosePointPatch },
 	{  true,    15, "fix invalid array construction",              1, sci21IntArraySignature,          sci21IntArrayPatch },
 	{  true,    22, "fix invalid array construction",              1, sci21IntArraySignature,          sci21IntArrayPatch },
 	{  true,   410, "fix slow transitions",                        1, sq6SlowTransitionSignature2,     sq6SlowTransitionPatch2 },
 	{  true,   460, "fix invalid array construction",              1, sci21IntArraySignature,          sci21IntArrayPatch },
 	{  true,   500, "fix slow transitions",                        1, sq6SlowTransitionSignature1,     sq6SlowTransitionPatch1 },
 	{  true,   510, "fix invalid array construction",              1, sci21IntArraySignature,          sci21IntArrayPatch },
+	{  true,   690, "fix duplicate points",                        1, sq6DuplicatePointsSignature,     sq6DuplicatePointsPatch },
 	{  true, 64908, "disable video benchmarking",                  1, sq6BenchmarkSignature,           sci2BenchmarkPatch },
 	{  true, 64990, "increase number of save games (1/2)",         1, sci2NumSavesSignature1,          sci2NumSavesPatch1 },
 	{  true, 64990, "increase number of save games (2/2)",         1, sci2NumSavesSignature2,          sci2NumSavesPatch2 },
 	{  true, 64990, "disable change directory button",             1, sci2ChangeDirSignature,          sci2ChangeDirPatch },
+	{  true, 64994, "fix restore-error dialog",                    1, sq6RestoreErrorDialogSignature,  sq6RestoreErrorDialogPatch },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -18119,6 +18991,12 @@ void ScriptPatcher::processScript(uint16 scriptNr, SciSpan<byte> scriptData) {
 					enablePatch(signatureTable, "Mac: skip broken hop singh scene");
 				}
 				break;
+			case GID_GK2:
+				// Enable subtitle compatibility if a sync resource is present
+				if (g_sci->getResMan()->testResource(ResourceId(kResourceTypeSync, 10))) {
+					enablePatch(signatureTable, "subtitle patch compatibility");
+				}
+				break;
 			case GID_KQ5:
 				if (g_sci->_features->useAltWinGMSound()) {
 					// See the explanation in the kq5SignatureWinGMSignals comment
@@ -18190,7 +19068,7 @@ void ScriptPatcher::processScript(uint16 scriptNr, SciSpan<byte> scriptData) {
 					foundOffset = findSignature(curEntry, curRuntimeEntry, scriptData);
 					if (foundOffset != -1) {
 						// found, so apply the patch
-						debugC(kDebugLevelScriptPatcher, "Script-Patcher: '%s' on script %d offset %d", curEntry->description, scriptNr, foundOffset);
+						debugC(kDebugLevelPatcher, "Script-Patcher: '%s' on script %d offset %d", curEntry->description, scriptNr, foundOffset);
 						applyPatch(curEntry, scriptData, foundOffset);
 					}
 					applyCount--;

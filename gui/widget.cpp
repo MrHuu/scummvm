@@ -45,6 +45,7 @@ Widget::Widget(GuiObject *boss, int x, int y, int w, int h, const char *tooltip)
 Widget::Widget(GuiObject *boss, const Common::String &name, const char *tooltip)
 	: GuiObject(name), _type(0), _boss(boss), _tooltip(tooltip),
 	  _id(0), _flags(0), _hasFocus(false), _state(ThemeEngine::kStateDisabled) {
+	reflowLayout();
 	init();
 }
 
@@ -57,7 +58,7 @@ void Widget::init() {
 
 Widget::~Widget() {
 	delete _next;
-	_next = 0;
+	_next = nullptr;
 }
 
 void Widget::resize(int x, int y, int w, int h) {
@@ -114,7 +115,7 @@ void Widget::draw() {
 
 		// Draw border
 		if (_flags & WIDGET_BORDER) {
-			g_gui.theme()->drawWidgetBackground(Common::Rect(_x, _y, _x + _w, _y + _h), 0,
+			g_gui.theme()->drawWidgetBackground(Common::Rect(_x, _y, _x + _w, _y + _h),
 			                                    ThemeEngine::kWidgetBackgroundBorder);
 			_x += 4;
 			_y += 4;
@@ -168,7 +169,7 @@ Widget *Widget::findWidgetInChain(Widget *w, const char *name) {
 		}
 		w = w->_next;
 	}
-	return 0;
+	return nullptr;
 }
 
 bool Widget::containsWidgetInChain(Widget *w, Widget *search) {
@@ -341,6 +342,13 @@ ButtonWidget::ButtonWidget(GuiObject *boss, const Common::String &name, const Co
 	_type = kButtonWidget;
 }
 
+void ButtonWidget::getMinSize(int &minWidth, int &minHeight) {
+	const Graphics::Font &font = g_gui.getFont(_font);
+
+	minWidth  = font.getStringWidth(_label);
+	minHeight = font.getFontHeight();
+}
+
 void ButtonWidget::handleMouseUp(int x, int y, int button, int clickCount) {
 	if (isEnabled() && _duringPress && x >= 0 && x < _w && y >= 0 && y < _h) {
 		setUnpressedState();
@@ -474,6 +482,14 @@ void DropdownButtonWidget::reflowLayout() {
 	ButtonWidget::reflowLayout();
 
 	reset();
+}
+
+void DropdownButtonWidget::getMinSize(int &minWidth, int &minHeight) {
+	ButtonWidget::getMinSize(minWidth, minHeight);
+
+	if (minWidth >= 0) {
+		minWidth += _dropdownWidth * 2;
+	}
 }
 
 void DropdownButtonWidget::appendEntry(const Common::String &label, uint32 cmd) {
@@ -838,12 +854,16 @@ void GraphicsWidget::drawWidget() {
 
 #pragma mark -
 
-ContainerWidget::ContainerWidget(GuiObject *boss, int x, int y, int w, int h) : Widget(boss, x, y, w, h) {
+ContainerWidget::ContainerWidget(GuiObject *boss, int x, int y, int w, int h) :
+		Widget(boss, x, y, w, h),
+		_backgroundType(ThemeEngine::kWidgetBackgroundBorder) {
 	setFlags(WIDGET_ENABLED | WIDGET_CLEARBG);
 	_type = kContainerWidget;
 }
 
-ContainerWidget::ContainerWidget(GuiObject *boss, const Common::String &name) : Widget(boss, name) {
+ContainerWidget::ContainerWidget(GuiObject *boss, const Common::String &name) :
+		Widget(boss, name),
+		_backgroundType(ThemeEngine::kWidgetBackgroundBorder) {
 	setFlags(WIDGET_ENABLED | WIDGET_CLEARBG);
 	_type = kContainerWidget;
 }
@@ -875,9 +895,12 @@ void ContainerWidget::removeWidget(Widget *widget) {
 	Widget::removeWidget(widget);
 }
 
+void ContainerWidget::setBackgroundType(ThemeEngine::WidgetBackground backgroundType) {
+	_backgroundType = backgroundType;
+}
+
 void ContainerWidget::drawWidget() {
-	g_gui.theme()->drawWidgetBackground(Common::Rect(_x, _y, _x + _w, _y + _h), 0,
-	                                    ThemeEngine::kWidgetBackgroundBorder);
+	g_gui.theme()->drawWidgetBackground(Common::Rect(_x, _y, _x + _w, _y + _h), _backgroundType);
 }
 
 } // End of namespace GUI

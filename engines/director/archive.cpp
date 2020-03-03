@@ -20,6 +20,7 @@
  *
  */
 
+#include "common/config-manager.h"
 #include "common/file.h"
 #include "common/substream.h"
 #include "common/macresman.h"
@@ -48,12 +49,12 @@ bool Archive::openFile(const Common::String &fileName) {
 		return false;
 	}
 
+	_fileName = fileName;
+
 	if (!openStream(file)) {
 		close();
 		return false;
 	}
-
-	_fileName = fileName;
 
 	return true;
 }
@@ -96,12 +97,12 @@ Common::SeekableSubReadStreamEndian *Archive::getFirstResource(uint32 tag) {
 
 Common::SeekableSubReadStreamEndian *Archive::getResource(uint32 tag, uint16 id) {
 	if (!_types.contains(tag))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("Archive::getResource(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	const ResourceMap &resMap = _types[tag];
 
 	if (!resMap.contains(id))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("Archive::getResource(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	const Resource &res = resMap[id];
 
@@ -110,24 +111,24 @@ Common::SeekableSubReadStreamEndian *Archive::getResource(uint32 tag, uint16 id)
 
 Resource Archive::getResourceDetail(uint32 tag, uint16 id) {
 	if (!_types.contains(tag))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("Archive::getResourceDetail(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	const ResourceMap &resMap = _types[tag];
 
 	if (!resMap.contains(id))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("Archive::getResourceDetail(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	return resMap[id];
 }
 
 uint32 Archive::getOffset(uint32 tag, uint16 id) const {
 	if (!_types.contains(tag))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("Archive::getOffset(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	const ResourceMap &resMap = _types[tag];
 
 	if (!resMap.contains(id))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("Archive::getOffset(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	return resMap[id].offset;
 }
@@ -147,12 +148,12 @@ uint16 Archive::findResourceID(uint32 tag, const Common::String &resName) const 
 
 Common::String Archive::getName(uint32 tag, uint16 id) const {
 	if (!_types.contains(tag))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("Archive::getName(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	const ResourceMap &resMap = _types[tag];
 
 	if (!resMap.contains(id))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("Archive::getName(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	return resMap[id].name;
 }
@@ -208,7 +209,9 @@ bool MacArchive::openFile(const Common::String &fileName) {
 
 	_resFork = new Common::MacResManager();
 
-	if (!_resFork->open(fileName) || !_resFork->hasResFork()) {
+	Common::String fName = fileName;
+
+	if (!_resFork->open(fName) || !_resFork->hasResFork()) {
 		close();
 		return false;
 	}
@@ -245,6 +248,10 @@ bool MacArchive::openStream(Common::SeekableReadStream *stream, uint32 startOffs
 Common::SeekableSubReadStreamEndian *MacArchive::getResource(uint32 tag, uint16 id) {
 	assert(_resFork);
 	Common::SeekableReadStream *stream = _resFork->getResource(tag, id);
+
+	if (stream == nullptr)
+		error("MacArchive::getResource('%s', %d): Resource doesn't exit", tag2str(tag), id);
+
 	return new Common::SeekableSubReadStreamEndian(stream, 0, stream->size(), true, DisposeAfterUse::NO);
 }
 
@@ -312,12 +319,12 @@ bool RIFFArchive::openStream(Common::SeekableReadStream *stream, uint32 startOff
 
 Common::SeekableSubReadStreamEndian *RIFFArchive::getResource(uint32 tag, uint16 id) {
 	if (!_types.contains(tag))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("RIFFArchive::getResource(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	const ResourceMap &resMap = _types[tag];
 
 	if (!resMap.contains(id))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("RIFFArchive::getResource(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	const Resource &res = resMap[id];
 
@@ -358,7 +365,32 @@ bool RIFXArchive::openStream(Common::SeekableReadStream *stream, uint32 startOff
 
 	Common::SeekableSubReadStreamEndian subStream(stream, startOffset + 4, stream->size(), _isBigEndian, DisposeAfterUse::NO);
 
-	subStream.readUint32(); // size
+	uint32 sz = subStream.readUint32(); // size
+
+	// If it is an embedded file, dump it if requested
+	if (ConfMan.getBool("dump_scripts") && startOffset) {
+		Common::DumpFile out;
+
+		char buf[256];
+		sprintf(buf, "./dumps/%s-%08x", g_director->getEXEName().c_str(), startOffset);
+
+		if (out.open(buf)) {
+			byte *data = (byte *)malloc(sz);
+
+			stream->seek(startOffset);
+			stream->read(data, sz);
+			out.write(data, sz);
+			out.flush();
+			out.close();
+
+			free(data);
+
+			stream->seek(startOffset + 8);
+			warning("dumped: %s", buf);
+		} else {
+			warning("Can not open dump file %s", buf);
+		}
+	}
 
 	uint32 rifxType = subStream.readUint32();
 
@@ -374,7 +406,7 @@ bool RIFXArchive::openStream(Common::SeekableReadStream *stream, uint32 startOff
 	subStream.readUint32(); // unknown
 	uint32 mmapOffset = subStream.readUint32() - startOffset - 4;
 	uint32 version = subStream.readUint32(); // 0 for 4.0, 0x4c1 for 5.0, 0x4c7 for 6.0, 0x708 for 8.5, 0x742 for 10.0
-	warning("RIFX: version: %x", version);
+	warning("RIFX: version: %x type: %s", version, tag2str(rifxType));
 
 	subStream.seek(mmapOffset);
 
@@ -404,7 +436,7 @@ bool RIFXArchive::openStream(Common::SeekableReadStream *stream, uint32 startOff
 		uint16 unk1 = subStream.readUint16();
 		uint32 unk2 = subStream.readUint32();
 
-		debug(3, "Found RIFX resource index %d: '%s', %d @ 0x%08x (%d), flags: %x unk1: %x unk2: %x",
+		debug(3, "Found RIFX resource index %d: '%s', %d bytes @ 0x%08x (%d), flags: %x unk1: %x unk2: %x",
 			i, tag2str(tag), size, offset, offset, flags, unk1, unk2);
 
 		Resource res;
@@ -434,6 +466,41 @@ bool RIFXArchive::openStream(Common::SeekableReadStream *stream, uint32 startOff
 				 tag == MKTAG('L', 's', 'c', 'r'))
 			_types[tag][i] = res;
 	}
+
+	if (ConfMan.getBool("dump_scripts")) {
+		debug("Dumping %d resources", resources.size());
+
+		byte *data = nullptr;
+		uint dataSize = 0;
+		Common::DumpFile out;
+
+		for (uint i = 0; i < resources.size(); i++) {
+			stream->seek(resources[i].offset);
+
+			uint32 len = resources[i].size;
+
+			if (dataSize < resources[i].size) {
+				free(data);
+				data = (byte *)malloc(resources[i].size);
+				dataSize = resources[i].size;
+			}
+
+			Common::String filename = Common::String::format("./dumps/%s-%s-%d", _fileName.c_str(), tag2str(resources[i].tag), i);
+			stream->read(data, len);
+
+			if (!out.open(filename)) {
+				warning("MacResManager::dumpRaw(): Can not open dump file %s", filename.c_str());
+				break;
+			}
+
+			out.write(data, len);
+
+			out.flush();
+			out.close();
+		}
+	}
+
+
 
 	// We need to have found the 'File' resource already
 	if (rifxType == MKTAG('A', 'P', 'P', 'L')) {
@@ -507,12 +574,12 @@ bool RIFXArchive::openStream(Common::SeekableReadStream *stream, uint32 startOff
 
 Common::SeekableSubReadStreamEndian *RIFXArchive::getResource(uint32 tag, uint16 id) {
 	if (!_types.contains(tag))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("RIFXArchive::getResource(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	const ResourceMap &resMap = _types[tag];
 
 	if (!resMap.contains(id))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("RIFXArchive::getResource(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	const Resource &res = resMap[id];
 
@@ -524,12 +591,12 @@ Common::SeekableSubReadStreamEndian *RIFXArchive::getResource(uint32 tag, uint16
 
 Resource RIFXArchive::getResourceDetail(uint32 tag, uint16 id) {
 	if (!_types.contains(tag))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("RIFXArchive::getResourceDetail(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	const ResourceMap &resMap = _types[tag];
 
 	if (!resMap.contains(id))
-		error("Archive does not contain '%s' %04x", tag2str(tag), id);
+		error("RIFXArchive::getResourceDetail(): Archive does not contain '%s' %d", tag2str(tag), id);
 
 	return resMap[id];
 }

@@ -249,11 +249,6 @@ void ToonEngine::parseInput() {
 						dialog.runModal();
 					}
 				}
-
-				if (event.kbd.keycode == Common::KEYCODE_d) {
-					_console->attach();
-					_console->onFrame();
-				}
 			}
 			break;
 		default:
@@ -1215,7 +1210,7 @@ ToonEngine::ToonEngine(OSystem *syst, const ADGameDescription *gameDescription)
 	_saveBufferStream = NULL;
 
 	_pathFinding = NULL;
-	_console = new ToonConsole(this);
+	setDebugger(new ToonConsole(this));
 
 	_cursorAnimation = NULL;
 	_cursorAnimationInstance = NULL;
@@ -1378,7 +1373,6 @@ ToonEngine::~ToonEngine() {
 	unloadToonDat();
 
 	DebugMan.clearAllDebugChannels();
-	delete _console;
 }
 
 void ToonEngine::flushPalette(bool deferFlushToNextRender) {
@@ -1529,7 +1523,13 @@ void ToonEngine::loadScene(int32 SceneId, bool forGameLoad) {
 	Common::String locationName = state()->_locations[SceneId]._name;
 
 	// load package
-	resources()->openPackage(createRoomFilename(locationName + ".PAK"));
+	if (!resources()->openPackage(createRoomFilename(locationName + ".PAK"))) {
+		Common::String msg = Common::String::format(_("Unable to locate the '%s' data file."), createRoomFilename(locationName + ".PAK").c_str());
+		GUIErrorMessage(msg);
+		warning("%s", msg.c_str());
+		_shouldQuit = true;
+		return;
+	}
 
 	loadAdditionalPalette(locationName + ".NPP", 0);
 

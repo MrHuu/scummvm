@@ -24,6 +24,7 @@
 #include "common/stack.h"
 #include "common/keyboard.h"
 #include "common/macresman.h"
+#include "common/winexe_pe.h"
 
 #include "graphics/primitives.h"
 #include "graphics/font.h"
@@ -200,8 +201,8 @@ static Common::U32String readUnicodeString(Common::SeekableReadStream *stream) {
 }
 
 
-MacMenu *MacMenu::createMenuFromPEexe(Common::PEResources &exe, MacWindowManager *wm) {
-	Common::SeekableReadStream *menuData = exe.getResource(Common::kWinMenu, 128);
+MacMenu *MacMenu::createMenuFromPEexe(Common::PEResources *exe, MacWindowManager *wm) {
+	Common::SeekableReadStream *menuData = exe->getResource(Common::kWinMenu, 128);
 	if (!menuData)
 		return nullptr;
 
@@ -564,8 +565,8 @@ void MacMenu::createSubMenuFromString(int id, const char *str, int commandId) {
 	}
 }
 
-const Font *MacMenu::getMenuFont() {
-	return _wm->_fontMan->getFont(Graphics::MacFont(kMacFontChicago, 12));
+const Font *MacMenu::getMenuFont(int slant) {
+	return _wm->_fontMan->getFont(Graphics::MacFont(kMacFontChicago, 12, slant));
 }
 
 const Common::String MacMenu::getAcceleratorString(MacMenuItem *item, const char *prefix) {
@@ -801,7 +802,9 @@ bool MacMenu::draw(ManagedSurface *g, bool forceRedraw) {
 			_font->drawString(&_screen, it->unicodeText, x, y, it->bbox.width(), color);
 			underlineAccelerator(&_screen, _font, it->unicodeText, x, y, it->shortcutPos, color);
 		} else {
-			_font->drawString(&_screen, it->text, x, y, it->bbox.width(), color);
+			const Font *font = getMenuFont(it->style);
+
+			font->drawString(&_screen, it->text, x, y, it->bbox.width(), color);
 		}
 	}
 
@@ -1263,4 +1266,4 @@ void MacMenu::eventLoop() {
 	}
 }
 
-} // End of namespace Wage
+} // End of namespace Graphics

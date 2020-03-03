@@ -205,24 +205,24 @@ public:
 		_guiOptions = GUIO1(GUIO_NOSPEECH);
 	}
 
-	const char *getEngineId() const {
+	const char *getEngineId() const override {
 		return "agi";
 	}
 
-	virtual const char *getName() const {
+	const char *getName() const override {
 		return "AGI preAGI + v2 + v3";
 	}
 
-	virtual const char *getOriginalCopyright() const {
+	const char *getOriginalCopyright() const override {
 		return "Sierra AGI Engine (C) Sierra On-Line Software";
 	}
 
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
-	virtual SaveStateList listSaves(const char *target) const;
-	virtual int getMaximumSaveSlot() const;
-	virtual void removeSaveState(const char *target, int slot) const;
-	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const;
+	bool hasFeature(MetaEngineFeature f) const override;
+	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	SaveStateList listSaves(const char *target) const override;
+	int getMaximumSaveSlot() const override;
+	void removeSaveState(const char *target, int slot) const override;
+	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
 
 	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const override;
 };
@@ -489,7 +489,6 @@ ADDetectedGame AgiMetaEngine::fallbackDetect(const FileMap &allFilesXXX, const C
 
 		if (agipal) { // Check if it is AGIPAL
 			description = "Unknown v2 AGIPAL Game";
-			g_fallbackDesc.features |= GF_AGIPAL; // Add AGIPAL feature flag
 		} else { // Not AGIPAL so just plain v2
 			description = "Unknown v2 Game";
 		}

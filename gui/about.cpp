@@ -65,7 +65,7 @@ enum {
 
 static const char *copyright_text[] = {
 "",
-"C0""Copyright (C) 2001-2019 The ScummVM Team",
+"C0""Copyright (C) 2001-2020 The ScummVM Team",
 "C0""https://www.scummvm.org",
 "",
 "C0""ScummVM is the legal property of its developers, whose names are too numerous to list here. Please refer to the COPYRIGHT file distributed with this binary.",
@@ -156,7 +156,7 @@ void AboutDialog::addLine(const char *str) {
 			// We could use TransMan.getCurrentCharset() but rather than compare strings
 			// it is easier to use TransMan.getCharsetMapping() (non null in case of non
 			// ISO-8859-1 mapping)
-			useAscii = (TransMan.getCharsetMapping() != NULL);
+			useAscii = (TransMan.getCharsetMapping() != nullptr);
 #endif
 			if (useAscii)
 				asciiStr = str;

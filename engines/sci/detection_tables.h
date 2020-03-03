@@ -187,7 +187,7 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		{"resource.map", 0, "9dd015e79cac4f91e7de805448f39775", 1912},
 		{"resource.000", 0, "e4efcd042f86679dd4e1834bb3a38edb", 3770943},
 		AD_LISTEND},
-		Common::EN_ANY, Common::kPlatformDOS, ADGF_UNSTABLE, GUIO7(GUIO_NOSUBTITLES, GUIO_NOMUSIC, GUIO_NOSPEECH, GUIO_NOSFX, GUIO_NOMIDI, GUIO_NOLAUNCHLOAD, GUIO_NOASPECT)	},
+		Common::EN_ANY, Common::kPlatformDOS, ADGF_TESTING, GUIO7(GUIO_NOSUBTITLES, GUIO_NOMUSIC, GUIO_NOSPEECH, GUIO_NOSFX, GUIO_NOMIDI, GUIO_NOLAUNCHLOAD, GUIO_NOASPECT)	},
 #endif
 
 	// Christmas Card 1988 - English DOS
@@ -873,8 +873,7 @@ static const struct ADGameDescription SciGameDescriptions[] = {
                             GUIO_NOLAUNCHLOAD, \
                             GUIO_NOASPECT, \
                             GAMEOPTION_HQ_VIDEO)
-#define GUIO_GK2      GUIO7(GUIO_NOSUBTITLES, \
-                            GUIO_LINKSPEECHTOSFX, \
+#define GUIO_GK2      GUIO6(GUIO_LINKSPEECHTOSFX, \
                             GUIO_NOMIDI, \
                             GUIO_NOASPECT, \
                             GAMEOPTION_ORIGINAL_SAVELOAD, \
@@ -951,6 +950,24 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		{"resmap.006", 0, "c5323f49b7ee6a2c08c4852290e351c0", 2995},
 		AD_LISTEND},
 		Common::DE_DEU, Common::kPlatformDOS, ADGF_NO_FLAGS, GUIO_GK2 },
+
+	// Gabriel Knight 2 - Portuguese DOS/Windows (6-CDs original release)
+	// Executable scanning reports "2.100.002", VERSION file reports "1.0"
+	{"gk2", "", {
+		{"resmap.001", 0, "dc313253adfe68584ad43993599dfb7e", 2806},
+		{"ressci.001", 0, "37d2df0e1ec0603b605d0c87f1c09ce5", 50932558},
+		{"resmap.002", 0, "3fd2283c7983d821b894593e97359913", 1999},
+		{"ressci.002", 0, "5d07e6b51afaa3a5850b17a3dbd800a0", 42258859},
+		{"resmap.003", 0, "c9980e5a16d7247f156b056a2e3adca7", 1711},
+		{"ressci.003", 0, "59b597ed3550b5e175746e4f9bc8786d", 35477175},
+		{"resmap.004", 0, "92e24eba78d7bed89954c472a5acc5f6", 2755},
+		{"ressci.004", 0, "5d07e6b51afaa3a5850b17a3dbd800a0", 59781752},
+		{"resmap.005", 0, "207f4f2ce425059bdd2f755a58c66309", 2101},
+		{"ressci.005", 0, "1eb5a72744799f5a5518543f5b4c3c79", 38249037},
+		{"resmap.006", 0, "c92f7b756964c8a57928a0b6558feaa5", 3007},
+		{"ressci.006", 0, "4037d941aec39d2e654e20960429aefc", 60781720},
+		AD_LISTEND},
+		Common::PT_BRA, Common::kPlatformDOS, ADGF_NO_FLAGS, GUIO_GK2 },
 
 	// Gabriel Knight 2 - Italian DOS/Windows (6-CDs original release, provided in Trac #11013)
 	// Executable scanning reports "2.100.002", VERSION file reports "Italian 1.0"
@@ -2042,6 +2059,16 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		{"resource.000", 0, "51c1ead1163e19a2de8f121c39df7a76", 200764100},
 		AD_LISTEND},
 		Common::ES_ESP, Common::kPlatformWindows, ADGF_NO_FLAGS, GUIO_KQ7 },
+		
+	// King's Quest 7 - Russian Windows (SoftClub official translation)
+	// VERSION file reports "2.1b", provided by trcpman in Trac #11302.
+	// This version is Windows-only. It does not include a DOS interpreter and
+	// only the Windows AVI files were translated. The DOS RBT files weren't.
+	{"kq7", "", {
+		{"resource.map", 0, "dd1504ee0274e4e3b8447b25137136df", 18709},
+		{"resource.000", 0, "e6cee6c1ddb1e73e8c25d8f2a9f508ff", 200873632},
+		AD_LISTEND},
+		Common::RU_RUS, Common::kPlatformWindows, ADGF_NO_FLAGS, GUIO_KQ7 },
 
 	// King's Quest 7 - English DOS Non-Interactive Demo
 	// SCI interpreter version 2.100.002
@@ -2933,6 +2960,21 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		{"resource.aud", 0, "d7b26b5df5ee6766b2dbd45b427b0074", 417594676},
 		AD_LISTEND},
 		Common::PL_POL, Common::kPlatformDOS, ADGF_NO_FLAGS, GUIO_LSL7 },
+
+	// Larry 7 - English Macintosh CD
+	{"lsl7", "", {
+		{"Data1", 0, "824a48b794c334b4bcf37e80fcc5f82e", 913286},
+		{"Data2", 0, "be36c59a3a694e14ed6d86e6ccc180a4", 7549943},
+		{"Data3", 0, "8325c7d702ffa8dd2854135e0f42b0d0", 6815697},
+		{"Data4", 0, "4584f786e0b5a502938d3cd90e6fab56", 8169195},
+		{"Data5", 0, "94bd026d27ba526d1f8d86d8e783acdd", 7452479},
+		{"Data6", 0, "c6a60210244a8591ecf10a50975ab9db", 8119360},
+		{"Data7", 0, "0d52c9764e047169f3d50f76d0cb5ae5", 8164785},
+		{"Data8", 0, "6f4838585ceb8a9ac277d13291c81235", 7754883},
+		{"Data9", 0, "68c0b7bd4aebf57e215f0517247a11d1", 8079211},
+		{"Data10", 0, "3dbacbcf4bd6d1b25aa8baeb3e2c4dab", 6446948},
+		AD_LISTEND},
+		Common::EN_ANY, Common::kPlatformMacintosh, ADGF_MACRESFORK | ADGF_UNSTABLE, GUIO_LSL7 },
 
 #undef GUIO_LSL7_DEMO
 #undef GUIO_LSL7
@@ -4414,6 +4456,25 @@ static const struct ADGameDescription SciGameDescriptions[] = {
 		{"ressci.000", 0, "f9eb6338f658945feadd4d27e58bdb93", 37404155},
 		AD_LISTEND},
 		Common::EN_ANY, Common::kPlatformWindows, ADGF_DEMO | ADGF_DROPPLATFORM, GUIO_SHIVERS },
+
+	// Shivers - English Macintosh CD
+	{"shivers", "", {
+		{"Data1", 0, "7154f2fc5466f0cd6923deb1a6f6729a", 4635483},
+		{"Data2", 0, "499e46f2b9d1c1485eca53cb90d60a18", 518575},
+		{"Data3", 0, "8f874e8207f3bf0f1d089fb3af01c1ad", 10159733},
+		{"Data4", 0, "af5e6582a7157eb2a8784fa7098cf1b1", 15479074},
+		{"Data5", 0, "1db5025dce818f35bab9acd6e67b5e31", 15635028},
+		{"Data6", 0, "d64c3acef05ffe1ae09173fdc7fad1fa", 15536868},
+		{"Data7", 0, "e0ff5994850499fe80024af11291e9db", 14592851},
+		{"Data8", 0, "2add76cb84e374c1cd56469b9fc85f3d", 15777002},
+		{"Data9", 0, "5415a1b9634fcdd8ce5ce736ee97ff92", 14644368},
+		{"Data10", 0, "4f2c24bcc71a35654b39ad8faa537f96", 16371379},
+		{"Data11", 0, "821e464fd28e5a2e9ca084cde9daeac6", 15270009},
+		{"Data12", 0, "85e6c8edf7899fc52864b83ede54a38a", 14970109},
+		{"Data13", 0, "cfb0bbb2bedb00be4849e3796abad3f8", 15182978},
+		// goes up to Data20
+		AD_LISTEND},
+		Common::EN_ANY, Common::kPlatformMacintosh, ADGF_MACRESFORK | ADGF_UNSTABLE, GUIO_SHIVERS },
 
 #undef GUIO_SHIVERS_DEMO
 #undef GUIO_SHIVERS

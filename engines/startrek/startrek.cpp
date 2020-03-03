@@ -105,13 +105,15 @@ StarTrekEngine::StarTrekEngine(OSystem *syst, const StarTrekGameDescription *gam
 
 	for (int i = 0; i < NUM_OBJECTS; i++)
 		_itemList[i] = g_itemList[i];
+
+	for (int i = 0; i < MAX_BAN_FILES; i++)
+		_banFiles[i] = nullptr;
 }
 
 StarTrekEngine::~StarTrekEngine() {
 	delete _activeMenu->nextMenu;
 	delete _activeMenu;
 
-	delete _console;
 	delete _gfx;
 	delete _sound;
 	delete _macResFork;
@@ -120,7 +122,7 @@ StarTrekEngine::~StarTrekEngine() {
 Common::Error StarTrekEngine::run() {
 	_gfx = new Graphics(this);
 	_sound = new Sound(this);
-	_console = new Console(this);
+	setDebugger(new Console(this));
 
 	if (getPlatform() == Common::kPlatformMacintosh) {
 		_macResFork = new Common::MacResManager();
@@ -132,7 +134,7 @@ Common::Error StarTrekEngine::run() {
 	initGraphics(SCREEN_WIDTH, SCREEN_HEIGHT);
 	initializeEventsAndMouse();
 
-	_gfx->setMouseBitmap(_gfx->loadBitmap("pushbtn"));
+	_gfx->setMouseBitmap("pushbtn");
 	_gfx->toggleMouse(true);
 
 	bool shouldPlayIntro = true;
@@ -271,8 +273,7 @@ void StarTrekEngine::runTransportSequence(const Common::String &name) {
 	actorFunc1();
 	initActors();
 
-	Bitmap *bgImage = _gfx->loadBitmap("transprt");
-	_gfx->setBackgroundImage(bgImage);
+	_gfx->setBackgroundImage("transprt");
 	_gfx->clearPri();
 	_gfx->loadPalette("palette");
 	_gfx->copyBackgroundScreen();
@@ -507,6 +508,10 @@ Common::MemoryReadStreamEndian *StarTrekEngine::loadFile(Common::String filename
 	delete stream;
 
 	return new Common::MemoryReadStreamEndian(data, size, bigEndian);
+}
+
+Common::MemoryReadStreamEndian *StarTrekEngine::loadBitmapFile(Common::String baseName) {
+	return loadFile(baseName + ".BMP");
 }
 
 Common::MemoryReadStreamEndian *StarTrekEngine::loadFileWithParams(Common::String filename, bool unk1, bool unk2, bool unk3) {

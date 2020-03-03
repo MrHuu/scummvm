@@ -42,6 +42,9 @@ class CachedMacText;
 
 class Cast {
 public:
+	Cast();
+	virtual ~Cast();
+
 	CastType _type;
 	Common::Rect _initialRect;
 	Common::Rect _boundingRect;
@@ -49,7 +52,7 @@ public:
 
 	const Graphics::Surface *_surface;
 
-	byte _modified;
+	bool _modified;
 };
 
 class BitmapCast : public Cast {
@@ -84,7 +87,7 @@ public:
 
 class TextCast : public Cast {
 public:
-	TextCast(Common::ReadStreamEndian &stream, uint16 version);
+	TextCast(Common::ReadStreamEndian &stream, uint16 version, int32 bgcolor);
 
 	void setText(const char *text);
 
@@ -92,15 +95,16 @@ public:
 	SizeType _gutterSize;
 	SizeType _boxShadow;
 
-	byte _flags1;
+	byte _flags;
 	uint32 _fontId;
 	uint16 _fontSize;
 	TextType _textType;
 	TextAlignType _textAlign;
 	SizeType _textShadow;
 	byte _textSlant;
-	Common::Array<TextFlag> _textFlags;
+	byte _textFlags;
 	uint16 _palinfo1, _palinfo2, _palinfo3;
+	int32 _bgcolor;
 
 	Common::String _ftext;
 	Common::String _ptext;
@@ -121,6 +125,14 @@ public:
 	ScriptCast(Common::ReadStreamEndian &stream, uint16 version);
 
 	uint32 _id;
+	ScriptType _scriptType;
+};
+
+class RTECast : public TextCast {
+public:
+	RTECast(Common::ReadStreamEndian &stream, uint16 version, int32 bgcolor);
+
+	void loadChunks();
 };
 
 struct CastInfo {

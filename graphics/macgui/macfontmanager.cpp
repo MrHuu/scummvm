@@ -87,6 +87,28 @@ static const char *const fontStyleSuffixes[] = {
 	"Extend"
 };
 
+int parseSlant(const Common::String fontname) {
+	int res = 0;
+
+	for (int i = 1; i < 7; i++)
+		if (fontname.contains(fontStyleSuffixes[i]))
+			res |= (1 << (i - 1));
+
+	return res;
+}
+
+Common::String cleanFontName(const Common::String fontname) {
+	const char *pos;
+	Common::String f = fontname;
+	for (int i = 1; i < 7; i++) {
+		if ((pos = strstr(f.c_str(), fontStyleSuffixes[i])))
+			f = Common::String(f.c_str(), pos);
+	}
+	f.trim();
+
+	return f;
+}
+
 MacFontManager::MacFontManager(uint32 mode) : _mode(mode) {
 	for (uint i = 0; i < ARRAYSIZE(fontNames); i++)
 		if (fontNames[i])
@@ -213,6 +235,11 @@ void MacFontManager::loadFonts(Common::MacResManager *fontFile) {
 			Common::SeekableReadStream *fond = fontFile->getResource(MKTAG('F', 'O', 'N', 'D'), *iterator);
 
 			Common::String familyName = fontFile->getResName(MKTAG('F', 'O', 'N', 'D'), *iterator);
+			int familySlant = parseSlant(familyName);
+
+			if (familySlant) {
+				familyName = cleanFontName(familyName);
+			}
 
 			Graphics::MacFontFamily *fontFamily = new MacFontFamily();
 			fontFamily->load(*fond);
@@ -220,7 +247,7 @@ void MacFontManager::loadFonts(Common::MacResManager *fontFile) {
 			Common::Array<Graphics::MacFontFamily::AsscEntry> *assoc = fontFamily->getAssocTable();
 
 			for (uint i = 0; i < assoc->size(); i++) {
-				debug(8, "size: %d style: %d id: %d", (*assoc)[i]._fontSize, (*assoc)[i]._fontStyle,
+				debug(8, "size: %d style: %d id: %d", (*assoc)[i]._fontSize, (*assoc)[i]._fontStyle | familySlant,
 										(*assoc)[i]._fontID);
 
 				Common::SeekableReadStream *fontstream;
@@ -239,13 +266,13 @@ void MacFontManager::loadFonts(Common::MacResManager *fontFile) {
 				}
 
 				font = new Graphics::MacFONTFont;
-				font->loadFont(*fontstream, fontFamily, (*assoc)[i]._fontSize, (*assoc)[i]._fontStyle);
+				font->loadFont(*fontstream, fontFamily, (*assoc)[i]._fontSize, (*assoc)[i]._fontStyle | familySlant);
 
 				delete fontstream;
 
-				Common::String fontName = Common::String::format("%s-%d-%d", familyName.c_str(), (*assoc)[i]._fontStyle, (*assoc)[i]._fontSize);
+				Common::String fontName = Common::String::format("%s-%d-%d", familyName.c_str(), (*assoc)[i]._fontStyle | familySlant, (*assoc)[i]._fontSize);
 
-				macfont = new MacFont(_fontIds.getVal(familyName, kMacFontNonStandard), (*assoc)[i]._fontSize, (*assoc)[i]._fontStyle);
+				macfont = new MacFont(_fontIds.getVal(familyName, kMacFontNonStandard), (*assoc)[i]._fontSize, (*assoc)[i]._fontStyle | familySlant);
 
 				FontMan.assignFontToName(fontName, font);
 				macfont->setFont(font);
@@ -337,14 +364,21 @@ void MacFontManager::clearFontMapping() {
 	_extraFontIds.clear();
 }
 
+void MacFont::setName(const char *name) {
+	_name = name;
+}
+
 const Common::String MacFontManager::getFontName(int id, int size, int slant, bool tryGen) {
 	Common::String n;
 
 	if (id == 3) // This is Geneva
 		id = 1;
 
+	int extraSlant = 0;
+
 	if (_extraFontNames.contains(id)) {
-		n = _extraFontNames[id];
+		n = cleanFontName(_extraFontNames[id]);
+		extraSlant = parseFontSlant(_extraFontNames[id]);
 	} else if (id < ARRAYSIZE(fontNames)) {
 		if (fontNames[id])
 			n = fontNames[id];
@@ -355,18 +389,7 @@ const Common::String MacFontManager::getFontName(int id, int size, int slant, bo
 		n = fontNames[1]; // Fallback to Geneva
 	}
 
-	if (tryGen && slant != kMacFontRegular) {
-		for (int i = 0; i < 7; i++) {
-			if (slant & (1 << i)) {
-				n += ' ';
-				n += fontStyleSuffixes[i + 1];
-			}
-		}
-
-		slant = 0;
-	}
-
-	return Common::String::format("%s-%d-%d", n.c_str(), slant, size);
+	return Common::String::format("%s-%d-%d", n.c_str(), slant | extraSlant, size);
 }
 
 const Common::String MacFontManager::getFontName(MacFont &font) {
@@ -405,42 +428,67 @@ void MacFontManager::generateFontSubstitute(MacFont &macFont) {
 	// No simple substitute was found. Looking for neighborhood fonts
 
 	// First we gather all font sizes for this font
-	Common::Array<int> sizes;
+	Common::Array<MacFont *> sizes;
 	for (Common::HashMap<Common::String, MacFont *>::iterator i = _fontRegistry.begin(); i != _fontRegistry.end(); ++i) {
 		if (i->_value->getId() == macFont.getId() && i->_value->getSlant() == macFont.getSlant() && !i->_value->isGenerated())
-			sizes.push_back(i->_value->getSize());
+			sizes.push_back(i->_value);
 	}
 
 	if (sizes.empty()) {
-		debug(1, "No viable substitute found for font %s", getFontName(macFont).c_str());
-		return;
+		if (macFont.getSlant() == kMacFontRegular) {
+			debug(1, "No viable substitute found (1) for font %s", getFontName(macFont).c_str());
+			return;
+		}
+
+		// Now let's try to find a regular font
+		for (Common::HashMap<Common::String, MacFont *>::iterator i = _fontRegistry.begin(); i != _fontRegistry.end(); ++i) {
+			if (i->_value->getId() == macFont.getId() && i->_value->getSlant() == kMacFontRegular && !i->_value->isGenerated())
+				sizes.push_back(i->_value);
+		}
+
+		if (sizes.empty()) {
+			debug(1, "No viable substitute found (2) for font %s", getFontName(macFont).c_str());
+			return;
+		}
 	}
 
-	// Now looking next larger font, and store the largest one for next check
-	int candidate = 1000;
-	int maxSize = sizes[0];
+	// Now looking for the next larger font, and store the largest one for next check
+	MacFont *candidate = nullptr;
+	MacFont *maxSize = sizes[0];
 	for (uint i = 0; i < sizes.size(); i++) {
-		if (sizes[i] > macFont.getSize() && sizes[i] < candidate)
+		if (sizes[i]->getSize() == macFont.getSize()) { // Same size but regular slant
+			candidate = sizes[i];
+			break;
+		}
+
+		if (sizes[i]->getSize() > macFont.getSize() && candidate && sizes[i]->getSize() < candidate->getSize())
 			candidate = sizes[i];
 
-		if (sizes[i] > maxSize)
+		if (sizes[i]->getSize() > maxSize->getSize())
 			maxSize = sizes[i];
 	}
 
-	if (candidate != 1000) {
-		generateFont(macFont, *_fontRegistry[getFontName(macFont.getId(), candidate, macFont.getSlant())]);
+	if (candidate) {
+		generateFont(macFont, *candidate);
 		return;
 	}
 
 	// Now next smaller font, which is the biggest we have
-	generateFont(macFont, *_fontRegistry[getFontName(macFont.getId(), maxSize, macFont.getSlant())]);
+	generateFont(macFont, *maxSize);
 }
 
 void MacFontManager::generateFont(MacFont &toFont, MacFont &fromFont) {
 	debugN("Found font substitute for font '%s' ", getFontName(toFont).c_str());
 	debug("as '%s'", getFontName(fromFont).c_str());
 
-	MacFONTFont *font = Graphics::MacFONTFont::scaleFont(fromFont.getFont(), toFont.getSize());
+	bool bold = false, italic = false;
+
+	if (fromFont.getSlant() == kMacFontRegular) {
+		bold = toFont.getSlant() == kMacFontBold;
+		italic = toFont.getSlant() == kMacFontItalic;
+	}
+
+	MacFONTFont *font = Graphics::MacFONTFont::scaleFont(fromFont.getFont(), toFont.getSize(), bold, italic);
 
 	if (!font) {
 		warning("Failed to generate font '%s'", getFontName(toFont).c_str());

@@ -107,6 +107,12 @@ bool DIBDecoder::loadStream(Common::SeekableReadStream &stream) {
 BITDDecoder::BITDDecoder(int w, int h, uint16 bitsPerPixel, uint16 pitch) {
 	_surface = new Graphics::Surface();
 
+	if (pitch < w) {
+		warning("BITDDecoder: pitch is too small: %d < %d", pitch, w);
+
+		pitch = w;
+	}
+
 	Graphics::PixelFormat pf = Graphics::PixelFormat::createFormatCLUT8();
 	switch (bitsPerPixel) {
 	case 2:
@@ -143,6 +149,7 @@ BITDDecoder::~BITDDecoder() {
 }
 
 void BITDDecoder::destroy() {
+	delete _surface;
 	_surface = 0;
 
 	delete[] _palette;
@@ -195,6 +202,16 @@ bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
 			stream.readUint16BE();
 	}
 
+	if (pixels.size() < (uint32)_surface->w * _surface->h) {
+		int tail = _surface->w * _surface->h - pixels.size();
+
+		warning("BITDDecoder::loadStream(): premature end of stream (%d of %d pixels)",
+			pixels.size(), pixels.size() + tail);
+
+		for (int i = 0; i < tail; i++)
+			pixels.push_back(0);
+	}
+
 	int offset = 0;
 	if (_surface->w < (pixels.size() / _surface->h))
 		offset = (pixels.size() / _surface->h) - _surface->w;
@@ -204,7 +221,7 @@ bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
 			for (x = 0; x < _surface->w;) {
 				switch (_bitsPerPixel) {
 				case 1: {
-					for (int c = 0; c < 8; c++, x++) {
+					for (int c = 0; c < 8 && x < _surface->w; c++, x++) {
 						*((byte *)_surface->getBasePtr(x, y)) = (pixels[(((y * _surface->pitch) + x) / 8)] & (1 << (7 - c))) ? 0 : 0xff;
 					}
 					break;

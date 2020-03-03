@@ -192,6 +192,12 @@ void GriffonEngine::loadMap(int mapnum) {
 		_spellInfo[i].frame = 0;
 
 	_roomLock = false;
+	_saidLocked = false;
+	_saidJammed = false;
+	_itemSelOn = false;
+	_selEnemyOn = false;
+	_curItem = 0;
+	_player.itemselshade = 0;
 
 	char name[256];
 	// read *.map file
@@ -484,6 +490,9 @@ void GriffonEngine::loadMap(int mapnum) {
 		INPUT("%i", &_npcInfo[i].item2);
 		INPUT("%i", &_npcInfo[i].item3);
 		INPUT("%i", &_npcInfo[i].script);
+
+		_npcInfo[i].frame2 = 0;
+		_npcInfo[i].attackattempt = 0;
 
 		// baby dragon
 		if (_npcInfo[i].spriteset == kMonsterBabyDragon) {

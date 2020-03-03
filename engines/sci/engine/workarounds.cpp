@@ -336,7 +336,6 @@ const SciWorkaroundEntry uninitializedReadForParamWorkarounds[] = {
 	{ GID_HOYLE5,         -1,    15, -1,               "Hand", "add",                             NULL,     1,     1,{ WORKAROUND_FAKE,   0 } }, // When the game adds cards to your hand in any mini-game
 	{ GID_HOYLE5,        700,   730,  0,                 NULL, "runningSuit",                     NULL,     2,     2,{ WORKAROUND_FAKE,   0 } }, // when an opponent is playing in Bridge
 	{ GID_HOYLE5,       1100,    22, -1,           "HandPile", "show",                            NULL,     1,     1,{ WORKAROUND_FAKE,   0 } }, // when showing money piles in Poker
-	{ GID_PHANTASMAGORIA2,-1, 64926,  0,              "Thumb", "action",                          NULL,     1,     1,{ WORKAROUND_FAKE,   0 } }, // When dragging one of the volume sliders and releasing the mouse button over the +/- buttons
 	{ GID_PHANTASMAGORIA2,-1, 63019,  0,     "WynDocTextView", "cue",                             NULL,     2,     2,{ WORKAROUND_FAKE,   0 } }, // When dragging the slider next to an e-mail message
 	{ GID_SHIVERS,        -1, 64918,  0,                "Str", "strip",                           NULL,     1,     1,{ WORKAROUND_FAKE,   0 } }, // When starting a new game and entering a name
 	{ GID_SQ4,            35,   928,  0,           "Narrator", "say",                             NULL,     1,     1,{ WORKAROUND_FAKE,  11 } }, // Clicking smell on sidewalk, fixes message due to missing say parameter in sidewalk1:doVerb(6) - bug #10917
@@ -369,8 +368,10 @@ const SciWorkaroundEntry uninitializedReadWorkarounds[] = {
 	{ GID_FREDDYPHARKAS, 540,   540,  0,          "WaverCode", "init",                            NULL,     0,     1, { WORKAROUND_FAKE,   0 } }, // Gun pratice mini-game, all temps - 0+1 - bug #5232
 	{ GID_GK1,            -1, 64950, -1,            "Feature", "handleEvent",                     NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // sometimes when walk-clicking
 	{ GID_GK1,            -1, 64937, -1,         "GKControls", "dispatchEvent",                   NULL,     6,     6, { WORKAROUND_FAKE,   0 } }, // when using keyboard navigation (tab) in the game settings and hitting 'enter' when over a slider
-	{ GID_GK2,            -1,    11,  0,                   "", "export 10",                       NULL,     3,     3, { WORKAROUND_FAKE,   0 } }, // called when the game starts
-	{ GID_GK2,            -1,    11,  0,                   "", "export 10",                       NULL,     4,     4, { WORKAROUND_FAKE,   0 } }, // called during the game
+	{ GID_GK1,            -1, 64994, -1,               "Game", "save",                            NULL,     1,     1, { WORKAROUND_FAKE,   0 } }, // when saving in Mac version
+	{ GID_GK1,            -1, 64994, -1,               "Game", "restore",                         NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // when restoring in Mac version
+	{ GID_GK2,            -1,    11,  0,                   "", "export 10",                       NULL,    -1,    -1, { WORKAROUND_FAKE,   0 } }, // When game starts and throughout game. temp1 in Italian version, temp3 in others
+	{ GID_GK2,            -1, 64921, -1,              "Print", "addEdit",                         NULL,     1,     1, { WORKAROUND_FAKE,   0 } }, // When trying to use the game debugger's flag setting command
 	{ GID_HOYLE1,          4,   104,  0,   "GinRummyCardList", "calcRuns",                        NULL,     4,     4, { WORKAROUND_FAKE,   0 } }, // Gin Rummy / right when the game starts
 	{ GID_HOYLE1,          5,   204,  0,            "tableau", "checkRuns",                       NULL,     2,     2, { WORKAROUND_FAKE,   0 } }, // Cribbage / during the game
 	{ GID_HOYLE1,          3,    16,  0,                   "", "export 0",     sig_uninitread_hoyle1_1,     3,     3, { WORKAROUND_FAKE,   0 } }, // Hearts / during the game - bug #5299
@@ -469,6 +470,8 @@ const SciWorkaroundEntry uninitializedReadWorkarounds[] = {
 	{ GID_LSL6HIRES,     820,    82,  0,                   "", "export 0",                        NULL,     3,     3, { WORKAROUND_FAKE,   0 } }, // when touching the electric fence - bug #10361
 	{ GID_LSL6HIRES,      -1, 64950,  1,            "Feature", "handleEvent",                     NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // at least when entering swimming pool area
 	{ GID_LSL6HIRES,      -1, 64964,  0,              "DPath", "init",                            NULL,     1,     1, { WORKAROUND_FAKE,   0 } }, // during the game
+	{ GID_LSL6HIRES,      -1, 64994, -1,               "Game", "save",                            NULL,     1,     1, { WORKAROUND_FAKE,   0 } }, // when saving in Mac version
+	{ GID_LSL6HIRES,      -1, 64994, -1,               "Game", "restore",                         NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // when restoring in Mac version
 	{ GID_LSL7,           -1, 64029,  0,          "oMessager", "nextMsg",                         NULL,     4,     4, { WORKAROUND_FAKE,   0 } }, // when running the game with subtitles only
 	{ GID_LSL7,           -1, 64017,  0,             "oFlags", "clear",                           NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // demo version, when it starts, and whenever the player chooses to go to the "Strip Liar's Dice" mini game
 	{ GID_LSL7,           -1, 64017,  0,        "oActorFlags", "clear",                           NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // after an NPC walks off the left side of the screen at the Clothing Optional Pool
@@ -553,6 +556,9 @@ const SciWorkaroundEntry uninitializedReadWorkarounds[] = {
 	{ GID_SQ6,           210,   210,  0,       "buttonSecret", "doVerb",                          NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // after winning the first round of stooge fighter 3
 	{ GID_SQ6,            -1, 64994, -1,               "Game", "restore",                         NULL,     1,     1, { WORKAROUND_FAKE,   0 } }, // When trying to load an invalid save game from the launcher
 	{ GID_SQ6,            -1, 64921, -1,              "Print", "addEdit",                         NULL,     1,     1, { WORKAROUND_FAKE,   0 } }, // When trying to use the game debugger's flag setting command
+	{ GID_SQ6,           105,   105, -1,    "doRestoreScript", "changeState",                     NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // when restoring from main menu in Mac version
+	{ GID_SQ6,            -1, 64994, -1,               "Game", "save",                            NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // when saving in Mac version
+	{ GID_SQ6,            -1, 64994, -1,               "Game", "restore",                         NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // when restoring in Mac version
 	{ GID_TORIN,          -1, 64017,  0,             "oFlags", "clear",                           NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // entering Torin's home in the French version
 	{ GID_TORIN,          -1, 64029,  0,          "oMessager", "nextMsg",                         NULL,     3,     3, { WORKAROUND_FAKE,   0 } }, // start of chapter one, or when running with subtitles only
 	{ GID_TORIN,          -1, 64892,  0,      "oEventHandler", "killAllEventHogs",                NULL,     1,     1, { WORKAROUND_FAKE,   0 } }, // when pressing the hint button when the game is about to transition to a new room (race condition) - Trac#9810
@@ -580,6 +586,16 @@ const SciWorkaroundEntry kArraySetElements_workarounds[] = {
 
 //    gameID,           room,script,lvl,          object-name, method-name, local-call-signature, index-range,   workaround
 const SciWorkaroundEntry kArrayFill_workarounds[] = {
+	// Phantasmagoria Mac calls kArrayFill to zero-initialize new string buffers, but almost
+	//  half of these calls are missing the start-index parameter and so they had no effect.
+	//  Our SCI strings are already zero-initialized and so these calls can be ignored.
+	{ GID_PHANTASMAGORIA, -1,    38,  0,        "SaveManager", "init",                      NULL,     0,     0, { WORKAROUND_IGNORE, 0 } },
+	{ GID_PHANTASMAGORIA, -1,    38,  0,        "SaveManager", "save",                      NULL,     0,     0, { WORKAROUND_IGNORE, 0 } },
+	{ GID_PHANTASMAGORIA, -1,    38,  0,        "SaveManager", "getSaveType",               NULL,     0,     0, { WORKAROUND_IGNORE, 0 } },
+	{ GID_PHANTASMAGORIA, -1,    38,  0,        "SaveManager", "testFlag",                  NULL,     0,     0, { WORKAROUND_IGNORE, 0 } },
+	{ GID_PHANTASMAGORIA, -1,    38,  0,        "SaveManager", "delete",                    NULL,     0,     0, { WORKAROUND_IGNORE, 0 } },
+	{ GID_PHANTASMAGORIA, -1,    90,  0,           "logoRoom", "init",                      NULL,     0,     0, { WORKAROUND_IGNORE, 0 } },
+	{ GID_PHANTASMAGORIA, -1, 45950,  0,            "rm45950", "init",                      NULL,     0,     0, { WORKAROUND_IGNORE, 0 } },
 	{ GID_PQ4,           540, 64918,  0,                "Str", "callKernel",                NULL,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // when clicking on Hate Crimes in the computer on day 2
 	SCI_WORKAROUNDENTRY_TERMINATOR
 };
@@ -1247,6 +1263,11 @@ static const SciMessageWorkaroundEntry messageWorkarounds[] = {
 	//  audio36 for the the other has the wrong tuple, which we fix in the audio36 workarounds.
 	{ GID_GK1,           SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  420,   2,  32,   3,  1, { MSG_WORKAROUND_REMAP,    420,   2,  32,   0,  1,  0,   0,   0, NULL } },
 	{ GID_GK1,           SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  420,   2,  32,   0,  1, { MSG_WORKAROUND_REMAP,    420,   2,  32,   2,  1,  0,   0,   0, NULL } },
+	// Clicking one of Gabriel's letters on Gerde in room 120 after getting his address in some versions
+	{ GID_GK2,           SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  120,  18,  63,   0,  1, { MSG_WORKAROUND_REMAP,    120,  18,  44,   0,  1,  0,   0,   0, NULL } },
+	{ GID_GK2,           SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  120,  18,  64,   0,  1, { MSG_WORKAROUND_REMAP,    120,  18,  44,   0,  1,  0,   0,   0, NULL } },
+	// Clicking any item other than the dagger on theater vent in room 11853
+	{ GID_GK2,           SCI_MEDIA_ALL,    K_LANG_NONE,     -1, 1185,   4,   0,   0,  1, { MSG_WORKAROUND_REMAP,   1185,   4,  62,   0,  1,  0,   0,   0, NULL } },
 	// Asking Yvette about Tut in act 2 party in floppy version - bug #10723
 	//  The last two sequences in this five part message reveal a murder that hasn't occurred yet.
 	//  We skip these as to not spoil the plot, but only in the act 2 rooms, as the message is used
@@ -1322,6 +1343,8 @@ static const SciMessageWorkaroundEntry audio36Workarounds[] = {
 	// game              media             language       room   mod    n    v    c   s    workaround-type          mod    n    v    c   s tlk  idx  len  text
 	// Clicking money on Lorelei when dancing - bug #10819 (see message workarounds above)
 	{ GID_GK1,           SCI_MEDIA_CD,     K_LANG_NONE,     -1,  420,   2,  32,   0,  1, { MSG_WORKAROUND_REMAP,    420,   2,  32,   3,  1,  0,   0,   0, NULL } },
+	// Clicking Von Glower's letter on Gabriel in room 1120
+	{ GID_GK2,           SCI_MEDIA_ALL,    K_LANG_ENGLISH,  -1, 1120,   5,  96,   0,  1, { MSG_WORKAROUND_REMAP,   1120,   5,   2,   0,  1,  0,   0,   0, NULL } },
 	// Clicking Look on floor grate in room 510 - bug #10848
 	{ GID_QFG4,          SCI_MEDIA_CD,     K_LANG_NONE,     -1,  510,  23,   1,   0,  1, { MSG_WORKAROUND_REMAP,    510, 199,   1,   0,  1,  0,   0,   0, NULL } },
 	// Clicking flowers on Rusalka - bug #10849 (see message workarounds above)

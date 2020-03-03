@@ -727,6 +727,7 @@ begin_credits("Credits");
 			begin_section("Director");
 				add_person("Eugene Sandulenko", "sev", "");
 				add_person("Dmitry Iskrich", "", "");
+				add_person("Scott Percival", "moralrecordings", "");
 				add_person("Steven Hoefel", "", "");
 				add_person("Tobia Tesan", "", "");
 			end_section();
@@ -1011,6 +1012,17 @@ begin_credits("Credits");
 
 			begin_section("Tucker");
 				add_person("Gregory Montoir", "cyx", "(retired)");
+			end_section();
+
+			begin_section("Ultima");
+				add_person("Paul Gilbert", "dreammaster", "");
+				add_person("Eric Fry", "yuv422", "(Nuvie)");
+				add_person("", "malignantmanor", "(Nuvie)");
+				add_person("", "sb-x", "(Nuvie)");
+				add_person("Dominik Reichardt", "Dominus Dragon", "(Pentagram)");
+				add_person("Willem Jan Palenstijn", "wjp", "(Pentagram)");
+				add_person("", "Colourless Dragon", "(Pentagram)");
+				add_person("", "mjimenez", "(Pentagram)");
 			end_section();
 
 			begin_section("Voyeur");

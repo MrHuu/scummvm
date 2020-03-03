@@ -32,19 +32,19 @@ class GobMetaEngine : public AdvancedMetaEngine {
 public:
 	GobMetaEngine();
 
-	const char *getEngineId() const {
+	const char *getEngineId() const override {
 		return "gob";
 	}
 
 	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const override;
 
-	virtual const char *getName() const;
-	virtual const char *getOriginalCopyright() const;
+	const char *getName() const override;
+	const char *getOriginalCopyright() const override;
 
-	virtual bool hasFeature(MetaEngineFeature f) const;
+	bool hasFeature(MetaEngineFeature f) const override;
 
-	virtual Common::Error createInstance(OSystem *syst, Engine **engine) const;
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
+	Common::Error createInstance(OSystem *syst, Engine **engine) const override;
+	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
 
 private:
 	/**

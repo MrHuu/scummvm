@@ -342,25 +342,25 @@ public:
 		_guiOptions = GUIO1(GUIO_NOMIDI);
 	}
 
-	const char *getEngineId() const {
+	const char *getEngineId() const override {
 		return "drascula";
 	}
 
-	virtual const char *getName() const {
+	const char *getName() const override {
 		return "Drascula: The Vampire Strikes Back";
 	}
 
-	virtual const char *getOriginalCopyright() const {
+	const char *getOriginalCopyright() const override {
 		return "Drascula: The Vampire Strikes Back (C) 2000 Alcachofa Soft, (C) 1996 Digital Dreams Multimedia, (C) 1994 Emilio de Paz";
 	}
 
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const;
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const;
-	virtual SaveStateList listSaves(const char *target) const;
-	virtual int getMaximumSaveSlot() const;
-	virtual void removeSaveState(const char *target, int slot) const;
-	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const;
+	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const override;
+	bool hasFeature(MetaEngineFeature f) const override;
+	const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const override;
+	SaveStateList listSaves(const char *target) const override;
+	int getMaximumSaveSlot() const override;
+	void removeSaveState(const char *target, int slot) const override;
+	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
 };
 
 bool DrasculaMetaEngine::hasFeature(MetaEngineFeature f) const {

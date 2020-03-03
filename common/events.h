@@ -74,16 +74,13 @@ enum EventType {
 	 **/
 	EVENT_PREDICTIVE_DIALOG = 12,
 
-#ifdef ENABLE_KEYMAPPER
-	// IMPORTANT NOTE: This is part of the WIP Keymapper. If you plan to use
-	// this, please talk to tsoliman and/or LordHoto.
-	EVENT_CUSTOM_BACKEND_ACTION = 18,
-	EVENT_CUSTOM_BACKEND_HARDWARE = 21,
-	EVENT_GUI_REMAP_COMPLETE_ACTION = 22,
-	EVENT_KEYMAPPER_REMAP = 19,
-#endif
+	EVENT_CUSTOM_BACKEND_ACTION_START = 18,
+	EVENT_CUSTOM_BACKEND_ACTION_END   = 19,
+	EVENT_CUSTOM_ENGINE_ACTION_START  = 20,
+	EVENT_CUSTOM_ENGINE_ACTION_END    = 21,
+
 #ifdef ENABLE_VKEYBD
-	EVENT_VIRTUAL_KEYBOARD = 20,
+	EVENT_VIRTUAL_KEYBOARD = 22,
 #endif
 
 	EVENT_DROP_FILE = 23,
@@ -92,7 +89,21 @@ enum EventType {
 	EVENT_JOYBUTTON_DOWN = 25,
 	EVENT_JOYBUTTON_UP = 26,
 
-	EVENT_CLIPBOARD_UPDATE = 27
+	EVENT_CLIPBOARD_UPDATE = 27,
+
+	EVENT_CUSTOM_BACKEND_HARDWARE = 28,
+	EVENT_DEBUGGER = 29,
+
+	/**
+	 * Additional mouse events, details in Event::mouse.
+	 *
+	 * Note that X1 and X2 are usually back and forward, however
+	 * this can't be guaranteed on all platforms.
+	 */
+	EVENT_X1BUTTONDOWN = 30,
+	EVENT_X1BUTTONUP = 31,
+	EVENT_X2BUTTONDOWN = 32,
+	EVENT_X2BUTTONUP = 33
 };
 
 const int16 JOYAXIS_MIN = -32768;
@@ -112,13 +123,13 @@ struct JoystickState {
 	 * Some of the button indices match well-known game controller
 	 * buttons. See JoystickButton.
 	 */
-	int8 button;
+	uint8 button;
 
 	JoystickState() : axis(0), position(0), button(0) {}
 };
 
 /**
- *  The list named buttons available from a joystick
+ *  The list of named buttons available from a joystick
  */
 enum JoystickButton {
 	JOYSTICK_BUTTON_A,
@@ -136,6 +147,31 @@ enum JoystickButton {
 	JOYSTICK_BUTTON_DPAD_DOWN,
 	JOYSTICK_BUTTON_DPAD_LEFT,
 	JOYSTICK_BUTTON_DPAD_RIGHT
+};
+
+/**
+ *  The list of named axes available from a joystick
+ */
+enum JoystickAxis {
+	JOYSTICK_AXIS_LEFT_STICK_X,
+	JOYSTICK_AXIS_LEFT_STICK_Y,
+	JOYSTICK_AXIS_RIGHT_STICK_X,
+	JOYSTICK_AXIS_RIGHT_STICK_Y,
+	JOYSTICK_AXIS_LEFT_TRIGGER,
+	JOYSTICK_AXIS_RIGHT_TRIGGER
+};
+
+/**
+ *  The list named buttons available from a mouse
+ */
+enum MouseButton {
+	MOUSE_BUTTON_LEFT   = 0,
+	MOUSE_BUTTON_RIGHT  = 1,
+	MOUSE_BUTTON_MIDDLE = 2,
+	MOUSE_WHEEL_UP      = 3,
+	MOUSE_WHEEL_DOWN    = 4,
+	MOUSE_BUTTON_X1     = 5,
+	MOUSE_BUTTON_X2     = 6
 };
 
 typedef uint32 CustomEventType;
@@ -170,11 +206,7 @@ struct Event {
 	 */
 	Point mouse;
 
-#ifdef ENABLE_KEYMAPPER
-	// IMPORTANT NOTE: This is part of the WIP Keymapper. If you plan to use
-	// this, please talk to tsoliman and/or LordHoto.
 	CustomEventType customType;
-#endif
 
 	/* The path of the file or directory dragged to the ScummVM window */
 	Common::String path;
@@ -185,10 +217,7 @@ struct Event {
 	 */
 	JoystickState joystick;
 
-	Event() : type(EVENT_INVALID), kbdRepeat(false) {
-#ifdef ENABLE_KEYMAPPER
-		customType = 0;
-#endif
+	Event() : type(EVENT_INVALID), kbdRepeat(false), customType(0) {
 	}
 };
 
@@ -277,11 +306,8 @@ public:
 
 	/**
 	 * Notifies the observer of pollEvent() query.
-	 *
-	 * @return  true if the event should not be passed to other observers,
-	 *          false otherwise.
 	 */
-	virtual bool notifyPoll() { return false; }
+	virtual void notifyPoll() { }
 };
 
 /**
@@ -296,28 +322,7 @@ public:
 	/**
 	 * Map an incoming event to one or more action events
 	 */
-	virtual List<Event> mapEvent(const Event &ev, EventSource *source) = 0;
-
-	virtual List<Event> getDelayedEvents() = 0;
-};
-
-class DefaultEventMapper : public EventMapper {
-public:
-	DefaultEventMapper() : _delayedEvents(), _delayedEffectiveTime(0) {}
-	// EventMapper interface
-	virtual List<Event> mapEvent(const Event &ev, EventSource *source);
-	virtual List<Event> getDelayedEvents();
-protected:
-	virtual void addDelayedEvent(uint32 millis, Event ev);
-
-	struct DelayedEventsEntry {
-		const uint32 timerOffset;
-		const Event event;
-		DelayedEventsEntry(const uint32 offset, const Event ev) : timerOffset(offset), event(ev) { }
-	};
-
-	Queue<DelayedEventsEntry> _delayedEvents;
-	uint32 _delayedEffectiveTime;
+	virtual List<Event> mapEvent(const Event &ev) = 0;
 };
 
 /**
@@ -354,24 +359,8 @@ public:
 
 	/**
 	 * Registers an event mapper with the dispatcher.
-	 *
-	 * The ownership of the "mapper" variable will pass
-	 * to the EventDispatcher, thus it will be deleted
-	 * with "delete", when EventDispatcher is destroyed.
-	 *
-	 * @param autoFree	Destroy previous mapper [default]
-	 *         		Normally we allow only one event mapper to exists,
-	 *			However Event Recorder must intervent into normal
-	 *			event flow without altering its semantics. Thus during
-	 *			Event Recorder playback and recording we allow
-	 *			two mappers.
 	 */
-	void registerMapper(EventMapper *mapper, bool autoFree = true);
-
-	/**
-	 * Queries the setup event mapper.
-	 */
-	EventMapper *queryMapper() const { return _mapper; }
+	void registerMapper(EventMapper *mapper);
 
 	/**
 	 * Registers a new EventSource with the Dispatcher.
@@ -400,7 +389,6 @@ public:
 	 */
 	void unregisterObserver(EventObserver *obs);
 private:
-	bool _autoFreeMapper;
 	EventMapper *_mapper;
 
 	struct Entry {
@@ -425,6 +413,7 @@ private:
 	void dispatchPoll();
 };
 
+class Keymap;
 class Keymapper;
 
 /**
@@ -438,8 +427,8 @@ public:
 	virtual ~EventManager() {}
 
 	enum {
-		LBUTTON = 1 << 0,
-		RBUTTON = 1 << 1
+		LBUTTON = 1 << MOUSE_BUTTON_LEFT,
+		RBUTTON = 1 << MOUSE_BUTTON_RIGHT
 	};
 
 
@@ -505,9 +494,9 @@ public:
 
 	// TODO: Consider removing OSystem::getScreenChangeID and
 	// replacing it by a generic getScreenChangeID method here
-#ifdef ENABLE_KEYMAPPER
+
 	virtual Keymapper *getKeymapper() = 0;
-#endif
+	virtual Keymap *getGlobalKeymap() = 0;
 
 	enum {
 		/**
@@ -519,7 +508,12 @@ public:
 		 * Priority of the event recorder. It has to go after event manager
 		 * in order to record events generated by it
 		 */
-		kEventRecorderPriority = 1
+		kEventRecorderPriority = 1,
+		/**
+		 * Priority of the remap dialog. It has to go first to capture all
+		 * the events before they are consumed by other observers.
+		 */
+		kEventRemapperPriority = 999
 	};
 
 	/**

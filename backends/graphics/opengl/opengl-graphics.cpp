@@ -33,6 +33,8 @@
 #include "common/translation.h"
 #include "common/algorithm.h"
 #include "common/file.h"
+#include "gui/debugger.h"
+#include "engines/engine.h"
 #ifdef USE_OSD
 #include "common/tokenizer.h"
 #include "common/rect.h"
@@ -236,6 +238,7 @@ const OSystem::GraphicsMode glStretchModes[] = {
 	{"pixel-perfect", _s("Pixel-perfect scaling"), STRETCH_INTEGRAL},
 	{"fit", _s("Fit to window"), STRETCH_FIT},
 	{"stretch", _s("Stretch to window"), STRETCH_STRETCH},
+	{"fit_force_aspect", _s("Fit to window (4:3)"), STRETCH_FIT_FORCE_ASPECT},
 	{nullptr, nullptr, 0}
 };
 
@@ -471,6 +474,11 @@ void OpenGLGraphicsManager::updateScreen() {
 	}
 #endif
 
+	// If there's an active debugger, update it
+	GUI::Debugger *debugger = g_engine ? g_engine->getDebugger() : nullptr;
+	if (debugger)
+		debugger->onFrame();
+
 	// We only update the screen when there actually have been any changes.
 	if (   !_forceRedraw
 		&& !_cursorNeedsRedraw
@@ -509,8 +517,10 @@ void OpenGLGraphicsManager::updateScreen() {
 
 	// Second step: Draw the overlay if visible.
 	if (_overlayVisible) {
+		int dstX = (_windowWidth - _overlayDrawRect.width()) / 2;
+		int dstY = (_windowHeight - _overlayDrawRect.height()) / 2;
 		_backBuffer.enableBlend(Framebuffer::kBlendModeTraditionalTransparency);
-		g_context.getActivePipeline()->drawTexture(_overlay->getGLTexture(), 0, 0, _overlayDrawRect.width(), _overlayDrawRect.height());
+		g_context.getActivePipeline()->drawTexture(_overlay->getGLTexture(), dstX, dstY, _overlayDrawRect.width(), _overlayDrawRect.height());
 	}
 
 	// Third step: Draw the cursor if visible.
@@ -1323,10 +1333,12 @@ bool OpenGLGraphicsManager::saveScreenshot(const Common::String &filename) const
 #endif
 	Graphics::Surface data;
 	data.init(width, height, lineSize, &pixels.front(), format);
+	data.flipVertical(Common::Rect(width, height));
+
 #ifdef USE_PNG
-	return Image::writePNG(out, data, true);
+	return Image::writePNG(out, data);
 #else
-	return Image::writeBMP(out, data, true);
+	return Image::writeBMP(out, data);
 #endif
 }
 

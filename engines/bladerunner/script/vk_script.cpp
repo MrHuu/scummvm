@@ -1522,8 +1522,20 @@ void VKScript::askDektora(int questionId) {
 		} else {
 			VK_Subject_Reacts(90, 15, -5, 10);
 			VK_Play_Speech_Line(kActorDektora, 1870, 0.5f);
+#if BLADERUNNER_ORIGINAL_BUGS
 			VK_Play_Speech_Line(kActorMcCoy, 8532, 0.5f);
 			VK_Play_Speech_Line(kActorDektora, 1890, 0.5f);
+#else
+			// Quotes 8532 (McCoy) and 1890 (Dektora) are muted in the ESP version
+			// They are completely missing from the ESP version (they don't appear elsewhere).
+			// The quotes here are:
+			// McCoy: "That's not a single word."
+			// Dektora: "All right. Aggressive. Powerful."
+			if (_vm->_language != Common::ES_ESP) {
+				VK_Play_Speech_Line(kActorMcCoy, 8532, 0.5f);
+				VK_Play_Speech_Line(kActorDektora, 1890, 0.5f);
+			}
+#endif // BLADERUNNER_ORIGINAL_BUGS
 		}
 		break;
 	case 7475:                          // Medium 01
@@ -2333,7 +2345,31 @@ void VKScript::askBulletBob(int questionId) {
 			Delay(2000u);
 			VK_Play_Speech_Line(kActorMcCoy, 8270, 0.5f);
 		}
-		VK_Play_Speech_Line(kActorBulletBob, 1240, 0.5f);
+		// Quote 1220 is *boop* in ENG and ITA versions
+		// In DEU version it seems largely redundant; it is one word, identical to the first word of quote 1240.
+		// In FRA version it is also one word, similar (but not identical) to how quote 1240 starts.
+		// In ESP version it can complement the following quote 1240
+		if (_vm->_cutContent) {
+			if (_vm->_language == Common::ES_ESP) {
+				// play both 1220, 1240
+				VK_Play_Speech_Line(kActorBulletBob, 1220, 0.5f);
+				VK_Play_Speech_Line(kActorBulletBob, 1240, 0.5f);
+			} else if (_vm->_language == Common::FR_FRA
+			           || _vm->_language == Common::DE_DEU){
+				// play either 1220 or 1240
+				if (Random_Query(0, 1)) {
+					VK_Play_Speech_Line(kActorBulletBob, 1220, 0.5f);
+				} else {
+					VK_Play_Speech_Line(kActorBulletBob, 1240, 0.5f);
+				}
+			} else {
+				// play only 1240
+				VK_Play_Speech_Line(kActorBulletBob, 1240, 0.5f);
+			}
+		} else {
+			// vanilla mode plays only 1240
+			VK_Play_Speech_Line(kActorBulletBob, 1240, 0.5f);
+		}
 		break;
 	case 7475:                          // Medium 01
 		VK_Play_Speech_Line(kActorBulletBob, 1250, 0.5f);

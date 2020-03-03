@@ -338,7 +338,6 @@ int ResourceManager::readAudioMapSCI11(IntMapResourceSource *map) {
 		return SCI_ERROR_NO_RESOURCE_FILES_FOUND;
 	}
 
-	const uint32 srcSize = fileStream->size();
 	disposeVolumeFileStream(fileStream, src);
 
 	SciSpan<const byte>::const_iterator ptr = mapRes->cbegin();
@@ -513,38 +512,42 @@ int ResourceManager::readAudioMapSCI11(IntMapResourceSource *map) {
 				continue;
 			}
 
+			// GK2 has invalid audio36 map entries on CD 1 of the German 
+			//  version and CD 6 of all versions. All are safe to ignore
+			//  because their content doesn't apply to the disc's chapter.
 			if (g_sci->getGameId() == GID_GK2) {
-				// At least version 1.00 of the US release, and the German
-				// release, of GK2 have multiple invalid audio36 map entries on
-				// CD 6
-				if (map->_volumeNumber == 6 && offset + syncSize >= srcSize) {
-					bool skip;
-					switch (g_sci->getLanguage()) {
-					case Common::EN_ANY:
-						skip = (map->_mapNumber == 22 || map->_mapNumber == 160);
-						break;
-					case Common::DE_DEU:
-						skip = (map->_mapNumber == 22);
-						break;
-					default:
-						skip = false;
-					}
-
-					if (skip) {
-						continue;
-					}
-				}
-
-				// Map 2020 on CD 1 of the German release of GK2 is invalid.
-				// This content does not appear to ever be used by the game (it
-				// does not even exist in the US release), and there is a
-				// correct copy of it on CD 6, so just ignore the bad copy on
-				// CD 1
-				if (g_sci->getLanguage() == Common::DE_DEU &&
-					map->_volumeNumber == 1 &&
+				// Map 2020 on CD 1 only exists in localized versions and
+				//  contains inventory messages from later chapters.
+				if (map->_volumeNumber == 1 &&
 					map->_mapNumber == 2020) {
 					continue;
 				}
+
+				// Maps 22 and 160 on CD 6 appear in various broken forms
+				//  in English and apparently every localized version.
+				//  These messages are for Grace's notebook and castle
+				//  secret passage rooms which aren't in chapter 6.
+				if (map->_volumeNumber == 6 &&
+					(map->_mapNumber == 22 || map->_mapNumber == 160)) {
+					continue;
+				}
+			}
+			
+			// Lighthouse German has invalid audio36 map entries for
+			//  content that was cut from the game. These resources
+			//  existed in the English version even though they were
+			//  inaccessible.
+			if (g_sci->getGameId() == GID_LIGHTHOUSE &&
+				map->_mapNumber == 800) {
+				continue;
+			}
+
+			// LSL7 French has an invalid audio36 map entry for a narrator
+			//  message that was cut from the game. This resource existed
+			//  in the English version even though it was inaccessible.
+			if (g_sci->getGameId() == GID_LSL7 &&
+				map->_mapNumber == 999) {
+				continue;
 			}
 
 			// Map 800 and 4176 contain content that was cut from the game. The

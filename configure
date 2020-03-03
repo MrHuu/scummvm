@@ -179,16 +179,16 @@ _lua=yes
 _build_scalers=yes
 _build_hq_scalers=yes
 _enable_prof=no
+_enable_asan=no
 _global_constructors=no
 _no_undefined_var_template=no
 _no_pragma_pack=no
 _bink=yes
 _cloud=auto
 _pandoc=no
-# Default vkeybd/keymapper/eventrec options
+# Default vkeybd/eventrec options
 _vkeybd=no
-_keymapper=no
-_eventrec=auto
+_eventrec=no
 # GUI translation options
 _translation=yes
 # Default platform settings
@@ -771,7 +771,7 @@ show_engine_help() {
 show_subengine_help() {
 	name=`get_engine_name $1`
 	parent=`get_engine_name $2`
-	option_help "${1}" "${name} in ${parent} engine" "  "
+	option_help "- ${1}" "${name} in ${parent} engine" "  "
 }
 
 # Prepare the strings about the engines to build
@@ -1044,7 +1044,6 @@ Optional Features:
   --disable-cloud          don't build cloud support
   --disable-system-dialogs don't build support for system dialogs
   --enable-vkeybd          build virtual keyboard support
-  --enable-keymapper       build key mapper support
   --enable-eventrecorder   enable event recording functionality
   --disable-eventrecorder  disable event recording functionality
   --enable-updates         build support for updates
@@ -1119,8 +1118,11 @@ Optional Libraries:
   --disable-osx-dock-plugin    disable the NSDockTilePlugin support
                                [Mac OS X only - autodetect]
 
-  --with-sdl-prefix=DIR    prefix where the sdl-config script is
-                           installed (optional)
+  --with-sdl-prefix=DIR    prefix where the SDL package is installed (optional)
+                           e.g., if sdl-config script is at:
+                           /opt/mxe/usr/i686-w64-mingw32.static/bin/sdl2-config
+                           then you should pass:
+                           '--with-sdl-prefix=/opt/mxe/usr/i686-w64-mingw32.static'
 
   --with-freetype2-prefix=DIR  prefix where the freetype-config script is
                                installed (optional)
@@ -1153,6 +1155,7 @@ Some influential environment variables:
   AR                 archiver command
   AS                 assembler command
   ASFLAGS            assembler flags
+  CONFIGURE_NO_HOST  Ignore the cross-compile target set by the --host= option
   CPPFLAGS           C++ preprocessor flags, e.g. -I<include dir> if you have
                      headers in a nonstandard directory <include dir>
   CXX                C++ compiler command
@@ -1190,6 +1193,19 @@ EOF
 
 for ac_option in $@; do
 	case "$ac_option" in
+	# Silently ignore options valid for Autotools configure.
+	--build=*)                                           ;;
+	--program-prefix=*)                                  ;;
+	--sbindir=*)                                         ;;
+	--sysconfdir=*)                                      ;;
+	--includedir=*)                                      ;;
+	--libexecdir=*)                                      ;;
+	--localstatedir=*)                                   ;;
+	--sharedstatedir=*)                                  ;;
+	--infodir=*)                                         ;;
+	--disable-dependency-tracking)                       ;;
+	--enable-dependency-tracking)                        ;;
+	# End of ignored options.
 	--enable-static)              _static_build=yes      ;;
 	--disable-16bit)              _16bit=no              ;;
 	--enable-highres)             _highres=yes           ;;
@@ -1276,8 +1292,6 @@ for ac_option in $@; do
 	--disable-translation)       _translation=no         ;;
 	--enable-vkeybd)             _vkeybd=yes             ;;
 	--disable-vkeybd)            _vkeybd=no              ;;
-	--enable-keymapper)          _keymapper=yes          ;;
-	--disable-keymapper)         _keymapper=no           ;;
 	--enable-eventrecorder)      _eventrec=yes           ;;
 	--disable-eventrecorder)     _eventrec=no            ;;
 	--enable-text-console)       _text_console=yes       ;;
@@ -1430,6 +1444,9 @@ for ac_option in $@; do
 	--enable-profiling)
 		_enable_prof=yes
 		;;
+	--enable-asan)
+		_enable_asan=yes
+		;;
 	--with-sdl-prefix=*)
 		arg=`echo $ac_option | cut -d '=' -f 2`
 		_sdlpath="$arg:$arg/bin"
@@ -1458,7 +1475,11 @@ for ac_option in $@; do
 		_xcodetoolspath=`echo $ac_option | cut -d '=' -f 2`
 		;;
 	--host=*)
-		_host=`echo $ac_option | cut -d '=' -f 2`
+		if test -z "$CONFIGURE_NO_HOST"; then
+			_host=`echo $ac_option | cut -d '=' -f 2`
+		else
+			echo "Ignoring --host option!" >&2
+		fi
 		;;
 	--prefix=*)
 		prefix=`echo $ac_option | cut -d '=' -f 2`
@@ -2544,17 +2565,17 @@ case $_host_os in
 		append_var DEFINES "-D__3DS__"
 		append_var DEFINES "-DARM"
 		append_var DEFINES "-DARM11"
-		append_var CXXFLAGS "-march=armv6k"
-		append_var CXXFLAGS "-mtune=mpcore"
+		append_var CXXFLAGS "-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft"
 		append_var CXXFLAGS "-mword-relocations"
-		append_var CXXFLAGS "-mfloat-abi=hard"
 		append_var CXXFLAGS "-ffunction-sections"
 		append_var CXXFLAGS "-fomit-frame-pointer"
 		append_var CXXFLAGS "-I$DEVKITPRO/libctru/include"
 		append_var CXXFLAGS "-I$DEVKITPRO/portlibs/3ds/include"
+		append_var LDFLAGS "-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft"
 		append_var LDFLAGS "-L$DEVKITPRO/libctru/lib"
 		append_var LDFLAGS "-L$DEVKITPRO/portlibs/3ds/lib"
-		append_var LIBS "-lcitro3d -lctru"
+		append_var LDFLAGS "-specs=3dsx.specs -lctru"
+		append_var LIBS "-lcitro3d"
 		;;
 	amigaos*)
 		append_var LDFLAGS "-Wl,--export-dynamic"
@@ -2959,6 +2980,7 @@ case $_host_os in
 		append_var LDFLAGS "-Wl,--gc-sections"
 		_port_mk="backends/platform/sdl/riscos/riscos.mk"
 		_pandoc=yes
+		_sdlconfig=sdl-config
 		;;
 	solaris*)
 		append_var DEFINES "-DSOLARIS"
@@ -3115,7 +3137,6 @@ if test -n "$_host"; then
 			_libcurl=no
 			_vkeybd=yes
 			_build_hq_scalers=no
-			_keymapper=no
 			# Force disable vorbis on dingux, it has terrible performance compared to tremor
 			_vorbis=no
 			# Force disable seq on dingux, no way to use it and it would get enabled by default with configure
@@ -3136,7 +3157,6 @@ if test -n "$_host"; then
 			# This is so optional OpenGL ES includes are found.
 			append_var CXXFLAGS "-I$RPI_ROOT/opt/vc/include"
 			_savegame_timestamp=no
-			_eventrec=no
 			_build_scalers=no
 			_build_hq_scalers=no
 			# We prefer SDL2 on the Raspberry Pi: acceleration now depends on it
@@ -3218,7 +3238,6 @@ if test -n "$_host"; then
 			_build_scalers=yes
 			_optimization_level=-O3
 			_vkeybd=yes
-			_keymapper=yes
 			_vorbis=no
 			_sdlconfig=sdl-config
 			_port_mk="backends/platform/dingux/dingux.mk"
@@ -3280,7 +3299,6 @@ if test -n "$_host"; then
 
 			_backend="maemo"
 			_vkeybd=yes
-			_keymapper=yes
 			_build_hq_scalers=no
 			_mt32emu=no
 			_alsa=no
@@ -3338,7 +3356,6 @@ if test -n "$_host"; then
 			_build_scalers=no
 			_savegame_timestamp=no
 			_translation=no
-			_keymapper=no
 			_text_console=no
 			_vkeybd=yes
 			_dynamic_modules=no
@@ -3434,7 +3451,6 @@ if test -n "$_host"; then
 		ps3)
 			_timidity=no
 			_vkeybd=yes
-			_eventrec=no
 			_port_mk="backends/platform/sdl/ps3/ps3.mk"
 			;;
 		psp2)
@@ -3444,7 +3460,6 @@ if test -n "$_host"; then
 			_build_hq_scalers=no
 			_mt32emu=no
 			_timidity=no
-			_eventrec=no
 			_port_mk="backends/platform/sdl/psp2/psp2.mk"
 			;;
 		psp)
@@ -3493,7 +3508,6 @@ if test -n "$_host"; then
 			_mt32emu=no
 			_seq_midi=no
 			_vkeybd=no
-			_keymapper=yes
 			add_line_to_config_mk "HOST_COMPILER = `uname`"
 			;;
 		wii)
@@ -3871,9 +3885,6 @@ esac
 #
 case $_backend in
 	sdl)
-		if test "$_eventrec" = auto ; then
-			_eventrec=yes
-		fi
 		;;
 	*)
 		_eventrec=no
@@ -5416,21 +5427,10 @@ if test "$_pandocext" = "default"; then
 fi
 
 #
-# Enable vkeybd / keymapper / event recorder
+# Enable vkeybd / event recorder
 #
 define_in_config_if_yes $_vkeybd 'ENABLE_VKEYBD'
-define_in_config_if_yes $_keymapper 'ENABLE_KEYMAPPER'
 define_in_config_if_yes $_eventrec 'ENABLE_EVENTRECORDER'
-
-#
-# Check if the keymapper and the event recorder are enabled simultaneously
-#
-if test "$_keymapper" = yes ; then
-	if test "$_eventrec" = yes ; then
-		echo "ERROR: The keymapper and the event recorder cannot be enabled simultaneously currently, please disable one of the two"
-		exit 1
-	fi
-fi
 
 # Check whether to build translation support
 #
@@ -5614,6 +5614,14 @@ if test "$_enable_prof" = yes ; then
 	append_var DEFINES "-DENABLE_PROFILING"
 fi
 
+echo_n "Enabling Address Sanitizer... "
+
+if test "$_enable_asan" = yes ; then
+	append_var CXXFLAGS "-fsanitize=address -fno-omit-frame-pointer"
+	append_var LDFLAGS "-fsanitize=address -fno-omit-frame-pointer"
+fi
+echo "$_enable_asan"
+
 echo_n "Backend... "
 echo_n "$_backend"
 
@@ -5663,10 +5671,6 @@ fi
 
 if test "$_vkeybd" = yes ; then
 	echo_n ", virtual keyboard"
-fi
-
-if test "$_keymapper" = yes ; then
-	echo_n ", keymapper"
 fi
 
 if test "$_eventrec" = yes ; then

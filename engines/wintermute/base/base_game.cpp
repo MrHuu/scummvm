@@ -48,6 +48,7 @@
 #include "engines/wintermute/base/base_surface_storage.h"
 #include "engines/wintermute/base/saveload.h"
 #include "engines/wintermute/base/save_thumb_helper.h"
+#include "engines/wintermute/base/scriptables/script_ext_array.h"
 #include "engines/wintermute/base/scriptables/script_value.h"
 #include "engines/wintermute/base/scriptables/script_engine.h"
 #include "engines/wintermute/base/scriptables/script_stack.h"
@@ -225,8 +226,10 @@ BaseGame::BaseGame(const Common::String &targetName) : BaseObject(this), _target
 	_constrainedMemory = false;
 
 	_settings = new BaseGameSettings(this);
-//#endif
 
+#ifdef ENABLE_HEROCRAFT
+	_rndHc = new Common::RandomSource("HeroCraft");
+#endif
 }
 
 
@@ -276,6 +279,11 @@ BaseGame::~BaseGame() {
 	_renderer = nullptr;
 	_musicSystem = nullptr;
 	_settings = nullptr;
+
+#ifdef ENABLE_HEROCRAFT
+	delete _rndHc;
+	_rndHc = nullptr;
+#endif
 
 	DEBUG_DebugDisable();
 	debugC(kWintermuteDebugLog, "--- shutting down normally ---\n");
@@ -1259,6 +1267,21 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 		return STATUS_OK;
 	}
 
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] RegistryFlush
+	// Return value is never used
+	// Used at SaveGameSettings() and Game.RegistryFlush()
+	// Called after a series of RegWriteNumber calls
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "RegistryFlush") == 0) {
+		stack->correctParams(0);
+		ConfMan.flushToDisk();
+		stack->pushNULL();
+		return STATUS_OK;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// RegWriteNumber
 	//////////////////////////////////////////////////////////////////////////
@@ -1362,12 +1385,53 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 	else if (strcmp(name, "GetSaveSlotDescription") == 0) {
 		stack->correctParams(1);
 		int slot = stack->pop()->getInt();
-		char desc[512];
-		desc[0] = '\0';
-		SaveLoad::getSaveSlotDescription(slot, desc);
-		stack->pushString(desc);
+		Common::String desc = SaveLoad::getSaveSlotDescription(slot);
+		stack->pushString(desc.c_str());
 		return STATUS_OK;
 	}
+
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetSaveSlotDescriptionTimestamp
+	// Return struct with "Description" and "Timestamp" fields in 1.2.362-
+	// Return array  with "Description" and "Timestamp" items  in 1.2.527+
+	// Timestamps should be comparable types
+	// Used to sort saved games by timestamps at save.script & load.script
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetSaveSlotDescriptionTimestamp") == 0) {
+		stack->correctParams(1);
+		int slot = stack->pop()->getInt();
+
+		TimeDate time;
+		SaveLoad::getSaveSlotTimestamp(slot, &time);
+		stack->pushInt(time.tm_sec);
+		stack->pushInt(time.tm_min);
+		stack->pushInt(time.tm_hour);
+		stack->pushInt(time.tm_mday);
+		stack->pushInt(time.tm_mon + 1);
+		stack->pushInt(time.tm_year + 1900);
+		stack->pushInt(6);
+		BaseScriptable *date = makeSXDate(_gameRef, stack);
+		stack->pushNative(date, false);
+
+		Common::String desc = SaveLoad::getSaveSlotDescription(slot);
+		stack->pushString(desc.c_str());
+
+		BaseScriptable *obj;
+		if (BaseEngine::instance().isFoxTail(FOXTAIL_1_2_527, FOXTAIL_LATEST_VERSION)) {
+			stack->pushInt(2);
+			obj = makeSXArray(_gameRef, stack);
+		} else {
+			stack->pushInt(0);
+			obj = makeSXObject(_gameRef, stack);
+			obj->scSetProperty("Description", stack->pop());
+			obj->scSetProperty("Timestamp", stack->pop());
+		}
+		stack->pushNative(obj, false);
+
+		return STATUS_OK;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// EmptySaveSlot
@@ -1919,6 +1983,94 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 		return STATUS_OK;
 	}
 
+#ifdef ENABLE_HEROCRAFT
+	//////////////////////////////////////////////////////////////////////////
+	// [HeroCraft] GetSpriteControl
+	// Returns some internal state
+	// Known return values are:
+	// * 44332211: MUST be returned at "game.script" to allow game start
+	// * 77885566: may be returned at "mainMenu.script" to force open registration window
+	// * 90123679: may be returned at "mainMenu.script" to make "Buy Game" button visible
+	// Used at "Pole Chudes" only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetSpriteControl") == 0) {
+		stack->correctParams(0);
+		stack->pushInt(44332211L);
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [HeroCraft] RandomInitSeed
+	// Additional method to be called before RandomSeed()
+	// Used at "Pole Chudes" only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "RandomInitSeed") == 0) {
+		stack->correctParams(1);
+		int seed = stack->pop()->getInt();
+
+		_rndHc->setSeed(seed);
+
+		stack->pushNULL();
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [HeroCraft] RandomSeed
+	// Similar to usual Random() function, but using seed provided earlier
+	// Used at "Pole Chudes" only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "RandomSeed") == 0) {
+		stack->correctParams(2);
+
+		int from = stack->pop()->getInt();
+		int to   = stack->pop()->getInt();
+		int rnd  = _rndHc->getRandomNumberRng(from, to);
+
+		stack->pushInt(rnd);
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [HeroCraft] GetImageInfo
+	// Returns image size in "<width>;<height>" format, e.g. "800;600"
+	// Known params: "fsdata\\splash1.jpg"
+	// Game script turn off scaling if returned value is "1024;768"
+	// Used at "Papa's Daughters 1" only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetImageInfo") == 0) {
+		stack->correctParams(1);
+		/*const char *filename =*/ stack->pop()->getString();
+		stack->pushString("1024;768");
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [HeroCraft] A lot of functions used for self-check
+	// Used at "Papa's Daughters 2" only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "DeleteItems") == 0 || strcmp(name, "CreateActorItems") == 0 || strcmp(name, "DeleteActorItems") == 0 || strcmp(name, "PrepareItems") == 0 || strcmp(name, "CreateEntityItems") == 0 || strcmp(name, "DeleteEntityItems") == 0 || strcmp(name, "PrepareItemsWin") == 0 || strcmp(name, "CreateItems") == 0) {
+		stack->correctParams(3);
+		uint32 a = (uint32)stack->pop()->getInt();
+		uint32 b = (uint32)stack->pop()->getInt();
+		uint32 c = (uint32)stack->pop()->getInt();
+
+		uint32 result = 0;
+		const char* fname = "PapasDaughters2.wrp.exe";
+		if (strcmp(name, "PrepareItems") == 0 || strcmp(name, "CreateEntityItems") == 0 || strcmp(name, "DeleteEntityItems") == 0) {
+			result = getFilePartChecksumHc(fname, b, a);
+		} else if (strcmp(name, "PrepareItemsWin") == 0) {
+			result = getFilePartChecksumHc(fname, b, c);
+		} else if (strcmp(name, "CreateItems") == 0) {
+			result = getFilePartChecksumHc(fname, a, c);
+		} else {
+			result = getFilePartChecksumHc(fname, a, b);
+		}
+
+		stack->pushInt(result);
+		return STATUS_OK;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// EnableScriptProfiling
 	//////////////////////////////////////////////////////////////////////////
@@ -1940,6 +2092,95 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 
 		return STATUS_OK;
 	}
+
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetScreenType
+	// Returns 0 on fullscreen and 1 on window
+	// Used to init and update controls at options.script and methods.script
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetScreenType") == 0) {
+		stack->correctParams(0);
+		int type = _renderer->isWindowed() ? 1 : 0;
+		stack->pushInt(type);
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetScreenMode
+	// Returns integer to be used as a pixelization mode multiplier
+	// (e.g. it returns 2 for 640x360, 3 for 960x540, etc...)
+	// Used to init and update controls at options.script and methods.script
+	// This implementation always return 2 to fake window size of 2*320 x 2*180
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetScreenMode") == 0) {
+		stack->correctParams(0);
+		stack->pushInt(2);
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetDesktopDisplayMode
+	// Return struct with "w" and "h" fields in 1.2.362-
+	// Return array  with "w" and "h" items  in 1.2.527+
+	// Used to init and update controls at options.script and methods.script
+	// w,h of actual desktop size expected to calcucate maximum available size
+	// Available screen modes are calcucated as 2...N, N*320<w and N*180<h
+	// This implementation fakes available size as 2*320 x 2*180 only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetDesktopDisplayMode") == 0) {
+		stack->correctParams(0);
+		stack->pushInt(2 * 180 + 1);
+		stack->pushInt(2 * 320 + 1);
+
+		BaseScriptable *obj;
+		if (BaseEngine::instance().isFoxTail(FOXTAIL_1_2_527, FOXTAIL_LATEST_VERSION)) {
+			stack->pushInt(2);
+			obj = makeSXArray(_gameRef, stack);
+		} else {
+			stack->pushInt(0);
+			obj = makeSXObject(_gameRef, stack);
+			obj->scSetProperty("w", stack->pop());
+			obj->scSetProperty("h", stack->pop());
+		}
+		stack->pushNative(obj, false);
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] SetScreenTypeMode
+	// This implementation ignores mode, toggles screen type only
+	// Used to change screen type&mode at options.script and methods.script
+	// Return value is never used
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "SetScreenTypeMode") == 0) {
+		stack->correctParams(2);
+		int type = stack->pop()->getInt();
+		stack->pop()->getInt(); //mode is unused
+
+		_renderer->setWindowed(type);
+		stack->pushNULL();
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] ChangeWindowGrab
+	// Used at game.script on "Keypress" event on F11
+	// Readme of FoxTail says: "F11 - free the mouse pointer from the window"
+	// This implementation does nothing
+	// Return value is never used
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "ChangeWindowGrab") == 0) {
+		stack->correctParams(0);
+		stack->pushNULL();
+
+		return STATUS_OK;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// ShowStatusLine
@@ -2328,6 +2569,123 @@ ScValue *BaseGame::scGetProperty(const Common::String &name) {
 		_scValue->setBool(_cursorHidden);
 		return _scValue;
 	}
+
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] SystemLanguage (RO)
+	// Returns Steam API language name string
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "SystemLanguage") {
+		switch (Common::parseLanguage(ConfMan.get("language"))) {
+		case Common::CZ_CZE:
+			_scValue->setString("czech");
+			break;
+		case Common::DA_DAN:
+			_scValue->setString("danish");
+			break;
+		case Common::DE_DEU:
+			_scValue->setString("german");
+			break;
+		case Common::ES_ESP:
+			_scValue->setString("spanish");
+			break;
+		case Common::FI_FIN:
+			_scValue->setString("finnish");
+			break;
+		case Common::FR_FRA:
+			_scValue->setString("french");
+			break;
+		case Common::GR_GRE:
+			_scValue->setString("greek");
+			break;
+		case Common::HU_HUN:
+			_scValue->setString("hungarian");
+			break;
+		case Common::IT_ITA:
+			_scValue->setString("italian");
+			break;
+		case Common::JA_JPN:
+			_scValue->setString("japanese");
+			break;
+		case Common::KO_KOR:
+			_scValue->setString("koreana");
+			break;
+		case Common::NB_NOR:
+			_scValue->setString("norwegian");
+			break;
+		case Common::NL_NLD:
+			_scValue->setString("dutch");
+			break;
+		case Common::PT_BRA:
+			_scValue->setString("brazilian");
+			break;
+		case Common::PT_POR:
+			_scValue->setString("portuguese");
+			break;
+		case Common::PL_POL:
+			_scValue->setString("polish");
+			break;
+		case Common::RU_RUS:
+			_scValue->setString("russian");
+			break;
+		case Common::SE_SWE:
+			_scValue->setString("swedish");
+			break;
+		case Common::UA_UKR:
+			_scValue->setString("ukrainian");
+			break;
+		case Common::ZH_CNA:
+			_scValue->setString("schinese");
+			break;
+		case Common::ZH_TWN:
+			_scValue->setString("tchinese");
+			break;
+		default:
+			_scValue->setString("english");
+			break;
+		}
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] BuildVersion (RO)
+	// Used to display full game version at options.script in UpdateControls()
+	// Returns FoxTail engine version number as a dotted string
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "BuildVersion") {
+		if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_227) {
+			_scValue->setString("1.2.227");
+		} else if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_230) {
+			_scValue->setString("1.2.230");
+		} else if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_304) {
+			_scValue->setString("1.2.304");
+		} else if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_362) {
+			_scValue->setString("1.2.362");
+		} else if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_527) {
+			_scValue->setString("1.2.527");
+		} else {
+			_scValue->setString("UNKNOWN");
+		}
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GameVersion (RO)
+	// Used to display full game version at options.script in UpdateControls()
+	// Returns FoxTail version number as a string
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "GameVersion") {
+		uint32 gameVersion = 0;
+		BaseFileManager *fileManager = BaseEngine::instance().getFileManager();
+		if (fileManager) {
+			gameVersion = fileManager->getPackageVersion("data.dcp");
+		}
+		char tmp[16];
+		sprintf(tmp,"%u",gameVersion);
+		_scValue->setString(tmp);
+		return _scValue;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// Platform (RO)
@@ -2996,6 +3354,44 @@ bool BaseGame::externalCall(ScScript *script, ScStack *stack, ScStack *thisStack
 		bool val = stack->pop()->getBool();
 		stack->pushBool(val);
 	}
+
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] Split
+	// Returns array of words of a string, using another as a delimeter
+	// Used to split strings by 1 character delimeter in various scripts
+	// All the delimeters ever used in FoxTail are: " ", "@", "#", "$", "&"
+	// So, this implementation takes 1st char of delimeter string only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "Split") == 0) {
+		stack->correctParams(2);
+		const char *str = stack->pop()->getString();
+		const char sep = stack->pop()->getString()[0];
+		size_t size = strlen(str) + 1;
+
+		// There is no way to makeSXArray() with exactly 1 given element
+		// That's why we are creating empty Array and SXArray::push() later
+		stack->pushInt(0);
+		BaseScriptable *arr = makeSXArray(_gameRef, stack);
+
+		// Iterating string copy, replacing delimeter with '\0' and pushing matches
+		char *copy = new char[size];
+		strcpy(copy, str);
+		char *begin = copy;
+		for (char *it = copy; it < copy + size; it++) {
+			if (*it == sep || *it == '\0') {
+				*it = '\0';
+				stack->pushString(begin);
+				((SXArray *)arr)->push(stack->pop());
+				begin = it + 1;
+			}
+		}
+
+		stack->pushNative(arr, false);
+
+		delete[] copy;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// failure
@@ -3948,6 +4344,40 @@ char *BaseGame::getKeyFromStringTable(const char *str) const {
 	return _settings->getKeyFromStringTable(str);
 }
 
+#ifdef ENABLE_HEROCRAFT
+uint8 BaseGame::getFilePartChecksumHc(const char *filename, uint32 begin, uint32 end) {
+	if (begin >= end) {
+		warning("Wrong limits for checksum check");
+		return 0;
+	}
+
+	uint32 size;
+	char *buffer = (char *)BaseFileManager::getEngineInstance()->readWholeFile(filename, &size);
+	if (buffer == nullptr) {
+		warning("Failed to open '%s' for checksum check", filename);
+		return 0;
+	}
+
+	if (size < end) {
+		warning("File '%s' is too small for checksum check", filename);
+		delete[] buffer;
+		return 0;
+	}
+
+	uint8 result = 0;
+	for (uint32 i = begin; i < end; i++) {
+		uint8 tmp = buffer[i];
+		result += tmp;
+		if (result < tmp) {
+			result++;
+		}
+	}
+
+	delete[] buffer;
+	return result;
+}
+#endif
+
 Common::String BaseGame::readRegistryString(const Common::String &key, const Common::String &initValue) const {
 	// Game specific hacks:
 	Common::String result = initValue;
@@ -3964,7 +4394,7 @@ Common::String BaseGame::readRegistryString(const Common::String &key, const Com
 	} else { // Just fallback to using ConfMan for now
 		Common::String privKey = "wme_" + StringUtil::encodeSetting(key);
 		if (ConfMan.hasKey(privKey)) {
-			result = StringUtil::decodeSetting(ConfMan.get(key));
+			result = StringUtil::decodeSetting(ConfMan.get(privKey));
 		}
 	}
 	return result;

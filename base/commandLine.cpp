@@ -131,6 +131,8 @@ static const char HELP_STRING[] =
 	"                           supported by some MIDI drivers)\n"
 	"  --multi-midi             Enable combination AdLib and native MIDI\n"
 	"  --native-mt32            True Roland MT-32 (disable GM emulation)\n"
+	"  --dump-midi              Dumps MIDI events to 'dump.mid', until quitting from game\n"
+	"                           (if file already exists, it will be overwritten)\n"
 	"  --enable-gs              Enable Roland GS mode for MIDI playback\n"
 	"  --output-rate=RATE       Select output sample rate in Hz (e.g. 22050)\n"
 	"  --opl-driver=DRIVER      Select AdLib (OPL) emulator (db, mame"
@@ -233,6 +235,7 @@ void registerDefaults() {
 
 	ConfMan.registerDefault("multi_midi", false);
 	ConfMan.registerDefault("native_mt32", false);
+	ConfMan.registerDefault("dump_midi", false);
 	ConfMan.registerDefault("enable_gs", false);
 	ConfMan.registerDefault("midi_gain", 100);
 
@@ -654,6 +657,9 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			DO_LONG_OPTION_BOOL("native-mt32")
 			END_OPTION
 
+			DO_LONG_OPTION_BOOL("dump-midi")
+			END_OPTION
+
 			DO_LONG_OPTION_BOOL("enable-gs")
 			END_OPTION
 
@@ -804,7 +810,7 @@ static void listTargets() {
 		// If there's no description, fallback on the default description.
 		if (description.empty()) {
 			QualifiedGameDescriptor g = EngineMan.findTarget(name);
-			if (g.description)
+			if (!g.description.empty())
 				description = g.description;
 		}
 		// If there's still no description, we cannot come up with one. Insert some dummy text.
@@ -854,7 +860,7 @@ static Common::Error listSaves(const Common::String &singleTarget) {
 			currentTarget = *i;
 			EngineMan.upgradeTargetIfNecessary(*i);
 			game = EngineMan.findTarget(*i, &plugin);
-		} else if (game = findGameMatchingName(*i), game.gameId) {
+		} else if (game = findGameMatchingName(*i), !game.gameId.empty()) {
 			// The name is a known game id
 			plugin = EngineMan.findPlugin(game.engineId);
 			currentTarget = createTemporaryTarget(game.engineId, game.gameId);
@@ -1278,7 +1284,7 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 	QualifiedGameDescriptor gameOption;
 	if (settings.contains("game")) {
 		gameOption = findGameMatchingName(settings["game"]);
-		if (!gameOption.gameId) {
+		if (gameOption.gameId.empty()) {
 			usage("Unrecognized game '%s'. Use the --list-games command for a list of accepted values.\n", settings["game"].c_str());
 		}
 	}
@@ -1361,7 +1367,7 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		if (ConfMan.hasGameDomain(command)) {
 			// Command is a known target
 			ConfMan.setActiveDomain(command);
-		} else if (gd = findGameMatchingName(command), gd.gameId) {
+		} else if (gd = findGameMatchingName(command), !gd.gameId.empty()) {
 			// Command is a known game ID
 			Common::String domainName = createTemporaryTarget(gd.engineId, gd.gameId);
 			ConfMan.setActiveDomain(domainName);

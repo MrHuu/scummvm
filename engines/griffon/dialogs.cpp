@@ -48,6 +48,7 @@ namespace Griffon {
 
 void GriffonEngine::title(int mode) {
 	float xofs = 0;
+	_itemyloc = 0;
 	bool exitTitle = false;
 
 	rcSrc.left = 0;
@@ -629,7 +630,7 @@ void GriffonEngine::saveLoadNew() {
 						}
 					}
 					if (lowerLock && tickPause < _ticks) {
-						if ((curCol == 1) && saveState(curRow - 1)) {
+						if ((curCol == 1) && saveGameState(curRow - 1, "", false).getCode() == Common::kNoError) {
 							_secStart += _secsInGame;
 							_secsInGame = 0;
 							lowerLock = false;
@@ -637,7 +638,7 @@ void GriffonEngine::saveLoadNew() {
 							curRow = 0;
 
 							renderSaveStates();
-						} else if ((curCol == 2) && loadState(curRow - 1)) {
+						} else if ((curCol == 2) && loadGameState(curRow - 1).getCode() == Common::kNoError) {
 
 							return;
 						}

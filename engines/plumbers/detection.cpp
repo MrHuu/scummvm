@@ -20,13 +20,11 @@
  *
  */
 
+#include "plumbers/plumbers.h"
+
 #include "base/plugins.h"
 
 #include "engines/advancedDetector.h"
-#include "common/file.h"
-
-#include "plumbers/plumbers.h"
-
 
 namespace Plumbers {
 const char *PlumbersGame::getGameId() const { return _gameDescription->gameId; }
@@ -75,20 +73,20 @@ public:
 	PlumbersMetaEngine() : AdvancedMetaEngine(Plumbers::gameDescriptions, sizeof(ADGameDescription), plumbersGames) {
 	}
 
-	const char *getEngineId() const {
+	const char *getEngineId() const override {
 		return "plumbers";
 	}
 
-	virtual const char *getName() const {
+	const char *getName() const override {
 		return "Plumbers Don't Wear Ties";
 	}
 
-	virtual const char *getOriginalCopyright() const {
+	const char *getOriginalCopyright() const override {
 		return "Plumbers Don't Wear Ties (C) 1993-94 Kirin Entertainment";
 	}
 
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
+	bool hasFeature(MetaEngineFeature f) const override;
+	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
 };
 
 bool PlumbersMetaEngine::hasFeature(MetaEngineFeature f) const {

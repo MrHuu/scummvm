@@ -131,11 +131,6 @@ void AgiEngine::processScummVMEvents() {
 			}
 			break;
 		case Common::EVENT_KEYDOWN:
-			if (event.kbd.hasFlags(Common::KBD_CTRL | Common::KBD_SHIFT) && event.kbd.keycode == Common::KEYCODE_d) {
-				_console->attach();
-				break;
-			}
-
 			key = event.kbd.ascii;
 			if (event.kbd.keycode >= Common::KEYCODE_KP0 && event.kbd.keycode <= Common::KEYCODE_KP9) {
 				if (!(event.kbd.flags & Common::KBD_NUM)) {
@@ -453,11 +448,6 @@ bool AgiEngine::handleController(uint16 key) {
 		}
 		// Otherwise go on and look for the ESC controller
 	}
-
-	// AGI 3.149 games, The Black Cauldron and King's Quest 4 need KEY_ESCAPE to use menus
-	// Games with the GF_ESCPAUSE flag need KEY_ESCAPE to pause the game
-	//		(key == KEY_ESCAPE && getVersion() != 0x3149 && getGameID() != GID_BC && getGameID() != GID_KQ4 && !(getFeatures() & GF_ESCPAUSE)) )
-	//		return false;
 
 	if ((getGameID() == GID_MH1 || getGameID() == GID_MH2) && (key == AGI_KEY_ENTER) &&
 	        (!_text->promptIsEnabled())) {

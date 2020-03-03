@@ -425,13 +425,12 @@ protected:
 	virtual void setAspectRatioCorrection(bool enable);
 	void setFilteringMode(bool enable);
 
-	virtual bool saveScreenshot(const Common::String &filename) const;
+	virtual bool saveScreenshot(const Common::String &filename) const override;
 	virtual void setGraphicsModeIntern();
 
 private:
 	void setFullscreenMode(bool enable);
-	bool handleScalerHotkeys(Common::KeyCode key);
-	bool isScalerHotkey(const Common::Event &event);
+	void handleScalerHotkeys(int scalefactor, int scalerType);
 
 	/**
 	 * Converts the given point from the overlay's coordinate space to the

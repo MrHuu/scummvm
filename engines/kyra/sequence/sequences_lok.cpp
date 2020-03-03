@@ -860,7 +860,7 @@ void KyraEngine_LoK::seq_fillFlaskWithWater(int item, int type) {
 	characterSays(voiceEntries[type], _fullFlask[type], 0, -2);
 }
 
-void KyraEngine_LoK::seq_playDrinkPotionAnim(int item, int unk2, int flags) {
+void KyraEngine_LoK::seq_playDrinkPotionAnim(int item, int makeFlaskEmpty, int flags) {
 	if (_flags.platform == Common::kPlatformAmiga) {
 		uint8 r, g, b;
 
@@ -1003,9 +1003,8 @@ void KyraEngine_LoK::seq_playDrinkPotionAnim(int item, int unk2, int flags) {
 		delayWithTicks(7);
 	}
 
-	if (unk2) {
-		// XXX
-	}
+	if (makeFlaskEmpty)
+		_screen->setPaletteIndex(0xFE, 30, 30, 30);
 
 	for (int i = 131; i >= 123; --i) {
 		_currentCharacter->currentAnimFrame = i;
@@ -1121,9 +1120,12 @@ int KyraEngine_LoK::seq_playEnd() {
 				_finalA->displayFrame(i, 0, 8, 8, 0, 0, 0);
 				_screen->updateScreen();
 			}
-			delete _finalA;
 
+			nextTime = _system->getMillis() + 300 * _tickLength;
+			delete _finalA;
 			_finalA = 0;
+			delayUntil(nextTime);
+
 			seq_playEnding();
 			return 1;
 		}

@@ -69,8 +69,8 @@ void TabWidget::init() {
 
 	int x = _w - _butRP - _butW * 2 - 2;
 	int y = _butTP - _tabHeight;
-	_navLeft = new ButtonWidget(this, x, y, _butW, _butH, "<", 0, kCmdLeft);
-	_navRight = new ButtonWidget(this, x + _butW + 2, y, _butW, _butH, ">", 0, kCmdRight);
+	_navLeft = new ButtonWidget(this, x, y, _butW, _butH, "<", nullptr, kCmdLeft);
+	_navRight = new ButtonWidget(this, x + _butW + 2, y, _butW, _butH, ">", nullptr, kCmdRight);
 	_lastRead = -1;
 }
 
@@ -81,10 +81,10 @@ TabWidget::~TabWidget() {
 	// date. So update it now.
 	if (_activeTab != -1)
 		_tabs[_activeTab].firstWidget = _firstWidget;
-	_firstWidget = 0;
+	_firstWidget = nullptr;
 	for (uint i = 0; i < _tabs.size(); ++i) {
 		delete _tabs[i].firstWidget;
-		_tabs[i].firstWidget = 0;
+		_tabs[i].firstWidget = nullptr;
 	}
 	_tabs.clear();
 	delete _navRight;
@@ -104,11 +104,12 @@ uint16 TabWidget::getHeight() const {
 	return _h + _tabHeight;
 }
 
-int TabWidget::addTab(const String &title) {
+int TabWidget::addTab(const String &title, const String &dialogName) {
 	// Add a new tab page
 	Tab newTab;
 	newTab.title = title;
-	newTab.firstWidget = 0;
+	newTab.dialogName = dialogName;
+	newTab.firstWidget = nullptr;
 
 	// Determine the new tab width
 	int newWidth = g_gui.getStringWidth(title) + kTabTitleSpacing;
@@ -133,7 +134,7 @@ void TabWidget::removeTab(int tabID) {
 	if (tabID == _activeTab) {
 		_tabs[tabID].firstWidget = _firstWidget;
 		releaseFocus();
-		_firstWidget = 0;
+		_firstWidget = nullptr;
 	}
 
 	// Dispose the widgets in that tab and then the tab itself
@@ -300,6 +301,10 @@ void TabWidget::reflowLayout() {
 		_tabs[_activeTab].firstWidget = _firstWidget;
 
 	for (uint i = 0; i < _tabs.size(); ++i) {
+		if (!_tabs[i].dialogName.empty()) {
+			g_gui.xmlEval()->reflowDialogLayout(_tabs[i].dialogName, _tabs[i].firstWidget);
+		}
+
 		Widget *w = _tabs[i].firstWidget;
 		while (w) {
 			w->reflowLayout();

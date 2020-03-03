@@ -25,6 +25,7 @@
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
+#include "director/lingo/lingo-code.h"
 #include "director/cast.h"
 #include "director/frame.h"
 #include "director/score.h"
@@ -51,6 +52,7 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 	_currentEntityId = 0;
 	_pc = 0;
 	_returning = false;
+	_nextRepeat = false;
 	_indef = kStateNone;
 	_ignoreMe = false;
 	_immediateMode = false;
@@ -73,6 +75,8 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 
 	_dontPassEvent = false;
 
+	_archiveIndex = 0;
+
 	initEventHandlerTypes();
 
 	initBuiltIns();
@@ -84,6 +88,25 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 }
 
 Lingo::~Lingo() {
+}
+
+ScriptContext *Lingo::getScriptContext(ScriptType type, uint16 id) {
+	if (type > ARRAYSIZE(_archives[_archiveIndex].scriptContexts) ||
+			!_archives[_archiveIndex].scriptContexts[type].contains(id)) {
+		return NULL;
+	}
+
+	return _archives[_archiveIndex].scriptContexts[type][id];
+}
+
+Common::String Lingo::getName(uint16 id) {
+	Common::String result;
+	if (id >= _archives[_archiveIndex].names.size()) {
+		warning("Name id %d not in list", id);
+		return result;
+	}
+	result = _archives[_archiveIndex].names[id];
+	return result;
 }
 
 const char *Lingo::findNextDefinition(const char *s) {
@@ -124,25 +147,28 @@ const char *Lingo::findNextDefinition(const char *s) {
 }
 
 void Lingo::addCode(const char *code, ScriptType type, uint16 id) {
-	debugC(1, kDebugLingoCompile, "Add code for type %s with id %d\n"
-			"***********\n%s\n\n***********", scriptType2str(type), id, code);
+	debugC(1, kDebugLingoCompile, "Add code for type %s(%d) with id %d\n"
+			"***********\n%s\n\n***********", scriptType2str(type), type, id, code);
 
-	if (_scriptContexts[type].contains(id)) {
-		for (size_t j = 0; j < _scriptContexts[type][id]->functions.size(); j++) {
-			delete _scriptContexts[type][id]->functions[j];
-		}
-		delete _scriptContexts[type][id];
+	if (getScriptContext(type, id)) {
+		// We can't undefine context data because it could be used in e.g. symbols.
+		// Abort on double definitions.
+		error("Script already defined for type %d, id %d", id, type);
+		return;
 	}
 
 	_currentScriptContext = new ScriptContext;
 	_currentScriptType = type;
 	_currentEntityId = id;
-	_scriptContexts[type][id] = _currentScriptContext;
+	_archives[_archiveIndex].scriptContexts[type][id] = _currentScriptContext;
 
 	// FIXME: unpack into seperate functions
 	_currentScriptFunction = 0;
-	_currentScriptContext->functions.push_back(new ScriptData);
-	_currentScript = _currentScriptContext->functions[_currentScriptFunction];
+	_currentScriptContext->functions.push_back(new Symbol);
+	_currentScript = new ScriptData;
+	_currentScriptContext->functions[_currentScriptFunction]->type = HANDLER;
+	_currentScriptContext->functions[_currentScriptFunction]->u.defn = _currentScript;
+	_currentScriptContext->functions[_currentScriptFunction]->ctx = _currentScriptContext;
 
 	_linenumber = _colnumber = 1;
 	_hadError = false;
@@ -219,19 +245,20 @@ void Lingo::addCode(const char *code, ScriptType type, uint16 id) {
 }
 
 void Lingo::executeScript(ScriptType type, uint16 id, uint16 function) {
-	if (!_scriptContexts[type].contains(id)) {
+	ScriptContext *sc = getScriptContext(type, id);
+	if (!sc) {
 		debugC(3, kDebugLingoExec, "Request to execute non-existant script type %d id %d", type, id);
 		return;
 	}
-	if (function >= _scriptContexts[type][id]->functions.size()) {
+	if (function >= sc->functions.size()) {
 		debugC(3, kDebugLingoExec, "Request to execute non-existant function %d in script type %d id %d", function, type, id);
 		return;
 	}
 
 	debugC(1, kDebugLingoExec, "Executing script type: %s, id: %d, function: %d", scriptType2str(type), id, function);
 
-	_currentScriptContext = _scriptContexts[type][id];
-	_currentScript = _currentScriptContext->functions[function];
+	_currentScriptContext = sc;
+	_currentScript = _currentScriptContext->functions[function]->u.defn;
 	_pc = 0;
 	_returning = false;
 
@@ -242,18 +269,28 @@ void Lingo::executeScript(ScriptType type, uint16 id, uint16 function) {
 	cleanLocalVars();
 }
 
+void Lingo::executeHandler(Common::String name) {
+	_returning = false;
+	_localvars = new SymbolHash;
+
+	debugC(1, kDebugLingoExec, "Executing script handler : %s", name.c_str());
+	LC::call(name, 0);
+
+	cleanLocalVars();
+}
+
 void Lingo::restartLingo() {
 	warning("STUB: restartLingo()");
 
 	for (int i = 0; i <= kMaxScriptType; i++) {
-		for (ScriptContextHash::iterator it = _scriptContexts[i].begin(); it != _scriptContexts[i].end(); ++it) {
+		for (ScriptContextHash::iterator it = _archives[_archiveIndex].scriptContexts[i].begin(); it != _archives[_archiveIndex].scriptContexts[i].end(); ++it) {
 			for (size_t j = 0; j < it->_value->functions.size(); j++) {
 				delete it->_value->functions[j];
 			}
 			delete it->_value;
 		}
 
-		_scriptContexts[i].clear();
+		_archives[_archiveIndex].scriptContexts[i].clear();
 	}
 
 	// TODO
@@ -275,12 +312,50 @@ void Lingo::restartLingo() {
 }
 
 int Lingo::alignTypes(Datum &d1, Datum &d2) {
-	int opType = INT;
+	int opType = VOID;
+
+	if (d1.type == STRING) {
+		char *endPtr = 0;
+		int i = strtol(d1.u.s->c_str(), &endPtr, 10);
+		if (*endPtr == 0) {
+			d1.type = INT;
+			d1.u.i = i;
+		} else {
+			double d = strtod(d1.u.s->c_str(), &endPtr);
+			if (*endPtr == 0) {
+				d1.type = FLOAT;
+				d1.u.f = d;
+			} else {
+				warning("Unable to parse '%s' as a number", d1.u.s->c_str());
+			}
+		}
+	}
+	if (d2.type == STRING) {
+		char *endPtr = 0;
+		int i = strtol(d2.u.s->c_str(), &endPtr, 10);
+		if (*endPtr == 0) {
+			d2.type = INT;
+			d2.u.i = i;
+		} else {
+			double d = strtod(d2.u.s->c_str(), &endPtr);
+			if (*endPtr == 0) {
+				d2.type = FLOAT;
+				d2.u.f = d;
+			} else {
+				warning("Unable to parse '%s' as a number", d2.u.s->c_str());
+			}
+		}
+	}
+
 
 	if (d1.type == FLOAT || d2.type == FLOAT) {
 		opType = FLOAT;
 		d1.toFloat();
 		d2.toFloat();
+	} else if (d1.type == INT && d2.type == INT) {
+		opType = INT;
+	} else {
+		warning("No numeric type alignment available");
 	}
 
 	return opType;
@@ -288,25 +363,61 @@ int Lingo::alignTypes(Datum &d1, Datum &d2) {
 
 int Datum::toInt() {
 	switch (type) {
+	case REFERENCE:
+		toString();
+		// fallthrough
+	case STRING:
+		{
+			char *endPtr = 0;
+			int result = strtol(u.s->c_str(), &endPtr, 10);
+			if (*endPtr == 0) {
+				u.i = result;
+			} else {
+				warning("Invalid int '%s'", u.s->c_str());
+				u.i = 0;
+			}
+		}
+		break;
+	case VOID:
+		u.i = 0;
+		break;
 	case INT:
 		// no-op
 		break;
 	case FLOAT:
 		u.i = (int)u.f;
-		type = INT;
 		break;
 	default:
 		warning("Incorrect operation toInt() for type: %s", type2str());
 	}
+
+	type = INT;
 
 	return u.i;
 }
 
 double Datum::toFloat() {
 	switch (type) {
+	case REFERENCE:
+		toString();
+		// fallthrough
+	case STRING:
+		{
+			char *endPtr = 0;
+			double result = strtod(u.s->c_str(), &endPtr);
+			if (*endPtr == 0) {
+				u.f = result;
+			} else {
+				warning("Invalid float '%s'", u.s->c_str());
+				u.f = 0.0;
+			}
+		}
+		break;
+	case VOID:
+		u.f = 0.0;
+		break;
 	case INT:
 		u.f = (double)u.i;
-		type = FLOAT;
 		break;
 	case FLOAT:
 		// no-op
@@ -314,6 +425,8 @@ double Datum::toFloat() {
 	default:
 		warning("Incorrect operation toFloat() for type: %s", type2str());
 	}
+
+	type = FLOAT;
 
 	return u.f;
 }
@@ -378,9 +491,16 @@ Common::String *Datum::toString() {
 	case REFERENCE:
 		{
 			int idx = u.i;
+			Score *score = g_director->getCurrentScore();
 
-			if (!g_director->getCurrentScore()->_loadedText->contains(idx)) {
-				if (!g_director->getCurrentScore()->_loadedText->contains(idx - 1024)) {
+			if (!score) {
+				warning("toString(): No score");
+				*s = "";
+				break;
+			}
+
+			if (!score->_loadedCast->contains(idx)) {
+				if (!score->_loadedCast->contains(idx - score->_castIDoffset)) {
 					warning("toString(): Unknown REFERENCE %d", idx);
 					*s = "";
 					break;
@@ -389,8 +509,19 @@ Common::String *Datum::toString() {
 				}
 			}
 
-			*s = g_director->getCurrentScore()->_loadedText->getVal(idx)->_ptext;
+			*s = ((TextCast *)score->_loadedCast->getVal(idx))->_ptext;
 		}
+		break;
+	case ARRAY:
+		*s = "[";
+
+		for (uint i = 0; i < u.farr->size(); i++) {
+			if (i > 0)
+				*s += ", ";
+			*s += *u.farr->operator[](i).toString();
+		}
+
+		*s += "]";
 		break;
 	default:
 		warning("Incorrect operation toString() for type: %s", type2str());
@@ -480,11 +611,25 @@ void Lingo::runTests() {
 }
 
 void Lingo::executeImmediateScripts(Frame *frame) {
-	for (uint16 i = 0; i < CHANNEL_COUNT; i++) {
+	for (uint16 i = 0; i <= _vm->getCurrentScore()->_numChannelsDisplayed; i++) {
 		if (_vm->getCurrentScore()->_immediateActions.contains(frame->_sprites[i]->_scriptId)) {
 			g_lingo->processEvent(kEventMouseUp, kFrameScript, frame->_sprites[i]->_scriptId);
 		}
 	}
+}
+
+void Lingo::printAllVars() {
+	debugN("  Local vars: ");
+	for (SymbolHash::iterator i = _localvars->begin(); i != _localvars->end(); ++i) {
+		debugN("%s, ", (*i)._key.c_str());
+	}
+	debugN("\n");
+
+	debugN("  Global vars: ");
+	for (SymbolHash::iterator i = _globalvars.begin(); i != _globalvars.end(); ++i) {
+		debugN("%s, ", (*i)._key.c_str());
+	}
+	debugN("\n");
 }
 
 } // End of namespace Director

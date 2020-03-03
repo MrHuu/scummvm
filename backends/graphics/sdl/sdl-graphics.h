@@ -134,7 +134,28 @@ public:
 
 	virtual void initSizeHint(const Graphics::ModeList &modes) override;
 
+	Common::Keymap *getKeymap();
+
 protected:
+	enum CustomEventAction {
+		kActionToggleFullscreen = 100,
+		kActionToggleMouseCapture,
+		kActionSaveScreenshot,
+		kActionToggleAspectRatioCorrection,
+		kActionToggleFilteredScaling,
+		kActionCycleStretchMode,
+		kActionIncreaseScaleFactor,
+		kActionDecreaseScaleFactor,
+		kActionSetScaleFilter1,
+		kActionSetScaleFilter2,
+		kActionSetScaleFilter3,
+		kActionSetScaleFilter4,
+		kActionSetScaleFilter5,
+		kActionSetScaleFilter6,
+		kActionSetScaleFilter7,
+		kActionSetScaleFilter8
+	};
+
 	virtual int getGraphicsModeScale(int mode) const = 0;
 
 	bool defaultGraphicsModeConfig() const;
