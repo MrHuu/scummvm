@@ -50,6 +50,10 @@ elif [ $GAMEID = "BBVS" ] ; then
 
 	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=bbvs
 
+elif [ $GAMEID = "BLADERUNNER" ] ; then
+
+	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=bladerunner
+
 elif [ $GAMEID = "COMI" ] ; then
 
 	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=scumm-7-8
@@ -141,22 +145,10 @@ else
 	echo *ONLY single Arguments
 	echo
 	echo Arguments available: 
-	echo  BBDOU BBVS COMI DIG DW DW2 FT LSL1 MANIAC MONKEY MONKEY2 MYST NEVERHOOD PHANTASMAGORIA QFG4
-	echo  QUEEN RIVEN SAMNMAX TENTACLE TOON
+	echo  BBDOU BBVS BLADERUNNER COMI DIG DW DW2 FT LSL1 MANIAC MONKEY MONKEY2 MYST NEVERHOOD
+	echo  PHANTASMAGORIA QFG4 QUEEN RIVEN SAMNMAX TENTACLE TOON
 	echo
-	echo Engines available:
-	echo agi,agos,agos2,cruise,gob,hugo,kyra,lure,myst,riven,queen,saga,ihnm,scumm,scumm-7-8,he,sci,sci32,
-	echo sherlock,sky,sword1,sword2,sword25,teenagent,tinsel,toon,touche,zvision
-	echo access,adl,bbvs,cge,cge2,cine,composer,draci,drascula,dreamweb,fullpipe,gnap,groovie,hopkins,
-	echo illusions,lol,eob,lab,made,mads,mohawk,mortevielle,neverhood,parallaction,pegasus,plumbers,
-	echo titanic,toltecs,tony,tsage,tucker,voyeur,wintermute,xeen
-	echo
-	echo Unstable:
-	echo avalanche,bladerunner,chewy,cryo,director,dm,groovie2,lastexpress,lilliput,macventure,cstime,
-	echo mutationofjb,pink,prince,sludge,startrek,supernova,testbed,wage
 	echo -------------------------------------------------------------------------------------------
-	echo Current:
-	echo [ENGINE] ALL - does not initially save scummmvm.ini
 	echo
 	exit
 

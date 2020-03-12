@@ -23,6 +23,10 @@ else ifeq ($(GAME), BBVS)
 	APP_TITLE       := Beavis & Butt-head in Virtual Stupidity
 	APP_UNIQUE_ID   := 0xFF322
 
+else ifeq ($(GAME), BLADERUNNER)
+	APP_TITLE       := Blade Runner
+	APP_UNIQUE_ID   := 0xFF333
+
 else ifeq ($(GAME), COMI)
 	APP_TITLE       := The Curse of Monkey Island
 	APP_UNIQUE_ID   := 0xFF323
@@ -74,7 +78,7 @@ else ifeq ($(GAME), NEVERHOOD)
 
 else ifeq ($(GAME), PHANTASMAGORIA)
 	APP_TITLE       := Phantasmagoria
-	APP_UNIQUE_ID   := 0x1F332
+	APP_UNIQUE_ID   := 0xFF332
 
 else ifeq ($(GAME), QFG4)
 	APP_TITLE       := Quest for Glory 4 - Shadows Of Darkness
