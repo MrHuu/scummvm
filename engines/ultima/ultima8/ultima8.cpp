@@ -41,7 +41,6 @@
 #include "ultima/ultima8/games/start_u8_process.h"
 #include "ultima/ultima8/graphics/fonts/font_manager.h"
 #include "ultima/ultima8/kernel/memory_manager.h"
-#include "ultima/ultima8/kernel/hid_manager.h"
 #include "ultima/ultima8/graphics/render_surface.h"
 #include "ultima/ultima8/graphics/texture.h"
 #include "ultima/ultima8/graphics/fonts/fixed_width_font.h"
@@ -63,7 +62,6 @@
 #include "ultima/ultima8/gumps/minimap_gump.h"
 #include "ultima/ultima8/gumps/quit_gump.h"
 #include "ultima/ultima8/gumps/menu_gump.h"
-#include "ultima/ultima8/gumps/pentagram_menu_gump.h"
 
 // For gump positioning... perhaps shouldn't do it this way....
 #include "ultima/ultima8/gumps/bark_gump.h"
@@ -110,6 +108,7 @@
 #include "ultima/ultima8/audio/audio_process.h"
 #include "ultima/ultima8/misc/util.h"
 #include "ultima/ultima8/audio/midi_player.h"
+#include "ultima/ultima8/meta_engine.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -120,7 +119,7 @@ DEFINE_RUNTIME_CLASSTYPE_CODE(Ultima8Engine, CoreApp)
 
 Ultima8Engine::Ultima8Engine(OSystem *syst, const Ultima::UltimaGameDescription *gameDesc) :
 		Shared::UltimaEngine(syst, gameDesc), CoreApp(gameDesc), _saveCount(0), _game(0),
-		_kernel(0), _objectManager(0), _hidManager(0), _mouse(0), _ucMachine(0), _screen(0),
+		_kernel(0), _objectManager(0), _mouse(0), _ucMachine(0), _screen(0),
 		_fontManager(0), _paletteManager(0), _gameData(0), _world(0), _desktopGump(0),
 		_gameMapGump(0), _avatarMoverProcess(0), _frameSkip(false), _frameLimit(true),
 		_interpolate(true), _animationRate(100), _avatarInStasis(false), _paintEditorItems(false),
@@ -138,7 +137,6 @@ Ultima8Engine::~Ultima8Engine() {
 	FORGET_OBJECT(_events);
 	FORGET_OBJECT(_kernel);
 	FORGET_OBJECT(_objectManager);
-	FORGET_OBJECT(_hidManager);
 	FORGET_OBJECT(_audioMixer);
 	FORGET_OBJECT(_ucMachine);
 	FORGET_OBJECT(_paletteManager);
@@ -154,7 +152,6 @@ Ultima8Engine::~Ultima8Engine() {
 Common::Error Ultima8Engine::run() {
 	if (initialize()) {
 		startup();
-
 		runGame();
 
 		deinitialize();
@@ -265,8 +262,6 @@ void Ultima8Engine::startup() {
 
 	GraphicSysInit();
 
-	_hidManager = new HIDManager();
-
 	// Audio Mixer
 	_audioMixer = new AudioMixer(_mixer);
 
@@ -278,7 +273,8 @@ void Ultima8Engine::startup() {
 	if (setupGame(info))
 		startupGame();
 	else
-		startupPentagramMenu();
+		// Couldn't setup the game, should never happen?
+		CANT_HAPPEN_MSG("default game failed to initialize");
 
 	paint();
 }
@@ -289,23 +285,6 @@ void Ultima8Engine::startupGame() {
 	GraphicSysInit();
 
 	_gameData = new GameData(_gameInfo);
-
-	Std::string bindingsfile;
-	if (GAME_IS_U8) {
-		bindingsfile = "@data/u8bindings.ini";
-	} else if (GAME_IS_REMORSE) {
-		bindingsfile = "@data/remorsebindings.ini";
-	}
-	if (!bindingsfile.empty()) {
-		// system-wide config
-		if (_configFileMan->readConfigFile(bindingsfile,
-			"bindings", true))
-			debug(MM_INFO, "%s... Ok", bindingsfile.c_str());
-		else
-			debug(MM_MINOR_WARN, "%s... Failed", bindingsfile.c_str());
-	}
-
-	_hidManager->loadBindings();
 
 	if (GAME_IS_U8) {
 		_ucMachine = new UCMachine(U8Intrinsics, 256);
@@ -353,21 +332,6 @@ void Ultima8Engine::startupGame() {
 	newGame(saveSlot);
 
 	pout << "-- Game Initialized --" << Std::endl << Std::endl;
-}
-
-void Ultima8Engine::startupPentagramMenu() {
-	pout << Std::endl << "-- Initializing Pentagram Menu -- " << Std::endl;
-
-	setupGame(getGameInfo("pentagram"));
-	assert(_gameInfo);
-
-	GraphicSysInit();
-
-	Rect dims;
-	_desktopGump->GetDims(dims);
-
-	Gump *menugump = new PentagramMenuGump(0, 0, dims.w, dims.h);
-	menugump->InitGump(0, true);
 }
 
 void Ultima8Engine::shutdown() {
@@ -466,13 +430,6 @@ void Ultima8Engine::menuInitMinimal(istring gamename) {
 	pout << "-- Finished loading minimal--" << Std::endl << Std::endl;
 }
 
-void Ultima8Engine::DeclareArgs() {
-	// parent's arguments first
-	CoreApp::DeclareArgs();
-
-	// anything else?
-}
-
 void Ultima8Engine::runGame() {
 	_isRunning = true;
 
@@ -542,7 +499,7 @@ void Ultima8Engine::runGame() {
 				if (setupGame(info))
 					startupGame();
 				else
-					startupPentagramMenu();
+					CANT_HAPPEN_MSG("Failed to start up game with valid info.");
 			} else {
 				perr << "Game '" << _changeGameName << "' not found" << Std::endl;
 				_changeGameName.clear();
@@ -739,7 +696,6 @@ void Ultima8Engine::enterTextMode(Gump *gump) {
 		if (_down[key]) {
 			_down[key] = false;
 			_lastDown[key] = false;
-			_hidManager->handleEvent((HID_Key)key, HID_EVENT_RELEASE);
 		}
 	}
 
@@ -807,6 +763,14 @@ void Ultima8Engine::handleEvent(const Common::Event &event) {
 		_mouse->setMouseCoords(event.mouse.x, event.mouse.y);
 		break;
 
+	case Common::EVENT_CUSTOM_ENGINE_ACTION_START:
+		MetaEngine::pressAction((KeybindingAction)event.customType);
+		return;
+
+	case Common::EVENT_CUSTOM_ENGINE_ACTION_END:
+		MetaEngine::releaseAction((KeybindingAction)event.customType);
+		return;
+
 	case Common::EVENT_QUIT:
 		_isRunning = false;
 		break;
@@ -815,18 +779,14 @@ void Ultima8Engine::handleEvent(const Common::Event &event) {
 		break;
 	}
 
-	if (_mouse->dragging() == Mouse::DRAG_NOT && evn == HID_EVENT_DEPRESS) {
-		if (_hidManager->handleEvent(key, HID_EVENT_PREEMPT))
-			return;
-	}
-
 	// Text mode input. A few hacks here
-	if (!_textModes.empty()) {
-		Gump *gump = 0;
+	Gump *gump = 0;
 
+	if (!_textModes.empty()) {
 		while (!_textModes.empty()) {
 			gump = p_dynamic_cast<Gump *>(_objectManager->getObject(_textModes.front()));
-			if (gump) break;
+			if (gump)
+				break;
 
 			_textModes.pop_front();
 		}
@@ -911,7 +871,7 @@ void Ultima8Engine::handleEvent(const Common::Event &event) {
 			break;
 
 		// Any special key handling goes here
-		if ((event.kbd.keycode == Common::KEYCODE_x || event.kbd.keycode == Common::KEYCODE_x) &&
+		if ((event.kbd.keycode == Common::KEYCODE_q || event.kbd.keycode == Common::KEYCODE_x) &&
 			(event.kbd.flags & (Common::KBD_CTRL | Common::KBD_ALT | Common::KBD_META)) != 0)
 			ForceQuit();
 		break;
@@ -921,14 +881,9 @@ void Ultima8Engine::handleEvent(const Common::Event &event) {
 	}
 
 	if (_mouse->dragging() == Mouse::DRAG_NOT && !handled) {
-		if (_hidManager->handleEvent(key, evn))
-			handled = true;
 		if (evn == HID_EVENT_DEPRESS) {
 			_down[key] = true;
-			if (now - _lastDown[key] < DOUBLE_CLICK_TIMEOUT &&
-				_lastDown[key] != 0) {
-				if (_hidManager->handleEvent(key, HID_EVENT_DOUBLE))
-					handled = true;
+			if (now - _lastDown[key] < DOUBLE_CLICK_TIMEOUT && _lastDown[key] != 0) {
 				_lastDown[key] = 0;
 			} else {
 				_lastDown[key] = now;
@@ -952,7 +907,6 @@ void Ultima8Engine::handleDelayedEvents() {
 		if (now - _lastDown[key] > DOUBLE_CLICK_TIMEOUT &&
 			_lastDown[key] != 0 && !_down[key]) {
 			_lastDown[key] = 0;
-			_hidManager->handleEvent((HID_Key)key, HID_EVENT_CLICK);
 		}
 	}
 
@@ -1400,8 +1354,7 @@ void Ultima8Engine::addGump(Gump *gump) {
 	assert(_desktopGump);
 
 	if (gump->IsOfType<ShapeViewerGump>() || gump->IsOfType<MiniMapGump>() ||
-		gump->IsOfType<ScalerGump>() || gump->IsOfType<PentagramMenuGump>() ||
-		gump->IsOfType<MessageBoxGump>()// ||
+		gump->IsOfType<ScalerGump>() || gump->IsOfType<MessageBoxGump>()// ||
 		//(_ttfOverrides && (gump->IsOfType<BarkGump>() ||
 		//                gump->IsOfType<AskGump>()))
 		) {
@@ -1577,6 +1530,13 @@ void Ultima8Engine::showSplashScreen() {
 
 	// Pause to allow the image to be seen
 	g_system->delayMillis(2000);
+}
+
+Gump *Ultima8Engine::getMenuGump() const {
+	if (_textModes.empty())
+		return nullptr;
+
+	return p_dynamic_cast<Gump *>(_objectManager->getObject(_textModes.front()));
 }
 
 } // End of namespace Ultima8

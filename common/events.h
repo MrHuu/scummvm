@@ -76,6 +76,7 @@ enum EventType {
 
 	EVENT_CUSTOM_BACKEND_ACTION_START = 18,
 	EVENT_CUSTOM_BACKEND_ACTION_END   = 19,
+	EVENT_CUSTOM_BACKEND_ACTION_AXIS  = 34,
 	EVENT_CUSTOM_ENGINE_ACTION_START  = 20,
 	EVENT_CUSTOM_ENGINE_ACTION_END    = 21,
 
@@ -222,6 +223,13 @@ struct Event {
 };
 
 /**
+ * Determinates whether an event is a mouse event
+ *
+ * Mouse events have valid mouse coordinates
+ */
+bool isMouseEvent(const Event &event);
+
+/**
  * A source of Events.
  *
  * An example for this is OSystem, it provides events created by the system
@@ -229,7 +237,7 @@ struct Event {
  */
 class EventSource {
 public:
-	virtual ~EventSource() {}
+	virtual ~EventSource();
 
 	/**
 	 * Queries a event from the source.
@@ -287,7 +295,7 @@ public:
  */
 class EventObserver {
 public:
-	virtual ~EventObserver() {}
+	virtual ~EventObserver();
 
 	/**
 	 * Notifies the observer of an incoming event.
@@ -317,7 +325,7 @@ public:
  */
 class EventMapper {
 public:
-	virtual ~EventMapper() {}
+	virtual ~EventMapper();
 
 	/**
 	 * Map an incoming event to one or more action events
@@ -423,8 +431,7 @@ class Keymapper;
  */
 class EventManager : NonCopyable {
 public:
-	EventManager() {}
-	virtual ~EventManager() {}
+	virtual ~EventManager();
 
 	enum {
 		LBUTTON = 1 << MOUSE_BUTTON_LEFT,

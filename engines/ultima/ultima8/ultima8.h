@@ -59,6 +59,7 @@ class UCMachine;
 class Game;
 class Gump;
 class GameMapGump;
+class MenuGump;
 class ScalerGump;
 class InverterGump;
 class RenderSurface;
@@ -67,7 +68,6 @@ class GameData;
 class World;
 class ObjectManager;
 class FontManager;
-class HIDManager;
 class Mouse;
 class AvatarMoverProcess;
 class IDataSource;
@@ -93,7 +93,6 @@ private:
 	Kernel *_kernel;
 	MemoryManager *_memoryManager;
 	ObjectManager *_objectManager;
-	HIDManager *_hidManager;
 	UCMachine *_ucMachine;
 	RenderSurface *_screen;
 	Mouse *_mouse;
@@ -171,8 +170,6 @@ protected:
 	Common::Error run() override;
 
 	bool initialize() override;
-
-	void DeclareArgs() override;
 
 	/**
 	 * Returns the data archive folder and version that's required
@@ -348,6 +345,7 @@ public:
 	void makeCheater() {
 		_hasCheated = true;
 	}
+	Gump *getMenuGump() const;
 };
 
 } // End of namespace Ultima8

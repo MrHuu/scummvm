@@ -121,6 +121,7 @@ class SequenceOpcodes;
 class ScriptOpcodes;
 class Talk;
 class SoundManager;
+class StrPlayer;
 struct DragonINI;
 
 
@@ -140,6 +141,7 @@ public:
 	Credits *_credits;
 	Talk *_talk;
 	SoundManager *_sound;
+	StrPlayer *_strPlayer;
 
 	PaletteCyclingInstruction _paletteCyclingTbl[8];
 
@@ -192,6 +194,7 @@ private:
 
 	bool _debugMode;
 	bool _isGamePaused;
+	bool _inMenu;
 
 	void (*_sceneUpdateFunction)();
 	void (*_vsyncUpdateFunction)();
@@ -246,6 +249,7 @@ public:
 
 	void reset_screen_maybe();
 
+	void init();
 	void loadScene(uint16 sceneId);
 
 	void reset();
@@ -278,6 +282,8 @@ public:
 	uint16 getRand(uint16 max);
 
 	void setupPalette1();
+
+	bool isInMenu();
 
 	//TODO this logic should probably go in its own class.
 	uint32 getBigFileInfoTblFromDragonEXE();
@@ -315,6 +321,8 @@ private:
 	void SomeInitSound_fun_8003f64c();
 
 	void initSubtitleFlag();
+
+	void mainMenu();
 };
 
 DragonsEngine *getEngine();
