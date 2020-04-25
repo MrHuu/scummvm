@@ -35,15 +35,11 @@ class SoundFlex : protected Archive {
 public:
 	ENABLE_RUNTIME_CLASSTYPE()
 
-	SoundFlex(IDataSource *ds);
+	SoundFlex(Common::SeekableReadStream *rs);
 	~SoundFlex() override;
 
 	//! Get an audiosample
-	AudioSample *getSample(uint32 index) {
-		if (index >= _count) return 0;
-		cache(index);
-		return _samples[index];
-	}
+	AudioSample *getSample(uint32 index);
 
 	void cache(uint32 index) override;
 	void uncache(uint32 index) override;

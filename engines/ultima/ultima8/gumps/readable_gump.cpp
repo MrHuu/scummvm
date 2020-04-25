@@ -34,8 +34,6 @@
 #include "ultima/ultima8/kernel/core_app.h"
 #include "ultima/ultima8/games/game_info.h"
 #include "ultima/ultima8/misc/util.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -63,11 +61,7 @@ void ReadableGump::InitGump(Gump *newparent, bool take_focus) {
 
 	SetShape(shape_, 0);
 
-	ShapeFrame *sf = shape_->getFrame(0);
-	assert(sf);
-
-	_dims.w = sf->_width;
-	_dims.h = sf->_height;
+	UpdateDimsFromShape();
 
 	if (CoreApp::get_instance()->getGameInfo()->_language ==
 	        GameInfo::GAMELANG_JAPANESE) {
@@ -126,11 +120,11 @@ uint32 ReadableGump::I_readPlaque(const uint8 *args, unsigned int /*argsize*/) {
 	return gump->GetNotifyProcess()->getPid();
 }
 
-void ReadableGump::saveData(ODataSource *ods) {
+void ReadableGump::saveData(Common::WriteStream *ws) {
 	CANT_HAPPEN_MSG("Trying to load ModalGump");
 }
 
-bool ReadableGump::loadData(IDataSource *ids, uint32 version) {
+bool ReadableGump::loadData(Common::ReadStream *rs, uint32 version) {
 	CANT_HAPPEN_MSG("Trying to load ModalGump");
 
 	return false;

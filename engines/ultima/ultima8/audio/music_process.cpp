@@ -26,8 +26,6 @@
 #include "ultima/ultima8/audio/music_flex.h"
 #include "ultima/ultima8/audio/midi_player.h"
 #include "ultima/ultima8/audio/audio_mixer.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -35,9 +33,9 @@ namespace Ultima8 {
 // p_dynamic_cast stuff
 DEFINE_RUNTIME_CLASSTYPE_CODE(MusicProcess, Process)
 
-MusicProcess *MusicProcess::_theMusicProcess = 0;
+MusicProcess *MusicProcess::_theMusicProcess = nullptr;
 
-MusicProcess::MusicProcess() : _midiPlayer(0), _state(PLAYBACK_NORMAL),
+MusicProcess::MusicProcess() : _midiPlayer(nullptr), _state(PLAYBACK_NORMAL),
 		_currentTrack(0), _combatMusicActive(false) {
 	Std::memset(_songBranches, (byte)-1, 128 * sizeof(int));
 }
@@ -47,13 +45,13 @@ MusicProcess::MusicProcess(MidiPlayer *player) : _midiPlayer(player),
 	Std::memset(_songBranches, (byte)-1, 128 * sizeof(int));
 
 	_theMusicProcess = this;
-	_flags |= PROC_RUNPAUSED;
 	_type = 1; // persistent
+	setRunPaused();
 }
 
 MusicProcess::~MusicProcess() {
 	_midiPlayer->stop();
-	_theMusicProcess = 0;
+	_theMusicProcess = nullptr;
 }
 
 void MusicProcess::playMusic(int track) {
@@ -106,6 +104,8 @@ void MusicProcess::playMusic_internal(int track) {
 		return;
 	}
 
+	MusicFlex *musicflex = GameData::get_instance()->getMusic();
+
 	// No current track if not playing
 	if (_midiPlayer && !_midiPlayer->isPlaying())
 		_trackState._wanted = _currentTrack = 0;
@@ -119,19 +119,17 @@ void MusicProcess::playMusic_internal(int track) {
 
 	} else {
 		// We want to do a transition
-		// TODO: Properly handle transitions under ScummVM
-#ifdef TODO
-		const MusicFlex::SongInfo *info = GameData::get_instance()->getMusic()->getSongInfo(_currentTrack);
+		const MusicFlex::SongInfo *info = musicflex->getSongInfo(_currentTrack);
 
 		uint32 measure = _midiPlayer->getSequenceCallbackData(0);
 
 		// No transition info, or invalid measure, so fast change
-		if (!info || (measure >= (uint32)info->num_measures) ||
-		        !info->transitions[track] || !info->transitions[track][measure]) {
+		if (!info || (measure >= (uint32)info->_numMeasures) ||
+		        !info->_transitions[track] || !info->_transitions[track][measure]) {
 			_currentTrack = 0;
 			if (track == 0) {
 				_trackState._wanted = 0;
-				_state = MUSIC_PLAY_WANTED;
+				_state = PLAYBACK_PLAY_WANTED;
 			} else {
 				playMusic_internal(track);
 			}
@@ -139,35 +137,29 @@ void MusicProcess::playMusic_internal(int track) {
 		}
 
 		// Get transition info
-		int trans = info->transitions[track][measure];
+		int trans = info->_transitions[track][measure];
 		bool speed_hack = false;
 
 		if (trans < 0) {
 			trans = (-trans) - 1;
 			speed_hack = true;
 		} else {
-			_midiPlayer->finishSequence(0);
+			_midiPlayer->stop();
 			trans = trans - 1;
 		}
 
 		// Now get the transition midi
 		int xmidi_index = _midiPlayer->isFMSynth() ? 260 : 258;
-		XMidiFile *xmidi = GameData::get_instance()->getMusic()->getXMidi(xmidi_index);
-		XMidiEventList *list;
+		MusicFlex::XMidiData *xmidi = musicflex->getXMidi(xmidi_index);
 
-		if (xmidi)
-			list = xmidi->GetEventList(trans);
-		else
-			list = 0;
+		//warning("Doing a MIDI transition! trans: %d xmidi: %d speedhack: %d", trans, xmidi_index, speed_hack);
 
-		if (list) {
-			_midiPlayer->startSequence(1, list, false, 255, _songBranches[track]);
-			if (speed_hack)
-				_midiPlayer->setSequenceSpeed(1, 200);
+		if (xmidi && xmidi->_data) {
+			_midiPlayer->play(xmidi->_data, xmidi->_size, 1, trans, speed_hack);
 		} else {
-			_midiPlayer->finishSequence(1);
+			_midiPlayer->stop();
 		}
-#endif
+
 		_trackState._wanted = track;
 		_state = PLAYBACK_TRANSITION;
 	}
@@ -197,22 +189,31 @@ void MusicProcess::run() {
 		if (_midiPlayer)
 			_midiPlayer->stop();
 
-		byte *data = nullptr;
-		uint32 size = 0;
+		MusicFlex::XMidiData *xmidi = nullptr;
 
 		if (_trackState._wanted) {
 			int xmidi_index = _trackState._wanted;
 			if (_midiPlayer && _midiPlayer->isFMSynth())
 				xmidi_index += 128;
 
-			data = GameData::get_instance()->getMusic()->getRawObject(xmidi_index, &size);
+			xmidi = GameData::get_instance()->getMusic()->getXMidi(xmidi_index);
 		}
 
-		if (data) {
+		if (xmidi && xmidi->_data) {
+#ifdef TODO
+			// TODO: support branches in tracks.
+			// Not clear how to do this with the scummvm xmidi parser..
+			if (song_branches[wanted_track] != -1)
+			 {
+				 XMidiEvent *event = list->findBranchEvent(song_branches[wanted_track]);
+				 if (!event) song_branches[wanted_track] = 0;
+			 }
+#endif
+
 			if (_midiPlayer) {
 				// if there's a track queued, only play this one once
 				bool repeat = (_trackState._queued == 0);
-				_midiPlayer->play(data, size);
+				_midiPlayer->play(xmidi->_data, xmidi->_size, 0, 0, false);
 				_midiPlayer->setLooping(repeat);
 			}
 
@@ -227,22 +228,22 @@ void MusicProcess::run() {
 	}
 }
 
-void MusicProcess::saveData(ODataSource *ods) {
-	Process::saveData(ods);
+void MusicProcess::saveData(Common::WriteStream *ws) {
+	Process::saveData(ws);
 
-	ods->write4(static_cast<uint32>(_trackState._wanted));
-	ods->write4(static_cast<uint32>(_trackState._lastRequest));
-	ods->write4(static_cast<uint32>(_trackState._queued));
+	ws->writeUint32LE(static_cast<uint32>(_trackState._wanted));
+	ws->writeUint32LE(static_cast<uint32>(_trackState._lastRequest));
+	ws->writeUint32LE(static_cast<uint32>(_trackState._queued));
 }
 
-bool MusicProcess::loadData(IDataSource *ids, uint32 version) {
-	if (!Process::loadData(ids, version)) return false;
+bool MusicProcess::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Process::loadData(rs, version)) return false;
 
-	_trackState._wanted = static_cast<int32>(ids->read4());
+	_trackState._wanted = static_cast<int32>(rs->readUint32LE());
 
 	if (version >= 4) {
-		_trackState._lastRequest = static_cast<int32>(ids->read4());
-		_trackState._queued = static_cast<int32>(ids->read4());
+		_trackState._lastRequest = static_cast<int32>(rs->readUint32LE());
+		_trackState._queued = static_cast<int32>(rs->readUint32LE());
 	} else {
 		_trackState._lastRequest = _trackState._wanted;
 		_trackState._queued = 0;

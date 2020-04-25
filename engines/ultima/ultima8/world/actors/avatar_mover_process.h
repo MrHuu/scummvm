@@ -47,9 +47,14 @@ public:
 		_idleTime = 0;
 	}
 
-	bool loadData(IDataSource *ids, uint32 version);
-protected:
-	void saveData(ODataSource *ods) override;
+	bool loadData(Common::ReadStream *rs, uint32 version);
+
+	void setFakeBothButtonClick() {
+		_fakeBothButtonClick = true;
+	}
+
+private:
+	void saveData(Common::WriteStream *ws) override;
 
 	void handleHangingMode();
 	void handleCombatMode();
@@ -69,6 +74,9 @@ protected:
 	// shake head when idle
 	uint32 _idleTime;
 	Animation::Sequence _lastHeadShakeAnim;
+
+	//! A fake "both button" event has been requested
+	bool _fakeBothButtonClick;
 
 	MButton _mouseButton[2];
 };

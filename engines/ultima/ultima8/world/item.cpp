@@ -51,8 +51,6 @@
 #include "ultima/ultima8/world/world_point.h"
 #include "ultima/ultima8/world/gravity_process.h"
 #include "ultima/ultima8/world/loop_script.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 #include "ultima/ultima8/world/camera_process.h"
 #include "ultima/ultima8/world/sprite_process.h"
 #include "ultima/ultima8/gumps/slider_gump.h"
@@ -73,8 +71,8 @@ Item::Item()
 	: _shape(0), _frame(0), _x(0), _y(0), _z(0),
 	  _flags(0), _quality(0), _npcNum(0), _mapNum(0),
 	  _extendedFlags(0), _parent(0),
-	  _cachedShape(0), _cachedShapeInfo(0), _gump(0), _gravityPid(0),
-	  _lastSetup(0) {
+	  _cachedShape(nullptr), _cachedShapeInfo(nullptr),
+	  _gump(0), _gravityPid(0), _lastSetup(0) {
 }
 
 
@@ -102,7 +100,8 @@ void Item::dumpInfo() const {
 
 Container *Item::getParentAsContainer() const {
 	// No _parent, no container
-	if (!_parent) return 0;
+	if (!_parent)
+		return nullptr;
 
 	Container *p = getContainer(_parent);
 
@@ -441,6 +440,12 @@ Box Item::getWorldBox() const {
 	return Box(_x, _y, _z, xd, yd, zd);
 }
 
+void Item::setShape(uint32 shape_) {
+	_shape = shape_;
+	_cachedShapeInfo = nullptr;
+	_cachedShape = nullptr;
+}
+
 bool Item::overlaps(Item &item2) const {
 	int32 x1a, y1a, z1a, x1b, y1b, z1b;
 	int32 x2a, y2a, z2a, x2b, y2b, z2b;
@@ -595,7 +600,8 @@ uint32 Item::getTotalWeight() const {
 
 uint32 Item::getVolume() const {
 	// invisible items (trap markers and such) don't take up volume
-	if (getFlags() & FLG_INVISIBLE) return 0;
+	if (hasFlags(FLG_INVISIBLE))
+		return 0;
 
 
 	uint32 volume = getShapeInfo()->_volume;
@@ -612,7 +618,7 @@ uint32 Item::getVolume() const {
 	}
 }
 
-bool Item::checkLoopScript(const uint8 *script, uint32 scriptsize) {
+bool Item::checkLoopScript(const uint8 *script, uint32 scriptsize) const {
 	// if really necessary this could be made static to prevent news/deletes
 	DynamicUCStack stack(0x40); // 64bytes should be plenty of room
 
@@ -1130,7 +1136,7 @@ uint32 Item::use() {
 	if (actor) {
 		if (actor->isDead()) {
 			// dead actor, so open/close the dead-body-_gump
-			if (getFlags() & FLG_GUMP_OPEN) {
+			if (hasFlags(FLG_GUMP_OPEN)) {
 				closeGump();
 			} else {
 				openGump(12); // CONSTANT!!
@@ -1445,7 +1451,7 @@ int32 Item::ascend(int delta) {
 }
 
 GravityProcess *Item::ensureGravityProcess() {
-	GravityProcess *p = 0;
+	GravityProcess *p;
 	if (_gravityPid) {
 		p = p_dynamic_cast<GravityProcess *>(
 		        Kernel::get_instance()->getProcess(_gravityPid));
@@ -1751,50 +1757,50 @@ bool Item::canMergeWith(Item *other) {
 }
 
 
-void Item::saveData(ODataSource *ods) {
-	Object::saveData(ods);
-	ods->write2(static_cast<uint16>(_extendedFlags));
-	ods->write2(_flags);
-	ods->write2(static_cast<uint16>(_shape));
-	ods->write2(static_cast<uint16>(_frame));
-	ods->write2(static_cast<uint16>(_x));
-	ods->write2(static_cast<uint16>(_y));
-	ods->write2(static_cast<uint16>(_z));
-	ods->write2(_quality);
-	ods->write2(_npcNum);
-	ods->write2(_mapNum);
+void Item::saveData(Common::WriteStream *ws) {
+	Object::saveData(ws);
+	ws->writeUint16LE(static_cast<uint16>(_extendedFlags));
+	ws->writeUint16LE(_flags);
+	ws->writeUint16LE(static_cast<uint16>(_shape));
+	ws->writeUint16LE(static_cast<uint16>(_frame));
+	ws->writeUint16LE(static_cast<uint16>(_x));
+	ws->writeUint16LE(static_cast<uint16>(_y));
+	ws->writeUint16LE(static_cast<uint16>(_z));
+	ws->writeUint16LE(_quality);
+	ws->writeUint16LE(_npcNum);
+	ws->writeUint16LE(_mapNum);
 	if (getObjId() != 0xFFFF) {
 		// these only make sense in currently loaded items
-		ods->write2(_gump);
-		ods->write2(_gravityPid);
+		ws->writeUint16LE(_gump);
+		ws->writeUint16LE(_gravityPid);
 	}
 	if ((_flags & FLG_ETHEREAL) && (_flags & (FLG_CONTAINED | FLG_EQUIPPED)))
-		ods->write2(_parent);
+		ws->writeUint16LE(_parent);
 }
 
-bool Item::loadData(IDataSource *ids, uint32 version) {
-	if (!Object::loadData(ids, version)) return false;
+bool Item::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Object::loadData(rs, version)) return false;
 
-	_extendedFlags = ids->read2();
-	_flags = ids->read2();
-	_shape = ids->read2();
-	_frame = ids->read2();
-	_x = ids->read2();
-	_y = ids->read2();
-	_z = ids->read2();
+	_extendedFlags = rs->readUint16LE();
+	_flags = rs->readUint16LE();
+	_shape = rs->readUint16LE();
+	_frame = rs->readUint16LE();
+	_x = rs->readUint16LE();
+	_y = rs->readUint16LE();
+	_z = rs->readUint16LE();
 
-	_quality = ids->read2();
-	_npcNum = ids->read2();
-	_mapNum = ids->read2();
+	_quality = rs->readUint16LE();
+	_npcNum = rs->readUint16LE();
+	_mapNum = rs->readUint16LE();
 	if (getObjId() != 0xFFFF) {
-		_gump = ids->read2();
-		_gravityPid = ids->read2();
+		_gump = rs->readUint16LE();
+		_gravityPid = rs->readUint16LE();
 	} else {
 		_gump = _gravityPid = 0;
 	}
 
 	if ((_flags & FLG_ETHEREAL) && (_flags & (FLG_CONTAINED | FLG_EQUIPPED)))
-		_parent = ids->read2();
+		_parent = rs->readUint16LE();
 	else
 		_parent = 0;
 

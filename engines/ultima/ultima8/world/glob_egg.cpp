@@ -28,8 +28,6 @@
 #include "ultima/ultima8/world/item_factory.h"
 #include "ultima/ultima8/world/current_map.h"
 #include "ultima/ultima8/kernel/core_app.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -79,12 +77,12 @@ void GlobEgg::enterFastArea() {
 	Item::enterFastArea();
 }
 
-void GlobEgg::saveData(ODataSource *ods) {
-	Item::saveData(ods);
+void GlobEgg::saveData(Common::WriteStream *ws) {
+	Item::saveData(ws);
 }
 
-bool GlobEgg::loadData(IDataSource *ids, uint32 version) {
-	if (!Item::loadData(ids, version)) return false;
+bool GlobEgg::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Item::loadData(rs, version)) return false;
 
 	return true;
 }

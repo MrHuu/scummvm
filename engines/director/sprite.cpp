@@ -31,12 +31,15 @@ Sprite::Sprite() {
 	_trails = 0;
 	_width = 0;
 	_ink = kInkTypeCopy;
-	_flags = 0;
+	_inkData = 0;
 	_height = 0;
 	_castId = 0;
 	_constraint = 0;
-	_moveable = 0;
+	_moveable = false;
+	_puppet = false;
+	_editable = false;
 	_castId = 0;
+	_castIndex = 0;
 	_backColor = 255;
 	_foreColor = 0;
 	_left = 0;
@@ -55,57 +58,17 @@ Sprite::Sprite() {
 	_cast = nullptr;
 
 	_blend = 0;
-	_lineSize = 1;
+	_thickness = 0;
 
 	_scriptId = 0;
-	_flags2 = 0;
-	_unk2 = 0;
+	_scriptCastIndex = 0;
+	_colorcode = 0;
+	_blendAmount = 0;
 	_unk3 = 0;
 	_spriteType = 0;
 }
 
-Sprite::Sprite(const Sprite &sprite) {
-	_enabled = sprite._enabled;
-	_castId = sprite._castId;
-	_flags = sprite._flags;
-	_trails = sprite._trails;
-	_ink = sprite._ink;
-	_width = sprite._width;
-	_height = sprite._height;
-	_startPoint.x = sprite._startPoint.x;
-	_startPoint.y = sprite._startPoint.y;
-	_backColor = sprite._backColor;
-	_foreColor = sprite._foreColor;
-	_left = sprite._left;
-	_right = sprite._right;
-	_top = sprite._top;
-	_bottom = sprite._bottom;
-	_visible = sprite._visible;
-	_movieRate = sprite._movieRate;
-	_movieTime = sprite._movieTime;
-	_stopTime = sprite._stopTime;
-	_volume = sprite._volume;
-	_stretch = sprite._stretch;
-	_type = sprite._type;
-
-	_cast = sprite._cast;
-
-	_constraint = sprite._constraint;
-	_moveable = sprite._moveable;
-	_blend = sprite._blend;
-	_startTime = sprite._startTime;
-	_lineSize = sprite._lineSize;
-
-	_scriptId = sprite._scriptId;
-	_flags2 = sprite._flags2;
-	_unk2 = sprite._unk2;
-	_unk3 = sprite._unk3;
-	_spriteType = sprite._spriteType;
-}
-
 Sprite::~Sprite() {
-	if (_cast)
-		delete _cast;
 }
 
 uint16 Sprite::getPattern() {

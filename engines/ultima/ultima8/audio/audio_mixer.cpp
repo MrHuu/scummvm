@@ -26,16 +26,15 @@
 #include "ultima/ultima8/audio/music_process.h"
 #include "ultima/ultima8/audio/audio_channel.h"
 #include "ultima/ultima8/audio/midi_player.h"
-#include "ultima/ultima8/conf/setting_manager.h"
 #include "ultima/ultima8/kernel/kernel.h"
 #include "audio/decoders/raw.h"
 
 namespace Ultima {
 namespace Ultima8 {
 
-AudioMixer *AudioMixer::_audioMixer = 0;
+AudioMixer *AudioMixer::_audioMixer = nullptr;
 
-AudioMixer::AudioMixer(Audio::Mixer *mixer) : _mixer(mixer), _midiPlayer(0) {
+AudioMixer::AudioMixer(Audio::Mixer *mixer) : _mixer(mixer), _midiPlayer(nullptr) {
 	_audioMixer = this;
 	
 	_channels.resize(CHANNEL_COUNT);

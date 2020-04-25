@@ -37,8 +37,6 @@
 #include "ultima/ultima8/world/get_object.h"
 #include "ultima/ultima8/world/actors/loiter_process.h"
 #include "ultima/ultima8/world/actors/ambush_process.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -75,7 +73,7 @@ void CombatProcess::run() {
 	// They should not try to approach.
 
 	Actor *a = getActor(_itemNum);
-	if (!(a->getFlags() & Item::FLG_FASTAREA))
+	if (!a->hasFlags(Item::FLG_FASTAREA))
 		return;
 
 	Actor *t = getActor(_target);
@@ -186,13 +184,13 @@ bool CombatProcess::isValidTarget(Actor *target_) {
 	if (target_ == a) return false;
 
 	// not in the fastarea
-	if (!(target_->getFlags() & Item::FLG_FASTAREA)) return false;
+	if (!target_->hasFlags(Item::FLG_FASTAREA)) return false;
 
 	// dead actors don't make good targets
 	if (target_->isDead()) return false;
 
 	// feign death only works on undead and demons
-	if (target_->getActorFlags() & Actor::ACT_FEIGNDEATH) {
+	if (target_->hasActorFlags(Actor::ACT_FEIGNDEATH)) {
 
 		if ((a->getDefenseType() & WeaponInfo::DMG_UNDEAD) ||
 		        (a->getShape() == 96)) return false; // CONSTANT!
@@ -278,7 +276,7 @@ void CombatProcess::turnToDirection(int direction) {
 bool CombatProcess::inAttackRange() {
 	Actor *a = getActor(_itemNum);
 	ShapeInfo *shapeinfo = a->getShapeInfo();
-	MonsterInfo *mi = 0;
+	MonsterInfo *mi = nullptr;
 	if (shapeinfo) mi = shapeinfo->_monsterInfo;
 
 	if (mi && mi->_ranged)
@@ -301,7 +299,7 @@ bool CombatProcess::inAttackRange() {
 void CombatProcess::waitForTarget() {
 	Actor *a = getActor(_itemNum);
 	ShapeInfo *shapeinfo = a->getShapeInfo();
-	MonsterInfo *mi = 0;
+	MonsterInfo *mi = nullptr;
 	if (shapeinfo) mi = shapeinfo->_monsterInfo;
 
 	if (mi && mi->_shifter && a->getMapNum() != 43 && (getRandom() % 2) == 0) {
@@ -329,20 +327,20 @@ void CombatProcess::dumpInfo() const {
 	pout << "Target: " << _target << Std::endl;
 }
 
-void CombatProcess::saveData(ODataSource *ods) {
-	Process::saveData(ods);
+void CombatProcess::saveData(Common::WriteStream *ws) {
+	Process::saveData(ws);
 
-	ods->write2(_target);
-	ods->write2(_fixedTarget);
-	ods->write1(static_cast<uint8>(_combatMode));
+	ws->writeUint16LE(_target);
+	ws->writeUint16LE(_fixedTarget);
+	ws->writeByte(static_cast<uint8>(_combatMode));
 }
 
-bool CombatProcess::loadData(IDataSource *ids, uint32 version) {
-	if (!Process::loadData(ids, version)) return false;
+bool CombatProcess::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Process::loadData(rs, version)) return false;
 
-	_target = ids->read2();
-	_fixedTarget = ids->read2();
-	_combatMode = static_cast<CombatMode>(ids->read1());
+	_target = rs->readUint16LE();
+	_fixedTarget = rs->readUint16LE();
+	_combatMode = static_cast<CombatMode>(rs->readByte());
 
 	return true;
 }

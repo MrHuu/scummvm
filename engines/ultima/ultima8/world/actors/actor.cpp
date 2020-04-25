@@ -52,8 +52,6 @@
 #include "ultima/ultima8/world/get_object.h"
 #include "ultima/ultima8/world/item_factory.h"
 #include "ultima/ultima8/world/loop_script.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -93,7 +91,7 @@ uint16 Actor::getMaxHP() const {
 
 bool Actor::loadMonsterStats() {
 	ShapeInfo *shapeinfo = getShapeInfo();
-	MonsterInfo *mi = 0;
+	MonsterInfo *mi = nullptr;
 	if (shapeinfo) mi = shapeinfo->_monsterInfo;
 	if (!mi)
 		return false;
@@ -122,7 +120,7 @@ bool Actor::loadMonsterStats() {
 bool Actor::giveTreasure() {
 	MainShapeArchive *mainshapes = GameData::get_instance()->getMainShapes();
 	ShapeInfo *shapeinfo = getShapeInfo();
-	MonsterInfo *mi = 0;
+	MonsterInfo *mi = nullptr;
 	if (shapeinfo) mi = shapeinfo->_monsterInfo;
 	if (!mi)
 		return false;
@@ -366,8 +364,7 @@ bool Actor::setEquip(Item *item, bool checkwghtvol) {
 
 	// now check 'equipment slots'
 	// we can have one item of each equipment type, plus one backpack
-	Std::list<Item *>::iterator iter;
-	for (iter = _contents.begin(); iter != _contents.end(); ++iter) {
+	for (Std::list<Item *>::const_iterator iter = _contents.begin(); iter != _contents.end(); ++iter) {
 		if ((*iter)->getObjId() == item->getObjId()) continue;
 
 		uint32 cet = (*iter)->getShapeInfo()->_equipType;
@@ -393,7 +390,7 @@ uint16 Actor::getEquip(uint32 type) const {
 		uint32 cet = (*iter)->getShapeInfo()->_equipType;
 		bool cbackpack = ((*iter)->getShape() == backpack_shape);
 
-		if (((*iter)->getFlags() & FLG_EQUIPPED) &&
+		if ((*iter)->hasFlags(FLG_EQUIPPED) &&
 		        (cet == type || (cbackpack && type == 7))) { // !! constant
 			return (*iter)->getObjId();
 		}
@@ -595,7 +592,7 @@ void Actor::receiveHit(uint16 other, int dir, int damage, uint16 damage_type) {
 		damage_type = hitter->getDamageType();
 	}
 
-	if (other == 1 && attacker->getLastAnim() != Animation::kick) {
+	if (other == 1 && attacker && attacker->getLastAnim() != Animation::kick) {
 		// _strength for kicks is accumulated in AvatarMoverProcess
 		MainActor *av = getMainActor();
 		av->accumulateStr(damage / 4);
@@ -628,11 +625,11 @@ void Actor::receiveHit(uint16 other, int dir, int damage, uint16 damage_type) {
 		Kernel::get_instance()->addProcess(sp);
 	}
 
-	if (damage > 0 && !(getActorFlags() & (ACT_IMMORTAL | ACT_INVINCIBLE))) {
+	if (damage > 0 && !hasActorFlags(ACT_IMMORTAL | ACT_INVINCIBLE)) {
 		if (damage >= _hitPoints) {
 			// we're dead
 
-			if (getActorFlags() & ACT_WITHSTANDDEATH) {
+			if (hasActorFlags(ACT_WITHSTANDDEATH)) {
 				// or maybe not...
 
 				setHP(getMaxHP());
@@ -750,7 +747,7 @@ ProcId Actor::die(uint16 damageType) {
 	giveTreasure();
 
 	ShapeInfo *shapeinfo = getShapeInfo();
-	MonsterInfo *mi = 0;
+	MonsterInfo *mi = nullptr;
 	if (shapeinfo) mi = shapeinfo->_monsterInfo;
 
 	if (mi && mi->_resurrection && !(damageType & WeaponInfo::DMG_FIRE)) {
@@ -912,7 +909,7 @@ int Actor::calculateAttackDamage(uint16 other, int damage, uint16 damage_type) {
 		// blocking?
 		if ((getLastAnim() == Animation::startBlock ||
 		        getLastAnim() == Animation::stopBlock) &&
-		        !(getActorFlags() & ACT_STUNNED)) {
+		        !hasActorFlags(ACT_STUNNED)) {
 			damage -= getStr() / 5;
 		}
 
@@ -920,7 +917,7 @@ int Actor::calculateAttackDamage(uint16 other, int damage, uint16 damage_type) {
 		if (damage_type & WeaponInfo::DMG_FIRE)
 			ACmod /= 2; // armour doesn't protect from fire as well
 
-		if (getActorFlags() & ACT_STUNNED)
+		if (hasActorFlags(ACT_STUNNED))
 			ACmod /= 2; // stunned?
 
 		if (ACmod > 100) ACmod = 100;
@@ -939,7 +936,7 @@ int Actor::calculateAttackDamage(uint16 other, int damage, uint16 damage_type) {
 		if (attackdex < 0) attackdex = 0;
 		if (defenddex <= 0) defenddex = 1;
 
-		if ((getActorFlags() & ACT_STUNNED) ||
+		if (hasActorFlags(ACT_STUNNED) ||
 		        (getRandom() % (attackdex + 3) > getRandom() % defenddex)) {
 			hit = true;
 		}
@@ -965,7 +962,8 @@ int Actor::calculateAttackDamage(uint16 other, int damage, uint16 damage_type) {
 
 CombatProcess *Actor::getCombatProcess() {
 	Process *p = Kernel::get_instance()->findProcess(_objId, 0xF2); // CONSTANT!
-	if (!p) return 0;
+	if (!p)
+		return nullptr;
 	CombatProcess *cp = p_dynamic_cast<CombatProcess *>(p);
 	assert(cp);
 
@@ -975,7 +973,7 @@ CombatProcess *Actor::getCombatProcess() {
 void Actor::setInCombat() {
 	if ((_actorFlags & ACT_INCOMBAT) != 0) return;
 
-	assert(getCombatProcess() == 0);
+	assert(getCombatProcess() == nullptr);
 
 	// kill any processes belonging to this actor
 	Kernel::get_instance()->killProcesses(getObjId(), 6, true);
@@ -1013,8 +1011,8 @@ bool Actor::areEnemiesNear() {
 		if (!npc) continue;
 		if (npc == this) continue;
 
-		if (npc->getActorFlags() & (ACT_DEAD | ACT_FEIGNDEATH)) continue;
-		if (!(npc->getActorFlags() & ACT_INCOMBAT)) continue;
+		if (npc->hasActorFlags(ACT_DEAD | ACT_FEIGNDEATH)) continue;
+		if (!npc->hasActorFlags(ACT_INCOMBAT)) continue;
 
 		// TODO: check if hostile.
 		// Might not be strictly necessary, though. This function is only
@@ -1043,7 +1041,7 @@ Actor *Actor::createActor(uint32 shape, uint32 frame) {
 	                  Item::FLG_IN_NPC_LIST,
 	                  0, 0, 0, true);
 	if (!newactor)
-		return 0;
+		return nullptr;
 	uint16 objID = newactor->getObjId();
 
 	// set stats
@@ -1073,39 +1071,39 @@ void Actor::dumpInfo() const {
 	     << Std::dec << Std::endl;
 }
 
-void Actor::saveData(ODataSource *ods) {
-	Container::saveData(ods);
-	ods->write2(_strength);
-	ods->write2(_dexterity);
-	ods->write2(_intelligence);
-	ods->write2(_hitPoints);
-	ods->write2(_mana);
-	ods->write2(_alignment);
-	ods->write2(_enemyAlignment);
-	ods->write2(_lastAnim);
-	ods->write2(_animFrame);
-	ods->write2(_direction);
-	ods->write4(_fallStart);
-	ods->write4(_actorFlags);
-	ods->write1(_unk0C);
+void Actor::saveData(Common::WriteStream *ws) {
+	Container::saveData(ws);
+	ws->writeUint16LE(_strength);
+	ws->writeUint16LE(_dexterity);
+	ws->writeUint16LE(_intelligence);
+	ws->writeUint16LE(_hitPoints);
+	ws->writeUint16LE(_mana);
+	ws->writeUint16LE(_alignment);
+	ws->writeUint16LE(_enemyAlignment);
+	ws->writeUint16LE(_lastAnim);
+	ws->writeUint16LE(_animFrame);
+	ws->writeUint16LE(_direction);
+	ws->writeUint32LE(_fallStart);
+	ws->writeUint32LE(_actorFlags);
+	ws->writeByte(_unk0C);
 }
 
-bool Actor::loadData(IDataSource *ids, uint32 version) {
-	if (!Container::loadData(ids, version)) return false;
+bool Actor::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Container::loadData(rs, version)) return false;
 
-	_strength = static_cast<int16>(ids->read2());
-	_dexterity = static_cast<int16>(ids->read2());
-	_intelligence = static_cast<int16>(ids->read2());
-	_hitPoints = ids->read2();
-	_mana = static_cast<int16>(ids->read2());
-	_alignment = ids->read2();
-	_enemyAlignment = ids->read2();
-	_lastAnim = static_cast<Animation::Sequence>(ids->read2());
-	_animFrame = ids->read2();
-	_direction = ids->read2();
-	_fallStart = ids->read4();
-	_actorFlags = ids->read4();
-	_unk0C = ids->read1();
+	_strength = static_cast<int16>(rs->readUint16LE());
+	_dexterity = static_cast<int16>(rs->readUint16LE());
+	_intelligence = static_cast<int16>(rs->readUint16LE());
+	_hitPoints = rs->readUint16LE();
+	_mana = static_cast<int16>(rs->readUint16LE());
+	_alignment = rs->readUint16LE();
+	_enemyAlignment = rs->readUint16LE();
+	_lastAnim = static_cast<Animation::Sequence>(rs->readUint16LE());
+	_animFrame = rs->readUint16LE();
+	_direction = rs->readUint16LE();
+	_fallStart = rs->readUint32LE();
+	_actorFlags = rs->readUint32LE();
+	_unk0C = rs->readByte();
 
 	return true;
 }
@@ -1379,7 +1377,7 @@ uint32 Actor::I_isImmortal(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ACTOR_FROM_PTR(actor);
 	if (!actor) return 0;
 
-	if (actor->getActorFlags() & ACT_IMMORTAL)
+	if (actor->hasActorFlags(ACT_IMMORTAL))
 		return 1;
 	else
 		return 0;
@@ -1408,7 +1406,7 @@ uint32 Actor::I_isWithstandDeath(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ACTOR_FROM_PTR(actor);
 	if (!actor) return 0;
 
-	if (actor->getActorFlags() & ACT_WITHSTANDDEATH)
+	if (actor->hasActorFlags(ACT_WITHSTANDDEATH))
 		return 1;
 	else
 		return 0;
@@ -1436,7 +1434,7 @@ uint32 Actor::I_isFeignDeath(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ACTOR_FROM_PTR(actor);
 	if (!actor) return 0;
 
-	if (actor->getActorFlags() & ACT_FEIGNDEATH)
+	if (actor->hasActorFlags(ACT_FEIGNDEATH))
 		return 1;
 	else
 		return 0;
@@ -1446,7 +1444,7 @@ uint32 Actor::I_setFeignDeath(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ACTOR_FROM_PTR(actor);
 	if (!actor) return 0;
 
-	if (actor->getActorFlags() & ACT_FEIGNDEATH)
+	if (actor->hasActorFlags(ACT_FEIGNDEATH))
 		return 0;
 
 	actor->setActorFlag(ACT_FEIGNDEATH);
@@ -1520,7 +1518,7 @@ uint32 Actor::I_isBusy(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_UC_PTR(ptr);
 	uint16 id = UCMachine::ptrToObject(ptr);
 
-	uint32 count = Kernel::get_instance()->getNumProcesses(id, 0x00F0);
+	uint32 count = Kernel::get_instance()->getNumProcesses(id, ActorAnimProcess::ACTOR_ANIM_PROC_TYPE);
 	if (count > 0)
 		return 1;
 	else
@@ -1580,7 +1578,7 @@ uint32 Actor::I_getAirWalkEnabled(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ACTOR_FROM_PTR(actor);
 	if (!actor) return 0;
 
-	if (actor->getActorFlags() & ACT_AIRWALK)
+	if (actor->hasActorFlags(ACT_AIRWALK))
 		return 1;
 	else
 		return 0;

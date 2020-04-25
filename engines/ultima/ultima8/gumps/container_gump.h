@@ -73,9 +73,9 @@ public:
 	void OnMouseClick(int button, int32 mx, int32 my) override;
 	void OnMouseDouble(int button, int32 mx, int32 my) override;
 
-	bool loadData(IDataSource *ids, uint32 version);
+	bool loadData(Common::ReadStream *rs, uint32 version);
 protected:
-	void saveData(ODataSource *ods) override;
+	void saveData(Common::WriteStream *ws) override;
 
 	void GetItemLocation(int32 lerp_factor) override;
 

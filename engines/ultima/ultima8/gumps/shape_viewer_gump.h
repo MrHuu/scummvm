@@ -39,7 +39,7 @@ public:
 	ENABLE_RUNTIME_CLASSTYPE()
 
 	ShapeViewerGump();
-	ShapeViewerGump(int width, int height,
+	ShapeViewerGump(int x, int y, int width, int height,
 	                Std::vector<Std::pair<Std::string, ShapeArchive *> > &flexes,
 	                uint32 flags = 0, int32 layer = LAYER_MODAL);
 	~ShapeViewerGump() override;
@@ -49,11 +49,14 @@ public:
 	bool OnKeyDown(int key, int mod) override;
 	bool OnTextInput(int unicode) override;
 
+	// Init the gump, call after construction
+	void InitGump(Gump *newparent, bool take_focus = true) override;
+
 	static void U8ShapeViewer();
 
-	bool loadData(IDataSource *ids);
+	bool loadData(Common::ReadStream *rs);
 protected:
-	void saveData(ODataSource *ods) override;
+	void saveData(Common::WriteStream *ws) override;
 
 	Std::vector<Std::pair<Std::string, ShapeArchive *> > _flexes;
 	unsigned int _curFlex;

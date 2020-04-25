@@ -28,9 +28,6 @@
 #include "ultima/ultima8/world/item.h"
 #include "ultima/ultima8/world/get_object.h"
 
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
-
 namespace Ultima {
 namespace Ultima8 {
 
@@ -109,11 +106,11 @@ uint32 TargetGump::I_target(const uint8 * /*args*/, unsigned int /*argsize*/) {
 
 
 
-void TargetGump::saveData(ODataSource *ods) {
+void TargetGump::saveData(Common::WriteStream *ws) {
 	CANT_HAPPEN_MSG("Trying to save ModalGump");
 }
 
-bool TargetGump::loadData(IDataSource *ids, uint32 versin) {
+bool TargetGump::loadData(Common::ReadStream *rs, uint32 versin) {
 	CANT_HAPPEN_MSG("Trying to load ModalGump");
 	return false;
 }

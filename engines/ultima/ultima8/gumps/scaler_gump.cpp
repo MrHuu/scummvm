@@ -36,12 +36,15 @@ DEFINE_RUNTIME_CLASSTYPE_CODE(ScalerGump, DesktopGump)
 
 ScalerGump::ScalerGump(int32 x, int32 y, int32 width, int32 height) :
 		DesktopGump(x, y, width, height),
-		_swidth1(width), _sheight1(height), _scaler1(0), _buffer1(0),
-		_swidth2(width), _sheight2(height), _scaler2(0), _buffer2(0),
+		_swidth1(width), _sheight1(height),
+		_scaler1(nullptr), _buffer1(nullptr),
+		_swidth2(width), _sheight2(height),
+		_scaler2(nullptr), _buffer2(nullptr),
 		_width(width), _height(height) {
 
 	setupScaling();
-	_buffer1->Fill32(0, 0, 0, _dims.w, _dims.h);
+	if (_buffer1)
+		_buffer1->Fill32(0, 0, 0, _dims.w, _dims.h);
 }
 
 ScalerGump::~ScalerGump() {
@@ -229,7 +232,7 @@ void ScalerGump::setupScaling() {
 		// _scaler2 not required
 		if (_width == 640 && _height == 480 &&
 		        _swidth2 == 640 && _sheight2 == 400 &&
-		        _swidth1 == 320 && _sheight2 == 200) {
+		        _swidth1 == 320 && _sheight1 == 200) {
 			return;
 		}
 

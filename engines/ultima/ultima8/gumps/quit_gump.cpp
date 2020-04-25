@@ -30,8 +30,6 @@
 #include "ultima/ultima8/gumps/desktop_gump.h"
 #include "ultima/ultima8/gumps/widgets/button_widget.h"
 #include "ultima/ultima8/gumps/widgets/text_widget.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -57,17 +55,13 @@ void QuitGump::InitGump(Gump *newparent, bool take_focus) {
 	ModalGump::InitGump(newparent, take_focus);
 
 	_shape = GameData::get_instance()->getGumps()->getShape(gumpShape);
-	ShapeFrame *sf = _shape->getFrame(0);
-	assert(sf);
-
-	_dims.w = sf->_width;
-	_dims.h = sf->_height;
+	UpdateDimsFromShape();
 
 	FrameID askshape(GameData::GUMPS, askShapeId, 0);
 	askshape = _TL_SHP_(askshape);
 
 	Shape *askShape = GameData::get_instance()->getShape(askshape);
-	sf = askShape->getFrame(askshape._frameNum);
+	const ShapeFrame *sf = askShape->getFrame(askshape._frameNum);
 	assert(sf);
 
 	Gump *ask = new Gump(0, 0, sf->_width, sf->_height);
@@ -145,12 +139,12 @@ void QuitGump::verifyQuit() {
 	gump->setRelativePosition(CENTER);
 }
 
-bool QuitGump::loadData(IDataSource *ids) {
+bool QuitGump::loadData(Common::ReadStream *rs) {
 	CANT_HAPPEN_MSG("Trying to load ModalGump");
 	return true;
 }
 
-void QuitGump::saveData(ODataSource *ods) {
+void QuitGump::saveData(Common::WriteStream *ws) {
 	CANT_HAPPEN_MSG("Trying to save ModalGump");
 }
 

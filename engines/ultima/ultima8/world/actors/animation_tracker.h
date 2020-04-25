@@ -30,8 +30,6 @@ namespace Ultima {
 namespace Ultima8 {
 
 class Actor;
-class IDataSource;
-class ODataSource;
 struct AnimAction;
 struct AnimFrame;
 
@@ -107,8 +105,8 @@ public:
 		return _hitObject;
 	}
 
-	bool load(IDataSource *ids, uint32 version);
-	void save(ODataSource *ods);
+	bool load(Common::ReadStream *rs, uint32 version);
+	void save(Common::WriteStream *ods);
 
 private:
 	enum Mode {

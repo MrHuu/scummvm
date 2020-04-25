@@ -91,10 +91,15 @@ int SoundCommandParser::getSoundResourceId(reg_t obj) {
 }
 
 void SoundCommandParser::initSoundResource(MusicEntry *newSound) {
-	if (newSound->resourceId && _resMan->testResource(ResourceId(kResourceTypeSound, newSound->resourceId)))
+	if (newSound->resourceId) {
 		newSound->soundRes = new SoundResource(newSound->resourceId, _resMan, _soundVersion);
-	else
-		newSound->soundRes = 0;
+		if (!newSound->soundRes->exists()) {
+			delete newSound->soundRes;
+			newSound->soundRes = nullptr;
+		}
+	} else {
+		newSound->soundRes = nullptr;
+	}
 
 	// In SCI1.1 games, sound effects are started from here. If we can find
 	// a relevant audio resource, play it, otherwise switch to synthesized
@@ -838,7 +843,8 @@ void SoundCommandParser::updateSci0Cues() {
 		// Is the sound stopped, and the sound object updated too? If yes, skip
 		// this sound, as SCI0 only allows one active song.
 		if  ((*i)->isQueued) {
-			pWaitingForPlay = (*i);
+			if (!pWaitingForPlay || pWaitingForPlay->priority < (*i)->priority)		// fix #9907
+				pWaitingForPlay = (*i);
 			// FIXME(?): In iceman 2 songs are queued when playing the door
 			// sound - if we use the first song for resuming then it's the wrong
 			// one. Both songs have same priority. Maybe the new sound function

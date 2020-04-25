@@ -38,11 +38,11 @@ using Std::string;
 // p_dynamic_cast stuff
 DEFINE_RUNTIME_CLASSTYPE_CODE_BASE_CLASS(CoreApp)
 
-CoreApp *CoreApp::_application = 0;
+CoreApp *CoreApp::_application = nullptr;
 
 CoreApp::CoreApp(const Ultima::UltimaGameDescription *gameDesc)
-		: _gameDesc(gameDesc), _isRunning(false), _gameInfo(0), _fileSystem(0),
-		_configFileMan(0), _settingMan(0) {
+		: _gameDesc(gameDesc), _isRunning(false), _gameInfo(nullptr), _fileSystem(nullptr),
+		_configFileMan(nullptr), _settingMan(nullptr) {
 	_application = this;
 }
 
@@ -57,7 +57,7 @@ CoreApp::~CoreApp() {
 	FORGET_OBJECT(_configFileMan);
 	FORGET_OBJECT(_gameInfo);
 
-	_application = 0;
+	_application = nullptr;
 }
 
 void CoreApp::startup() {
@@ -66,7 +66,7 @@ void CoreApp::startup() {
 }
 
 void CoreApp::sysInit() {
-	_gameInfo = 0;
+	_gameInfo = nullptr;
 
 	_fileSystem = new FileSystem;
 
@@ -145,28 +145,9 @@ GameInfo *CoreApp::getDefaultGame() {
 	if (defaultset) {
 		// default game specified in config file
 		gamename = defaultgame;
-
-	} else if (_games.size() == 2) {// TODO - Do this in a better method
-		// only one game in config file, so pick that
-		for (GameMap::iterator i = _games.begin(); i != _games.end(); ++i) {
-			if (i->_value->_name != "pentagram")
-				gamename = i->_value->_name;
-		}
-
-	} else if (_games.size() == 1) {
-		gamename = _games.begin()->_value->_name;
-
 	} else {
-		perr << "Multiple games found in configuration, but no default "
-		     << "game is selected." << Std::endl
-		     << "Either start Pentagram with the \"--game <gamename>\","
-		     << Std::endl
-		     << "or set pentagram/defaultgame in pentagram.ini"
-		     << Std::endl;  // FIXME - report more useful error message
-		return 0;
+		gamename = _gameDesc->desc.gameId;
 	}
-
-	pout << "Default game: " << gamename << Std::endl;
 
 	GameInfo *info = getGameInfo(gamename);
 
@@ -209,7 +190,7 @@ void CoreApp::killGame() {
 	_configFileMan->clearRoot("game");
 	_settingMan->setCurrentDomain(SettingManager::DOM_GLOBAL);
 
-	_gameInfo = 0;
+	_gameInfo = nullptr;
 }
 
 
@@ -230,10 +211,15 @@ bool CoreApp::getGameInfo(istring &game, GameInfo *ginfo) {
 		ginfo->_language = GameInfo::GAMELANG_ENGLISH;
 
 	} else {
-		assert(game == "ultima8");
+		assert(game == "ultima8" || game == "remorse" || game == "regret");
 
-		ginfo->_type = GameInfo::GAME_U8;
-		
+		if (game == "ultima8")
+			ginfo->_type = GameInfo::GAME_U8;
+		else if (game == "remorse")
+			ginfo->_type = GameInfo::GAME_REMORSE;
+		else if (game == "regret")
+			ginfo->_type = GameInfo::GAME_REGRET;
+
 		switch (_gameDesc->desc.language) {
 		case Common::EN_ANY:
 			ginfo->_language = GameInfo::GAMELANG_ENGLISH;
@@ -318,7 +304,7 @@ GameInfo *CoreApp::getGameInfo(istring game) const {
 	if (i != _games.end())
 		return i->_value;
 	else
-		return 0;
+		return nullptr;
 }
 
 } // End of namespace Ultima8

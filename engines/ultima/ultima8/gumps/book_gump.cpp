@@ -32,9 +32,6 @@
 #include "ultima/ultima8/world/item.h"
 #include "ultima/ultima8/world/get_object.h"
 
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
-
 namespace Ultima {
 namespace Ultima8 {
 
@@ -73,12 +70,7 @@ void BookGump::InitGump(Gump *newparent, bool take_focus) {
 	Shape *shapeP = GameData::get_instance()->getGumps()->getShape(6);
 
 	SetShape(shapeP, 0);
-
-	ShapeFrame *sf = shapeP->getFrame(0);
-	assert(sf);
-
-	_dims.w = sf->_width;
-	_dims.h = sf->_height;
+	UpdateDimsFromShape();
 }
 
 void BookGump::NextText() {
@@ -115,11 +107,11 @@ uint32 BookGump::I_readBook(const uint8 *args, unsigned int /*argsize*/) {
 	return gump->GetNotifyProcess()->getPid();
 }
 
-void BookGump::saveData(ODataSource *ods) {
+void BookGump::saveData(Common::WriteStream *ws) {
 	CANT_HAPPEN_MSG("Trying to save ModalGump");
 }
 
-bool BookGump::loadData(IDataSource *ids, uint32 version) {
+bool BookGump::loadData(Common::ReadStream *rs, uint32 version) {
 	CANT_HAPPEN_MSG("Trying to load ModalGump");
 
 	return false;

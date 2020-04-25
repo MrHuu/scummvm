@@ -28,9 +28,6 @@
 #include "ultima/ultima8/world/teleport_egg.h"
 #include "ultima/ultima8/world/get_object.h"
 
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
-
 namespace Ultima {
 namespace Ultima8 {
 
@@ -96,13 +93,13 @@ void EggHatcherProcess::run() {
 	if (!nearteleporter) av->setJustTeleported(false); // clear flag
 }
 
-void EggHatcherProcess::saveData(ODataSource *ods) {
-	Process::saveData(ods);
+void EggHatcherProcess::saveData(Common::WriteStream *ws) {
+	Process::saveData(ws);
 }
 
 
-bool EggHatcherProcess::loadData(IDataSource *ids, uint32 version) {
-	if (!Process::loadData(ids, version)) return false;
+bool EggHatcherProcess::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Process::loadData(rs, version)) return false;
 
 	// the _eggs will be re-added to the EggHatcherProcess when they're
 	// re-added to the CurrentMap

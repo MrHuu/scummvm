@@ -31,8 +31,6 @@
 #include "ultima/ultima8/gumps/gump_notify_process.h"
 #include "ultima/ultima8/world/item.h"
 #include "ultima/ultima8/world/get_object.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -66,12 +64,7 @@ void ScrollGump::InitGump(Gump *newparent, bool take_focus) {
 	Shape *shape_ = GameData::get_instance()->getGumps()->getShape(19);
 
 	SetShape(shape_, 0);
-
-	ShapeFrame *sf = shape_->getFrame(0);
-	assert(sf);
-
-	_dims.w = sf->_width;
-	_dims.h = sf->_height;
+	UpdateDimsFromShape();
 }
 
 void ScrollGump::NextText() {
@@ -103,11 +96,11 @@ uint32 ScrollGump::I_readScroll(const uint8 *args, unsigned int /*argsize*/) {
 	return gump->GetNotifyProcess()->getPid();
 }
 
-void ScrollGump::saveData(ODataSource *ods) {
+void ScrollGump::saveData(Common::WriteStream *ws) {
 	CANT_HAPPEN_MSG("Trying to save ModalGump");
 }
 
-bool ScrollGump::loadData(IDataSource *ids, uint32 version) {
+bool ScrollGump::loadData(Common::ReadStream *rs, uint32 version) {
 	CANT_HAPPEN_MSG("Trying to load ModalGump");
 
 	return false;

@@ -90,7 +90,7 @@ void ASpit::xastartupbtnhide(const ArgumentArray &args) {
 	// The original game hides the start/setup buttons depending on an ini entry.
 	// It's safe to ignore this command.
 
-	if (!(_vm->getFeatures() & GF_25TH))
+	if (!_vm->isGameVariant(GF_25TH))
 		return;
 
 	int lang = -1;
@@ -202,7 +202,7 @@ void ASpit::xaatrusbooknextpage(const ArgumentArray &args) {
 	// Keep turning pages while the mouse is pressed
 	while (keepTurningPages()) {
 		// Check for the last page
-		if (((_vm->getFeatures() & GF_DEMO) && page == 6) || page == 10)
+		if ((_vm->isGameVariant(GF_DEMO) && page == 6) || page == 10)
 			return;
 
 		// Update the page number
@@ -352,11 +352,11 @@ void ASpit::xarestoregame(const ArgumentArray &args) {
 	}
 
 	// Launch the load game dialog
-	_vm->runLoadDialog();
+	_vm->loadGameDialog();
 }
 
 void ASpit::xaSaveGame(const ArgumentArray &args) {
-	_vm->runSaveDialog();
+	_vm->saveGameDialog();
 }
 
 void ASpit::xaResumeGame(const ArgumentArray &args) {

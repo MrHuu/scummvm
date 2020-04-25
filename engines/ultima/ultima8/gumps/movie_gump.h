@@ -52,11 +52,11 @@ public:
 
 	bool OnKeyDown(int key, int mod) override;
 
-	static ProcId U8MovieViewer(RawArchive *skf, bool introMusicHack = false);
+	static ProcId U8MovieViewer(RawArchive *skf, bool fade, bool introMusicHack = false);
 
-	bool loadData(IDataSource *ids);
+	bool loadData(Common::ReadStream *rs);
 protected:
-	void saveData(ODataSource *ods) override;
+	void saveData(Common::WriteStream *ws) override;
 
 	SKFPlayer *_player;
 };

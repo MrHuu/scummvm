@@ -59,7 +59,7 @@ public:
 	};
 
 private:
-	void saveData(ODataSource *ods) override;
+	void saveData(Common::WriteStream *ws) override;
 
 	//! Play a music track
 	//! \param track The track number to play. Pass 0 to stop music
@@ -113,7 +113,7 @@ public:
 
 	void run() override;
 
-	bool loadData(IDataSource *ids, uint32 version);
+	bool loadData(Common::ReadStream *rs, uint32 version);
 };
 
 } // End of namespace Ultima8

@@ -44,7 +44,6 @@ class GumpNotifyProcess;
 //
 
 class Gump : public Object {
-	friend class GumpList;
 protected:
 	uint16 _owner;        // Owner item
 	Gump *_parent;        // Parent gump
@@ -94,6 +93,9 @@ public:
 	}
 
 	void                        SetShape(FrameID frame, bool adjustsize = false);
+
+	//! Update the width/height to match the gump's current shape frame
+	void 						UpdateDimsFromShape();
 
 	//! Set the Gump's frame
 	inline void                 Set_frameNum(uint32 frameNum) {
@@ -196,7 +198,7 @@ public:
 	virtual void        Close(bool no_del = false);
 
 	//! Check to see if a Gump is Closing
-	bool                IsClosing() {
+	bool                IsClosing() const {
 		return (_flags & FLAG_CLOSING) != 0;
 	}
 
@@ -458,9 +460,9 @@ public:
 		LAYER_CONSOLE       = 16        // Layer for the console
 	};
 
-	bool loadData(IDataSource *ids, uint32 version);
+	bool loadData(Common::ReadStream *rs, uint32 version);
 protected:
-	void saveData(ODataSource *ods) override;
+	void saveData(Common::WriteStream *ws) override;
 };
 
 } // End of namespace Ultima8

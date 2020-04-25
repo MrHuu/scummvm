@@ -92,8 +92,7 @@ void Lingo::printStack(const char *s, uint pc) {
 
 	for (uint i = 0; i < _stack.size(); i++) {
 		Datum d = _stack[i];
-		d.toString();
-		stack += Common::String::format("<%s> ", d.u.s->c_str());
+		stack += Common::String::format("<%s> ", d.getPrintable().c_str());
 	}
 	debugC(5, kDebugLingoExec, "[%3d]: %s", pc, stack.c_str());
 }
@@ -158,6 +157,14 @@ Common::String Lingo::decodeInstruction(ScriptData *sd, uint pc, uint *newPc) {
 					int v = READ_UINT32(&i);
 
 					res += Common::String::format(" %s", field2str(v));
+					break;
+				}
+			case 'N':
+				{
+					i = (*sd)[pc++];
+					int v = READ_UINT32(&i);
+
+					res += Common::String::format(" \"%s\"", getName(v).c_str());
 					break;
 				}
 			default:
@@ -485,6 +492,32 @@ void Lingo::processIf(int startlabel, int endlabel, int finalElse) {
 	}
 }
 
+int Lingo::castIdFetch(Datum &var) {
+	Score *score = _vm->getCurrentScore();
+	if (!score) {
+		warning("castIdFetch: Score is empty");
+		return 0;
+	}
+
+	int id = 0;
+	if (var.type == STRING) {
+		if (score->_castsNames.contains(*var.u.s))
+			id = score->_castsNames[*var.u.s];
+		else
+			warning("castIdFetch: reference to non-existent cast member: %s", var.u.s->c_str());
+	} else if (var.type == INT || var.type == FLOAT) {
+		var.makeInt();
+		if (!score->_loadedCast->contains(var.u.i))
+			warning("castIdFetch: reference to non-existent cast ID: %d", var.u.i);
+		else
+			id = var.u.i;
+	} else {
+		error("castIdFetch: was expecting STRING or INT, got %s", var.type2str());
+	}
+
+	return id;
+}
+
 void Lingo::varAssign(Datum &var, Datum &value) {
 	if (var.type != VAR && var.type != REFERENCE) {
 		warning("varAssign: assignment to non-variable");
@@ -522,7 +555,7 @@ void Lingo::varAssign(Datum &var, Datum &value) {
 			sym->u.farr = new DatumArray(*value.u.farr);
 			delete value.u.farr;
 		} else if (value.type == SYMBOL) {
-			sym->u.i = value.u.i;
+			sym->u.s = value.u.s;
 		} else if (value.type == OBJECT) {
 			sym->u.s = value.u.s;
 		} else if (value.type == VOID) {
@@ -549,7 +582,7 @@ void Lingo::varAssign(Datum &var, Datum &value) {
 		if (cast) {
 			switch (cast->_type) {
 			case kCastText:
-				value.toString();
+				value.makeString();
 				((TextCast *)cast)->setText(value.u.s->c_str());
 				delete value.u.s;
 				break;
@@ -587,7 +620,7 @@ Datum Lingo::varFetch(Datum &var) {
 		else if (sym->type == POINT)
 			result.u.farr = sym->u.farr;
 		else if (sym->type == SYMBOL)
-			result.u.i = var.u.sym->u.i;
+			result.u.s = var.u.sym->u.s;
 		else if (sym->type == VOID)
 			result.u.i = 0;
 		else if (sym->type == ARRAY) {

@@ -52,8 +52,8 @@ void PathfindingState::load(const Actor *_actor) {
 	_actor->getLocation(_x, _y, _z);
 	_lastAnim = _actor->getLastAnim();
 	_direction = _actor->getDir();
-	_firstStep = (_actor->getActorFlags() & Actor::ACT_FIRSTSTEP) != 0;
-	_flipped = (_actor->getFlags() & Item::FLG_FLIPPED) != 0;
+	_firstStep = _actor->hasActorFlags(Actor::ACT_FIRSTSTEP);
+	_flipped = _actor->hasFlags(Item::FLG_FLIPPED);
 	_combat = _actor->isInCombat();
 }
 
@@ -530,7 +530,7 @@ bool Pathfinder::pathfind(Std::vector<PathfindingAction> &path) {
 	PathNode *startnode = new PathNode();
 	startnode->state = _start;
 	startnode->cost = 0;
-	startnode->parent = 0;
+	startnode->parent = nullptr;
 	startnode->depth = 0;
 	startnode->stepsfromparent = 0;
 	_nodeList.push_back(startnode);

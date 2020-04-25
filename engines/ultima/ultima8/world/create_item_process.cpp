@@ -25,9 +25,6 @@
 #include "ultima/ultima8/world/item_factory.h"
 #include "ultima/ultima8/world/item.h"
 
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
-
 namespace Ultima {
 namespace Ultima8 {
 
@@ -63,34 +60,34 @@ void CreateItemProcess::run() {
 	terminate();
 }
 
-void CreateItemProcess::saveData(ODataSource *ods) {
-	Process::saveData(ods);
+void CreateItemProcess::saveData(Common::WriteStream *ws) {
+	Process::saveData(ws);
 
-	ods->write4(_shape);
-	ods->write4(_frame);
-	ods->write2(_quality);
-	ods->write2(_flags);
-	ods->write2(_npcNum);
-	ods->write2(_mapNum);
-	ods->write4(_extendedFlags);
-	ods->write4(static_cast<uint32>(_x));
-	ods->write4(static_cast<uint32>(_y));
-	ods->write4(static_cast<uint32>(_z));
+	ws->writeUint32LE(_shape);
+	ws->writeUint32LE(_frame);
+	ws->writeUint16LE(_quality);
+	ws->writeUint16LE(_flags);
+	ws->writeUint16LE(_npcNum);
+	ws->writeUint16LE(_mapNum);
+	ws->writeUint32LE(_extendedFlags);
+	ws->writeUint32LE(static_cast<uint32>(_x));
+	ws->writeUint32LE(static_cast<uint32>(_y));
+	ws->writeUint32LE(static_cast<uint32>(_z));
 }
 
-bool CreateItemProcess::loadData(IDataSource *ids, uint32 version) {
-	if (!Process::loadData(ids, version)) return false;
+bool CreateItemProcess::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Process::loadData(rs, version)) return false;
 
-	_shape = ids->read4();
-	_frame = ids->read4();
-	_quality = ids->read2();
-	_flags = ids->read2();
-	_npcNum = ids->read2();
-	_mapNum = ids->read2();
-	_extendedFlags = ids->read4();
-	_x = static_cast<int32>(ids->read4());
-	_y = static_cast<int32>(ids->read4());
-	_z = static_cast<int32>(ids->read4());
+	_shape = rs->readUint32LE();
+	_frame = rs->readUint32LE();
+	_quality = rs->readUint16LE();
+	_flags = rs->readUint16LE();
+	_npcNum = rs->readUint16LE();
+	_mapNum = rs->readUint16LE();
+	_extendedFlags = rs->readUint32LE();
+	_x = static_cast<int32>(rs->readUint32LE());
+	_y = static_cast<int32>(rs->readUint32LE());
+	_z = static_cast<int32>(rs->readUint32LE());
 	return true;
 }
 

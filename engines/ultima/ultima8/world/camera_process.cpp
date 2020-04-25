@@ -31,8 +31,6 @@
 #include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/kernel/core_app.h"
 #include "ultima/ultima8/world/get_object.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -43,7 +41,7 @@ DEFINE_RUNTIME_CLASSTYPE_CODE(CameraProcess, Process)
 //
 // Statics
 //
-CameraProcess *CameraProcess::_camera = 0;
+CameraProcess *CameraProcess::_camera = nullptr;
 int32 CameraProcess::_earthquake = 0;
 int32 CameraProcess::_eqX = 0;
 int32 CameraProcess::_eqY = 0;
@@ -53,7 +51,7 @@ CameraProcess::CameraProcess() : Process() {
 
 CameraProcess::~CameraProcess() {
 	if (_camera == this)
-		_camera = 0;
+		_camera = nullptr;
 }
 
 uint16 CameraProcess::SetCameraProcess(CameraProcess *cam) {
@@ -65,7 +63,7 @@ uint16 CameraProcess::SetCameraProcess(CameraProcess *cam) {
 
 void CameraProcess::ResetCameraProcess() {
 	if (_camera) _camera->terminate();
-	_camera = 0;
+	_camera = nullptr;
 }
 
 void CameraProcess::GetCameraLocation(int32 &x, int32 &y, int32 &z) {
@@ -165,7 +163,7 @@ void CameraProcess::ItemMoved() {
 		Item *item = getItem(_itemNum);
 
 		// We only update for now if lerping has been disabled
-		if (item && (item->getExtFlags() & Item::EXT_LERP_NOPREV)) {
+		if (item && item->hasExtFlags(Item::EXT_LERP_NOPREV)) {
 			item->getLocation(_ex, _ey, _ez);
 			_sx = _ex;
 			_sy = _ey;
@@ -269,40 +267,40 @@ uint16 CameraProcess::FindRoof(int32 factor) {
 	return roofid;
 }
 
-void CameraProcess::saveData(ODataSource *ods) {
-	Process::saveData(ods);
+void CameraProcess::saveData(Common::WriteStream *ws) {
+	Process::saveData(ws);
 
-	ods->write4(static_cast<uint32>(_sx));
-	ods->write4(static_cast<uint32>(_sy));
-	ods->write4(static_cast<uint32>(_sz));
-	ods->write4(static_cast<uint32>(_ex));
-	ods->write4(static_cast<uint32>(_ey));
-	ods->write4(static_cast<uint32>(_ez));
-	ods->write4(static_cast<uint32>(_time));
-	ods->write4(static_cast<uint32>(_elapsed));
-	ods->write2(_itemNum);
-	ods->write4(_lastFrameNum);
-	ods->write4(static_cast<uint32>(_earthquake));
-	ods->write4(static_cast<uint32>(_eqX));
-	ods->write4(static_cast<uint32>(_eqY));
+	ws->writeUint32LE(static_cast<uint32>(_sx));
+	ws->writeUint32LE(static_cast<uint32>(_sy));
+	ws->writeUint32LE(static_cast<uint32>(_sz));
+	ws->writeUint32LE(static_cast<uint32>(_ex));
+	ws->writeUint32LE(static_cast<uint32>(_ey));
+	ws->writeUint32LE(static_cast<uint32>(_ez));
+	ws->writeUint32LE(static_cast<uint32>(_time));
+	ws->writeUint32LE(static_cast<uint32>(_elapsed));
+	ws->writeUint16LE(_itemNum);
+	ws->writeUint32LE(_lastFrameNum);
+	ws->writeUint32LE(static_cast<uint32>(_earthquake));
+	ws->writeUint32LE(static_cast<uint32>(_eqX));
+	ws->writeUint32LE(static_cast<uint32>(_eqY));
 }
 
-bool CameraProcess::loadData(IDataSource *ids, uint32 version) {
-	if (!Process::loadData(ids, version)) return false;
+bool CameraProcess::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Process::loadData(rs, version)) return false;
 
-	_sx = static_cast<int32>(ids->read4());
-	_sy = static_cast<int32>(ids->read4());
-	_sz = static_cast<int32>(ids->read4());
-	_ex = static_cast<int32>(ids->read4());
-	_ey = static_cast<int32>(ids->read4());
-	_ez = static_cast<int32>(ids->read4());
-	_time = static_cast<int32>(ids->read4());
-	_elapsed = static_cast<int32>(ids->read4());
-	_itemNum = ids->read2();
-	_lastFrameNum = ids->read4();
-	_earthquake = static_cast<int32>(ids->read4()); //static
-	_eqX = static_cast<int32>(ids->read4()); //static
-	_eqY = static_cast<int32>(ids->read4()); //static
+	_sx = static_cast<int32>(rs->readUint32LE());
+	_sy = static_cast<int32>(rs->readUint32LE());
+	_sz = static_cast<int32>(rs->readUint32LE());
+	_ex = static_cast<int32>(rs->readUint32LE());
+	_ey = static_cast<int32>(rs->readUint32LE());
+	_ez = static_cast<int32>(rs->readUint32LE());
+	_time = static_cast<int32>(rs->readUint32LE());
+	_elapsed = static_cast<int32>(rs->readUint32LE());
+	_itemNum = rs->readUint16LE();
+	_lastFrameNum = rs->readUint32LE();
+	_earthquake = static_cast<int32>(rs->readUint32LE()); //static
+	_eqX = static_cast<int32>(rs->readUint32LE()); //static
+	_eqY = static_cast<int32>(rs->readUint32LE()); //static
 
 	_camera = this; //static
 

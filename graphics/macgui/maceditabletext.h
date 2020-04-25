@@ -28,6 +28,7 @@
 
 namespace Graphics {
 
+class MacMenu;
 class MacText;
 class MacWidget;
 class MacWindow;
@@ -52,21 +53,25 @@ struct SelectedText {
 
 class MacEditableText : public MacText, public MacWidget {
 public:
-	MacEditableText(int w, int h, MacWindowManager *wm, Common::U32String s, const MacFont *font, int fgcolor, int bgcolor,
+	MacEditableText(MacWidget *parent, int x, int y, int w, int h, MacWindowManager *wm, Common::U32String s, const MacFont *font, int fgcolor, int bgcolor,
 			int maxWidth = -1, TextAlign textAlignment = kTextAlignLeft, int interlinear = 0);
-	MacEditableText(int w, int h, MacWindowManager *wm, const Common::String &s, const MacFont *font, int fgcolor, int bgcolor,
+	MacEditableText(MacWidget *parent, int x, int y, int w, int h, MacWindowManager *wm, const Common::String &s, const MacFont *font, int fgcolor, int bgcolor,
 			int maxWidth = -1, TextAlign textAlignment = kTextAlignLeft, int interlinear = 0);
 			// 0 pixels between the lines by default
 	virtual ~MacEditableText();
 
 	virtual void resize(int w, int h);
 
-	virtual bool processEvent(Common::Event &event);
+	virtual bool processEvent(Common::Event &event) override;
 
-	virtual bool draw(ManagedSurface *g, bool forceRedraw = false);
+	virtual bool draw(ManagedSurface *g, bool forceRedraw = false) override;
+	virtual bool draw(bool forceRedraw = false) override;
+	virtual void blit(ManagedSurface *g, Common::Rect &dest) override;
 
 	void setTextFont(const MacFont *macFont);
 	const MacFont *getTextFont();
+
+	virtual void setActive(bool active) override;
 
 	void appendText(Common::U32String str, const MacFont *macFont, bool skipAdd = false);
 	void appendText(const Common::String &str, const MacFont *macFont, bool skipAdd = false);
@@ -121,7 +126,6 @@ private:
 	const Font *_fontRef;
 
 	ManagedSurface *_cursorSurface;
-	ManagedSurface _composeSurface;
 
 	bool _inTextSelection;
 	SelectedText _selectedText;

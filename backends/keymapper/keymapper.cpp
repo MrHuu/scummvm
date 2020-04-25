@@ -62,9 +62,16 @@ void Keymapper::clear() {
 	_hardwareInputs = nullptr;
 }
 
-void Keymapper::registerHardwareInputSet(HardwareInputSet *inputs) {
-	if (_hardwareInputs)
-		error("Hardware input set already registered");
+void Keymapper::registerHardwareInputSet(HardwareInputSet *inputs, KeymapperDefaultBindings *backendDefaultBindings) {
+	bool reloadMappings = false;
+	if (_hardwareInputs) {
+		reloadMappings = true;
+		delete _hardwareInputs;
+	}
+	if (_backendDefaultBindings) {
+		reloadMappings = true;
+		delete _backendDefaultBindings;
+	}
 
 	if (!inputs) {
 		warning("No hardware input were defined, using defaults");
@@ -75,13 +82,11 @@ void Keymapper::registerHardwareInputSet(HardwareInputSet *inputs) {
 	}
 
 	_hardwareInputs = inputs;
-}
-
-void Keymapper::registerBackendDefaultBindings(KeymapperDefaultBindings *backendDefaultBindings) {
-	if (!_keymaps.empty())
-		error("Backend default bindings must be defined before adding keymaps");
-
 	_backendDefaultBindings = backendDefaultBindings;
+
+	if (reloadMappings) {
+		reloadAllMappings();
+	}
 }
 
 void Keymapper::addGlobalKeymap(Keymap *keymap) {
@@ -113,6 +118,10 @@ void Keymapper::initKeymap(Keymap *keymap, ConfigManager::Domain *domain) {
 	}
 
 	keymap->setConfigDomain(domain);
+	reloadKeymapMappings(keymap);
+}
+
+void Keymapper::reloadKeymapMappings(Keymap *keymap) {
 	keymap->setHardwareInputs(_hardwareInputs);
 	keymap->setBackendDefaultBindings(_backendDefaultBindings);
 	keymap->loadMappings();
@@ -143,7 +152,7 @@ Keymap *Keymapper::getKeymap(const String &id) const {
 
 void Keymapper::reloadAllMappings() {
 	for (uint i = 0; i < _keymaps.size(); i++) {
-		_keymaps[i]->loadMappings();
+		reloadKeymapMappings(_keymaps[i]);
 	}
 }
 
@@ -162,11 +171,12 @@ List<Event> Keymapper::mapEvent(const Event &ev) {
 	hardcodedEventMapping(ev);
 
 	List<Event> mappedEvents;
-	if (!mapEvent(ev, _enabledKeymapType, mappedEvents)) {
+	bool matchedAction = mapEvent(ev, _enabledKeymapType, mappedEvents);
+	if (!matchedAction) {
 		// If we found actions matching this input in the game / gui keymaps,
 		// no need to look at the global keymaps. An input resulting in actions
 		// from system and game keymaps would lead to unexpected user experience.
-		mapEvent(ev, Keymap::kKeymapTypeGlobal, mappedEvents);
+		matchedAction = mapEvent(ev, Keymap::kKeymapTypeGlobal, mappedEvents);
 	}
 
 	if (ev.type == EVENT_JOYAXIS_MOTION && ev.joystick.axis < ARRAYSIZE(_joystickAxisPreviouslyPressed)) {
@@ -177,14 +187,7 @@ List<Event> Keymapper::mapEvent(const Event &ev) {
 		}
 	}
 
-	// Ignore keyboard repeat events. Repeat event are meant for text input,
-	// the keymapper / keymaps are supposed to be disabled during text input.
-	// TODO: Add a way to keep repeat events if needed.
-	if (!mappedEvents.empty() && ev.type == EVENT_KEYDOWN && ev.kbdRepeat) {
-		return List<Event>();
-	}
-
-	if (mappedEvents.empty()) {
+	if (!matchedAction) {
 		// if it didn't get mapped, just pass it through
 		mappedEvents.push_back(ev);
 	}
@@ -286,11 +289,20 @@ Event Keymapper::executeAction(const Action *action, const Event &incomingEvent)
 		return outgoingEvent;
 	}
 
+	if (incomingEvent.type == EVENT_KEYDOWN && incomingEvent.kbdRepeat && !action->shouldTriggerOnKbdRepeats()) {
+		outgoingEvent.type = EVENT_INVALID;
+		return outgoingEvent;
+	}
+
 	EventType convertedType = convertStartToEnd(outgoingEvent.type);
 
 	// hardware keys need to send up instead when they are up
 	if (incomingType == kIncomingEventEnd) {
 		outgoingEvent.type = convertedType;
+	}
+
+	if (outgoingEvent.type == EVENT_KEYDOWN && incomingEvent.type == EVENT_KEYDOWN) {
+		outgoingEvent.kbdRepeat = incomingEvent.kbdRepeat;
 	}
 
 	if (isMouseEvent(outgoingEvent)) {

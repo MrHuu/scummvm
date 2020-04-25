@@ -62,7 +62,8 @@ enum {
 	kWMModeAutohideMenu 	= (1 << 1),
 	kWMModalMenuMode 		= (1 << 2),
 	kWMModeForceBuiltinFonts= (1 << 3),
-	kWMModeUnicode			= (1 << 4)
+	kWMModeUnicode			= (1 << 4),
+	kWMModeManualDrawWidgets= (1 << 5)
 };
 
 }
@@ -81,6 +82,7 @@ typedef Common::Array<byte *> MacPatterns;
 
 struct MacPlotData {
 	Graphics::ManagedSurface *surface;
+	Graphics::ManagedSurface *mask;
 	MacPatterns *patterns;
 	uint fillType;
 	int fillOriginX;
@@ -88,8 +90,8 @@ struct MacPlotData {
 	int thickness;
 	uint bgColor;
 
-	MacPlotData(Graphics::ManagedSurface *s, MacPatterns *p, uint f, int fx, int fy, int t, uint bg) :
-		surface(s), patterns(p), fillType(f), fillOriginX(fx), fillOriginY(fy), thickness(t), bgColor(bg) {
+	MacPlotData(Graphics::ManagedSurface *s, Graphics::ManagedSurface *m, MacPatterns *p, uint f, int fx, int fy, int t, uint bg) :
+		surface(s), mask(m), patterns(p), fillType(f), fillOriginX(fx), fillOriginY(fy), thickness(t), bgColor(bg) {
 	}
 };
 
@@ -162,7 +164,7 @@ public:
 	 * Set the desired window state to active.
 	 * @param id ID of the window that has to be set to active.
 	 */
-	void setActive(int id);
+	void setActiveWindow(int id);
 	/**
 	 * Mark a window for removal.
 	 * Note that the window data will be destroyed.
@@ -211,7 +213,7 @@ public:
 	void pushCrossHairCursor();
 	void pushCrossBarCursor();
 	void pushWatchCursor();
-	void pushCustomCursor(byte *data, int w, int h, int transcolor);
+	void pushCustomCursor(const byte *data, int w, int h, int hx, int hy, int transcolor);
 	void popCursor();
 
 	void pauseEngine(bool pause);

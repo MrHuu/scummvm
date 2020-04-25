@@ -25,8 +25,6 @@
 #include "ultima/ultima8/world/actors/main_actor.h"
 #include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/world/get_object.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -114,18 +112,18 @@ uint32 HealProcess::I_feedAvatar(const uint8 *args, unsigned int /*argsize*/) {
 }
 
 
-void HealProcess::saveData(ODataSource *ods) {
-	Process::saveData(ods);
+void HealProcess::saveData(Common::WriteStream *ws) {
+	Process::saveData(ws);
 
-	ods->write2(_healCounter);
-	ods->write2(_hungerCounter);
+	ws->writeUint16LE(_healCounter);
+	ws->writeUint16LE(_hungerCounter);
 }
 
-bool HealProcess::loadData(IDataSource *ids, uint32 version) {
-	if (!Process::loadData(ids, version)) return false;
+bool HealProcess::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Process::loadData(rs, version)) return false;
 
-	_healCounter = ids->read2();
-	_hungerCounter = ids->read2();
+	_healCounter = rs->readUint16LE();
+	_hungerCounter = rs->readUint16LE();
 
 	return true;
 }

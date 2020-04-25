@@ -29,11 +29,18 @@ namespace LC {
 	void c_xpop();
 	void c_printtop();
 
+	Datum mapBinaryOp(Datum (*func)(Datum, Datum), Datum d1, Datum d2);
+	Datum addData(Datum d1, Datum d2);
 	void c_add();
+	Datum subData(Datum d1, Datum d2);
 	void c_sub();
+	Datum mulData(Datum d1, Datum d2);
 	void c_mul();
+	Datum divData(Datum d1, Datum d2);
 	void c_div();
+	Datum modData(Datum d1, Datum d2);
 	void c_mod();
+	Datum negateData(Datum d1);
 	void c_negate();
 
 	void c_and();
@@ -78,6 +85,7 @@ namespace LC {
 	void c_swap();
 
 	void c_theentitypush();
+	void c_themenuentitypush();
 	void c_theentityassign();
 	void c_themenuitementityassign();
 	void c_objectfieldpush();
@@ -93,11 +101,18 @@ namespace LC {
 	void c_tell();
 	void c_telldone();
 	void c_exitRepeat();
+	Datum compareArrays(Datum (*compareFunc)(Datum, Datum), Datum d1, Datum d2);
+	Datum eqData(Datum d1, Datum d2);
 	void c_eq();
+	Datum neqData(Datum d1, Datum d2);
 	void c_neq();
+	Datum gtData(Datum d1, Datum d2);
 	void c_gt();
+	Datum ltData(Datum d1, Datum d2);
 	void c_lt();
+	Datum geData(Datum d1, Datum d2);
 	void c_ge();
+	Datum leData(Datum d1, Datum d2);
 	void c_le();
 	void c_jump();
 	void c_jumpifz();
@@ -120,7 +135,6 @@ namespace LC {
 	void c_property();
 
 	void c_play();
-	void c_playdone();
 
 	void c_open();
 	void c_hilite();

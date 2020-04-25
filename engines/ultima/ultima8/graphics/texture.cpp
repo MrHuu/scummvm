@@ -27,10 +27,12 @@
 #include "ultima/ultima8/graphics/texture_png.h"
 #include "ultima/ultima8/graphics/render_surface.h"
 
-#include <cstring>
-
 namespace Ultima {
 namespace Ultima8 {
+
+
+Texture::Texture() : _format(TEX_FMT_STANDARD), _glTex(0), _next(nullptr) {
+}
 
 //
 // Destructor
@@ -44,9 +46,9 @@ Texture::~Texture() {
 #define TRY_TYPE(TextureType)               \
 	tex = new TextureType();                    \
 	/* If read failed, delete the texture. */   \
-	if (!tex->Read(ds)) {                       \
+	if (!tex->Read(rs)) {                       \
 		delete tex;                             \
-		tex = 0;                                \
+		tex = nullptr;                          \
 	}                                           \
 	else {                                      \
 		/* Worked so return it */               \
@@ -63,7 +65,7 @@ void Texture::create(uint16 width, uint16 height, TextureFormat textureFormat) {
 // Create a texture from a Data Source
 // (filename is used to help detection of type)
 //
-Texture *Texture::Create(IDataSource *ds, const char *filename) {
+Texture *Texture::Create(Common::SeekableReadStream *rs, const char *filename) {
 	Texture *tex;
 
 	if (filename) {
@@ -87,7 +89,7 @@ Texture *Texture::Create(IDataSource *ds, const char *filename) {
 	TRY_TYPE(TextureTarga);
 
 	// Couldn't find it
-	return 0;
+	return nullptr;
 }
 
 void Texture::loadSurface(const Graphics::Surface *surf) {

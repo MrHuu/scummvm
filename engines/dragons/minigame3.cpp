@@ -169,12 +169,12 @@ void Minigame3::run() {
 	delete fd;
 
 	origInventoryType = _vm->_inventory->getState();
-//	fade_related_calls_with_1f();
+	_vm->fadeToBlack();
 	_vm->_inventory->setState(Closed);
 	_vm->reset_screen_maybe();
 	flicker = _vm->_dragonINIResource->getFlickerRecord();
 	flicker->sceneId = 0;
-	_vm->_dragonINIResource->setFlickerRecord(NULL);
+	_vm->_dragonINIResource->setFlickerRecord(nullptr);
 	origSceneId = _vm->getCurrentSceneId();
 	_vm->_scene->setSceneId(6);
 	_vm->_scene->loadScene(6 | 0x8000, 0);
@@ -201,7 +201,7 @@ void Minigame3::run() {
 	int i = 0;
 	while ((int16)i < 4) {
 		bunnyActorTbl[(int16)i] = _vm->_actorManager->loadActor(0x15, 4, 0, 0);
-		if (bunnyActorTbl[(int16)i] == NULL) {
+		if (bunnyActorTbl[(int16)i] == nullptr) {
 			error("Couldn't_alloc_bunny");
 		}
 		bunnyActorTbl[(int16)i]->setFlag(ACTOR_FLAG_80);
@@ -217,7 +217,7 @@ void Minigame3::run() {
 	i = 0;
 	while ((int16)i < 8) {
 		tearActorTbl[(int16)i] = _vm->_actorManager->loadActor(0x15, 0x13, 0, 0);
-		if (tearActorTbl[(int16)i] == NULL) {
+		if (tearActorTbl[(int16)i] == nullptr) {
 			error("Couldn't alloc tear");
 		}
 		tearActorTbl[(int16)i]->_flags = tearActorTbl[(int16)i]->_flags | 0x380;
@@ -230,7 +230,7 @@ void Minigame3::run() {
 	local_1e0 = 0;
 	local_1e8 = 0;
 	handActorId = _vm->_actorManager->loadActor(0x19, 0, 0, 0);
-	if (handActorId == NULL) {
+	if (handActorId == nullptr) {
 		error("Couldn't alloc hand");
 	}
 	handActorId->setFlag(ACTOR_FLAG_80);
@@ -245,7 +245,7 @@ void Minigame3::run() {
 	i = 0;
 	while ((int16)i < 2) {
 		tearBlinkActorTbl[(int16)i] = _vm->_actorManager->loadActor(0x34, (uint)i, 0, 0);
-		if (tearBlinkActorTbl[(int16)i] == NULL) {
+		if (tearBlinkActorTbl[(int16)i] == nullptr) {
 			error("Couldn't alloc tear blink");
 		}
 		tearBlinkActorTbl[(int16)i]->_flags = tearBlinkActorTbl[(int16)i]->_flags | 0x4384;
@@ -256,7 +256,7 @@ void Minigame3::run() {
 	i = 0;
 	while ((int16)i < 2) {
 		tearBlinkActorTbl2[(int16)i] = _vm->_actorManager->loadActor(0x16, (uint)i, 0, 0);
-		if (tearBlinkActorTbl2[(int16)i] == NULL) {
+		if (tearBlinkActorTbl2[(int16)i] == nullptr) {
 			error("Couldn't alloc tear blink");
 		}
 		tearBlinkActorTbl2[(int16)i]->setFlag(ACTOR_FLAG_100);
@@ -292,7 +292,7 @@ void Minigame3::run() {
 	updateBackgroundLayerOffset(2, 0x280, 0);
 	updateBackgroundLayerOffset(1, 0, 0);
 	updateBackgroundLayerOffset(0, 0, 0);
-//	call_fade_related_1f();
+	_vm->fadeFromBlack();
 	_vm->waitForFrames(0xf);
 	_vm->_talk->loadAndDisplayDialogAroundPoint(0x479A, 0x14, 3, 0x1e01, 0);
 	_vm->waitForFrames(0x1e);
@@ -732,7 +732,7 @@ void Minigame3::run() {
 	}
 	_vm->waitForFrames(0x3c * 2);
 	_vm->_sound->PauseCDMusic();
-//	fade_related_calls_with_1f();
+	_vm->fadeToBlack();
 //	fun_80017f28_noop();
 //	DAT_80093234 = DAT_80093234 + 1;
 	_vm->_dragonINIResource->setFlickerRecord(flicker);

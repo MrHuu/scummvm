@@ -47,6 +47,7 @@
 #include "ultima/ultima8/world/get_object.h"
 #include "ultima/ultima8/world/item_factory.h"
 #include "ultima/ultima8/world/actors/quick_avatar_mover_process.h"
+#include "ultima/ultima8/world/actors/avatar_mover_process.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
 #include "ultima/ultima8/world/actors/pathfinder.h"
 
@@ -82,6 +83,7 @@ Debugger::Debugger() : Shared::Debugger() {
 	registerCmd("Ultima8Engine::togglePaintEditorItems", WRAP_METHOD(Debugger, cmdTogglePaintEditorItems));
 	registerCmd("Ultima8Engine::toggleShowTouchingItems", WRAP_METHOD(Debugger, cmdToggleShowTouchingItems));
 	registerCmd("Ultima8Engine::closeItemGumps", WRAP_METHOD(Debugger, cmdCloseItemGumps));
+	registerCmd("AvatarMoverProcess::setFakeBothButtonClick", WRAP_METHOD(Debugger, cmdBothButtonClick));
 
 	registerCmd("AudioProcess::listSFX", WRAP_METHOD(Debugger, cmdListSFX));
 	registerCmd("AudioProcess::playSFX", WRAP_METHOD(Debugger, cmdPlaySFX));
@@ -262,9 +264,9 @@ bool Debugger::cmdListGames(int argc, const char **argv) {
 	Ultima8Engine *app = Ultima8Engine::get_instance();
 	Std::vector<istring> games;
 	games = app->_settingMan->listGames();
-	Std::vector<istring>::iterator iter;
+	Std::vector<istring>::const_iterator iter;
 	for (iter = games.begin(); iter != games.end(); ++iter) {
-		istring _game = *iter;
+		const istring &_game = *iter;
 		GameInfo *info = app->getGameInfo(_game);
 		debugPrintf("%s: ", _game.c_str());
 		if (info) {
@@ -324,13 +326,13 @@ bool Debugger::cmdMemberVar(int argc, const char **argv) {
 	Ultima8Engine *g = Ultima8Engine::get_instance();
 
 	// Set the pointer to the correct type
-	bool *b = 0;
-	int *i = 0;
-	Std::string *str = 0;
-	istring *istr = 0;
+	bool *b = nullptr;
+	int *i = nullptr;
+	Std::string *str = nullptr;
+	istring *istr = nullptr;
 
 	// ini entry name if supported
-	const char *ini = 0;
+	const char *ini = nullptr;
 
 	if (!scumm_stricmp(argv[1], "_frameLimit")) {
 		b = &g->_frameLimit;
@@ -392,7 +394,7 @@ bool Debugger::cmdListSFX(int argc, const char **argv) {
 		debugPrintf("Error: No AudioProcess\n");
 
 	} else {
-		Std::list<AudioProcess::SampleInfo>::iterator it;
+		Std::list<AudioProcess::SampleInfo>::const_iterator it;
 		for (it = ap->_sampleInfo.begin(); it != ap->_sampleInfo.end(); ++it) {
 			debugPrintf("Sample: num %d, obj %d, loop %d, prio %d",
 				it->_sfxNum, it->_objId, it->_loops, it->_priority);
@@ -685,7 +687,7 @@ bool Debugger::cmdToggleInvincibility(int argc, const char **argv) {
 	}
 	MainActor *av = getMainActor();
 
-	if (av->getActorFlags() & Actor::ACT_INVINCIBLE) {
+	if (av->hasActorFlags(Actor::ACT_INVINCIBLE)) {
 		av->clearActorFlag(Actor::ACT_INVINCIBLE);
 		debugPrintf("Avatar is no longer invincible.\n");
 	} else {
@@ -796,12 +798,12 @@ bool Debugger::cmdDumpMap(int argc, const char **argv) {
 	sprintf(buf, "%02d", World::get_instance()->getCurrentMap()->getNum());
 	filename += buf;
 	filename += ".png";
-	ODataSource *ds = FileSystem::get_instance()->WriteFile(filename);
+	Common::WriteStream *ws = FileSystem::get_instance()->WriteFile(filename);
 	Std::string pngcomment = "Map ";
 	pngcomment += buf;
 	pngcomment += ", dumped by Pentagram.";
 
-	PNGWriter *pngw = new PNGWriter(ds);
+	PNGWriter *pngw = new PNGWriter(ws);
 	pngw->init(awidth, aheight, pngcomment);
 
 	// Now render the map
@@ -843,7 +845,7 @@ bool Debugger::cmdDumpMap(int argc, const char **argv) {
 	pngw->finish();
 	delete pngw;
 
-	delete ds;
+	delete ws;
 
 	delete g;
 	delete s;
@@ -1041,7 +1043,7 @@ bool Debugger::cmdListMarks(int argc, const char **argv) {
 	SettingManager *settings = SettingManager::get_instance();
 	Std::vector<istring> marks;
 	marks = settings->listDataKeys("marks");
-	for (Std::vector<istring>::iterator iter = marks.begin();
+	for (Std::vector<istring>::const_iterator iter = marks.begin();
 		iter != marks.end(); ++iter) {
 		debugPrintf("%s\n", iter->c_str());
 	}
@@ -1095,6 +1097,19 @@ bool Debugger::cmdUseBedroll(int argc, const char **argv) {
 bool Debugger::cmdUseKeyring(int argc, const char **argv) {
 	MainActor *av = getMainActor();
 	av->useInventoryItem(79);
+	return false;
+}
+
+bool Debugger::cmdBothButtonClick(int argc, const char **argv) {
+	if (Ultima8Engine::get_instance()->isAvatarInStasis()) {
+		debugPrintf("Can't: avatarInStasis\n");
+		return true;
+	}
+	AvatarMoverProcess *proc = Ultima8Engine::get_instance()->getAvatarMoverProcess();
+
+	if (proc) {
+		proc->setFakeBothButtonClick();
+	}
 	return false;
 }
 
@@ -1431,14 +1446,14 @@ bool Debugger::cmdPlayMovie(int argc, const char **argv) {
 
 	Std::string filename = Common::String::format("@game/static/%s.skf", argv[1]);
 	FileSystem *filesys = FileSystem::get_instance();
-	IDataSource *skf = filesys->ReadFile(filename);
+	Common::SeekableReadStream *skf = filesys->ReadFile(filename);
 	if (!skf) {
 		debugPrintf("movie not found.\n");
 		return true;
 	}
 
 	RawArchive *flex = new RawArchive(skf);
-	MovieGump::U8MovieViewer(flex);
+	MovieGump::U8MovieViewer(flex, false);
 	return false;
 }
 

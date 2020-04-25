@@ -26,6 +26,8 @@
 
 namespace Graphics {
 
+#define DEBUG 0
+
 const Font *MacFontRun::getFont() {
 	if (font)
 		return font;
@@ -151,6 +153,8 @@ void MacText::splitString(Common::U32String &str) {
 	bool nextChunk = false;
 	MacFontRun previousFormatting;
 
+	debug(9, "******** splitString: \"%s\"", toPrintable(str.encode()).c_str());
+
 	while (*s) {
 #if DEBUG
 		for (uint i = 0; i < _textLines.size(); i++) {
@@ -159,7 +163,7 @@ void MacText::splitString(Common::U32String &str) {
 			for (uint j = 0; j < _textLines[i].chunks.size(); j++)
 				debugN(9, "[%d] \"%s\"", _textLines[i].chunks[j].fontId, Common::toPrintable(_textLines[i].chunks[j].text.encode()).c_str());
 
-			debug(9, " --> %c %d, '%s'", (*s > 0x20 ? *s : ' '), (byte)*s, Common::toPrintable(tmp.encode()).c_str());
+			debug(9, " --> '%c' 0x%02x, \"%s\"", (*s > 0x20 ? *s : ' '), (byte)*s, Common::toPrintable(tmp.encode()).c_str());
 		}
 #endif
 
@@ -293,6 +297,18 @@ void MacText::splitString(Common::U32String &str) {
 			}
 		}
 	}
+
+#if DEBUG
+	debug(9, "Result:");
+	for (uint i = 0; i < _textLines.size(); i++) {
+		debugN(9, "%2d ", i);
+
+		for (uint j = 0; j < _textLines[i].chunks.size(); j++)
+			debugN(9, "[%d] \"%s\"", _textLines[i].chunks[j].fontId, Common::toPrintable(_textLines[i].chunks[j].text.encode()).c_str());
+
+		debug(9, " --> '%c' 0x%02x, \"%s\"", (*s > 0x20 ? *s : ' '), (byte)*s, Common::toPrintable(tmp.encode()).c_str());
+	}
+#endif
 }
 
 void MacText::reallocSurface() {
@@ -346,6 +362,12 @@ void MacText::render(int from, int to) {
 		else if (_textAlignment == kTextAlignCenter)
 			xOffset = (_textMaxWidth / 2) - (getLineWidth(i) / 2);
 
+		int maxHeightForRow = 0;
+		for (uint j = 0; j < _textLines[i].chunks.size(); j++) {
+			if (_textLines[i].chunks[j].font->getFontHeight() > maxHeightForRow)
+				maxHeightForRow = _textLines[i].chunks[j].font->getFontHeight();
+		}
+
 		// TODO: _textMaxWidth, when -1, was not rendering ANY text.
 		for (uint j = 0; j < _textLines[i].chunks.size(); j++) {
 			debug(9, "MacText::render: line %d[%d] h:%d at %d,%d (%s) fontid: %d on %dx%d",
@@ -355,7 +377,14 @@ void MacText::render(int from, int to) {
 			if (_textLines[i].chunks[j].text.empty())
 				continue;
 
-			_textLines[i].chunks[j].getFont()->drawString(_surface, _textLines[i].chunks[j].text, xOffset, _textLines[i].y, w, _fgcolor);
+			//TODO: There might be a vertical alignment setting somewhere for differing font sizes in a single row?
+			int yOffset = 0;
+			if (_textLines[i].chunks[j].font->getFontHeight() < maxHeightForRow) {
+				//TODO: determine where the magic value 2 comes from
+				yOffset = maxHeightForRow - _textLines[i].chunks[j].font->getFontHeight() - 2;
+			}
+
+			_textLines[i].chunks[j].getFont()->drawString(_surface, _textLines[i].chunks[j].text, xOffset, _textLines[i].y + yOffset, w, _fgcolor);
 			xOffset += _textLines[i].chunks[j].getFont()->getStringWidth(_textLines[i].chunks[j].text);
 		}
 	}

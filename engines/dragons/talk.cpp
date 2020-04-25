@@ -169,7 +169,7 @@ uint8 Talk::conversation_related_maybe(uint16 *dialogText, uint16 x, uint16 y, u
 		_vm->clearFlags(ENGINE_FLAG_8);
 	}
 	tmpTextPtr = findCharInU16Str(dialogText, 0x5c);
-	if (tmpTextPtr != NULL) {
+	if (tmpTextPtr != nullptr) {
 		sVar3 = tmpTextPtr[1];
 		*tmpTextPtr = sVar3;
 		while (sVar3 != 0) {
@@ -579,7 +579,7 @@ bool Talk::talkToActor(ScriptOpCall &scriptOpCall) {
 		}
 
 		selectedDialogText = displayTalkDialogMenu(dialogEntries);
-		if (selectedDialogText == NULL) {
+		if (selectedDialogText == nullptr) {
 			callMaybeResetData();
 			exitTalkMenu(isFlag8Set, isFlag100Set, dialogEntries);
 			return true;
@@ -647,7 +647,6 @@ TalkDialogEntry *Talk::displayTalkDialogMenu(Common::Array<TalkDialogEntry*> dia
 	uint uVar7;
 	uint16 uVar8;
 	TalkDialogEntry *talkDialogEntry;
-	uint16 local_430 [80];
 	uint16 local_390[5];
 	uint16 local_386 [195];
 	uint16 asStack512 [200];
@@ -660,11 +659,7 @@ TalkDialogEntry *Talk::displayTalkDialogMenu(Common::Array<TalkDialogEntry*> dia
 	bool hasDialogEntries;
 	uint16 *_dat_80083104;
 
-	talkDialogEntry = NULL;
-	for (int i = 0; i < 0x24; i++) {
-		local_430[i] = 0x20;
-	}
-	local_430[0x24] = 0;
+	talkDialogEntry = nullptr;
 
 	uVar8 = 0;
 	local_60 = 0;
@@ -864,7 +859,7 @@ void Talk::talkFromIni(uint32 iniId, uint32 textIndex) {
 	if (textIndex == 0) {
 		return;
 	}
-	Actor *actor = NULL;
+	Actor *actor = nullptr;
 	if (iniId == 0) {
 		//TODO playSoundFromTxtIndex(textIndex);
 		actor = _vm->_dragonINIResource->getFlickerRecord()->actor;
@@ -892,7 +887,7 @@ void Talk::talkFromIni(uint32 iniId, uint32 textIndex) {
 //	if (((unkFlags1 & 1) == 0) && (((engine_flags_maybe & 0x1000) == 0 || (sVar1 == -1)))) {
 //		pcVar2 = load_string_from_dragon_txt(textIndex, acStack2016);
 //	}
-	_vm->_talk->displayDialogAroundINI(iniId, dialog, textIndex); //TODO need to pass dialog here (pcVar2). not NULL
+	_vm->_talk->displayDialogAroundINI(iniId, dialog, textIndex); //TODO need to pass dialog here (pcVar2). not nullptr
 	if (iniId == 0) {
 		if (!_vm->isFlagSet(ENGINE_FLAG_2000000)) {
 			if (_vm->getCurrentSceneId() != 0x32) {
@@ -1014,7 +1009,7 @@ uint16 *Talk::findCharInU16Str(uint16 *text, uint16 chr) {
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 uint16 *Talk::UTF16ToUTF16Z(uint16 *dest, uint16 *src) {

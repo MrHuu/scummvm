@@ -26,9 +26,6 @@
 #include "ultima/ultima8/world/item.h"
 #include "ultima/ultima8/world/get_object.h"
 
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
-
 namespace Ultima {
 namespace Ultima8 {
 
@@ -65,7 +62,7 @@ void DestroyItemProcess::run() {
 
 	// FIXME: should probably prevent player from opening gump in the
 	// first place...
-	if (it->getFlags() & Item::FLG_GUMP_OPEN) {
+	if (it->hasFlags(Item::FLG_GUMP_OPEN)) {
 		// first close gump in case player is still rummaging through us
 		it->closeGump();
 	}
@@ -77,12 +74,12 @@ void DestroyItemProcess::run() {
 	// NOTE: we're terminated here because this process belongs to the item
 }
 
-void DestroyItemProcess::saveData(ODataSource *ods) {
-	Process::saveData(ods);
+void DestroyItemProcess::saveData(Common::WriteStream *ws) {
+	Process::saveData(ws);
 }
 
-bool DestroyItemProcess::loadData(IDataSource *ids, uint32 version) {
-	if (!Process::loadData(ids, version)) return false;
+bool DestroyItemProcess::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Process::loadData(rs, version)) return false;
 
 	return true;
 }

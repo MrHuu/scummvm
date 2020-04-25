@@ -146,7 +146,7 @@ static const char *const selectorNameTable[] = {
 	"handleEvent",  // EcoQuest 2, Shivers
 #ifdef ENABLE_SCI32
 	"newWith",      // SCI2 array script
-	"posn",         // SCI2 benchmarking script
+	"posn",         // GK1, Phant2, QFG4
 	"printLang",    // GK2
 	"view",         // RAMA benchmarking, GK1, QFG4
 	"fade",         // Shivers
@@ -396,22 +396,31 @@ static const uint16 sci21IntArrayPatch[] = {
 // to overflow, leading to randomly disabled effects. This patch changes the
 // benchmarking code to always return the game's maximum speed value.
 //
-// Applies to at least: GK1 floppy, PQ4 floppy, PQ4CD, LSL6hires, Phant1,
-// Shivers, SQ6
+// The speed test function in script 64908 changes between games and is compiled
+//  differently between versions of the same game, so to generically patch this
+//  we replace the call-sites with zero, which is the fastest result. RAMA's
+//  speed test function reverses this and returns a high value for fast machines
+//  so it requires a different patch.
+//
+// Applies to: GK1, PQ4, LSL6hires, Phant1, Shivers, SQ6, RAMA
 static const uint16 sci2BenchmarkSignature[] = {
 	SIG_MAGICDWORD,
-	0x38, SIG_SELECTOR16(init),  // pushi init
-	0x76,                        // push0
-	0x38, SIG_SELECTOR16(posn),  // pushi posn
+	0x76,                       // push0
+	0x46, SIG_UINT16(0xfd8c),   // calle proc64908_0 [ speed test function ] 
+	      SIG_UINT16(0x0000),
+	      SIG_UINT16(0x0000),
 	SIG_END
 };
 
 static const uint16 sci2BenchmarkPatch[] = {
-	0x7a,                         // push2
-	0x38, SIG_UINT16(64908),      // pushi 64908
-	0x76,                         // push0
-	0x43, 0x03, SIG_UINT16(0x04), // callk DisposeScript[3], 4
-	0x48,                         // ret
+	0x35, 0x00,                 // ldi 00 [ fastest speed test result ]
+	0x33, 0x04,                 // jmp 04
+	PATCH_END
+};
+
+static const uint16 sci2BenchmarkReversePatch[] = {
+	0x34, PATCH_UINT16(0x2710), // ldi 10000 [ fastest speed test result for RAMA ]
+	0x33, 0x03,                 // jmp 03
 	PATCH_END
 };
 
@@ -2210,7 +2219,6 @@ static const SciScriptPatcherEntry hoyle5Signatures[] = {
 	{  true,   200, "fix setScale calls",                         11, hoyle5SetScaleSignature,          hoyle5PatchSetScale },
 	{  true,   500, "remove kGetTime spin",                        1, hoyle5SignatureSpinLoop,          hoyle5PatchSpinLoop },
 	{  true, 64937, "remove kGetTime spin",                        1, hoyle5SignatureSpinLoop,          hoyle5PatchSpinLoop },
-	{  true, 64908, "disable video benchmarking",                  1, sci2BenchmarkSignature,           sci2BenchmarkPatch },
 	{  true,   733, "bridge arithmetic against object ",           1, hoyle5SignatureBridgeArithmetic,  hoyle5PatchBridgeArithmetic },
 	{  true, 64990, "increase number of save games (1/2)",         1, sci2NumSavesSignature1,           sci2NumSavesPatch1 },
 	{  true, 64990, "increase number of save games (2/2)",         1, sci2NumSavesSignature2,           sci2NumSavesPatch2 },
@@ -2225,7 +2233,6 @@ static const SciScriptPatcherEntry hoyle5ChildrensCollectionSignatures[] = {
 	{  true,   200, "fix setScale calls",                         11, hoyle5SetScaleSignature,          hoyle5PatchSetScale },
 	{  true,   500, "remove kGetTime spin",                        1, hoyle5SignatureSpinLoop,          hoyle5PatchSpinLoop },
 	{  true, 64937, "remove kGetTime spin",                        1, hoyle5SignatureSpinLoop,          hoyle5PatchSpinLoop },
-	{  true, 64908, "disable video benchmarking",                  1, sci2BenchmarkSignature,           sci2BenchmarkPatch },
 	{  true,   975, "disable Gin Rummy",                           1, hoyle5SignatureGinRummy,          hoyle5PatchDisableGame },
 	{  true,   975, "disable Cribbage",                            1, hoyle5SignatureCribbage,          hoyle5PatchDisableGame },
 	{  true,   975, "disable Klondike",                            1, hoyle5SignatureKlondike,          hoyle5PatchDisableGame },
@@ -2242,7 +2249,6 @@ static const SciScriptPatcherEntry hoyle5BridgeSignatures[] = {
 	{  true,    23, "remove kGetTime spin",                        1, hoyle5SignatureSpinLoop,          hoyle5PatchSpinLoop },
 	{  true,   500, "remove kGetTime spin",                        1, hoyle5SignatureSpinLoop,          hoyle5PatchSpinLoop },
 	{  true, 64937, "remove kGetTime spin",                        1, hoyle5SignatureSpinLoop,          hoyle5PatchSpinLoop },
-	{  true, 64908, "disable video benchmarking",                  1, sci2BenchmarkSignature,           sci2BenchmarkPatch },
 	{  true,   733, "bridge arithmetic against object ",           1, hoyle5SignatureBridgeArithmetic,  hoyle5PatchBridgeArithmetic },
 	{  true,   975, "disable Gin Rummy",                           1, hoyle5SignatureGinRummy,          hoyle5PatchDisableGame },
 	{  true,   975, "disable Cribbage",                            1, hoyle5SignatureCribbage,          hoyle5PatchDisableGame },
@@ -3365,6 +3371,7 @@ static const uint16 gk1LoreleiDanceTimerPatch[] = {
 //          script, description,                                      signature                         patch
 static const SciScriptPatcherEntry gk1Signatures[] = {
 	{  true,     0, "remove alt+n syslogger hotkey",               1, gk1SysLoggerHotKeySignature,      gk1SysLoggerHotKeyPatch },
+	{  true,    17, "disable video benchmarking",                  1, sci2BenchmarkSignature,           sci2BenchmarkPatch },
 	{  true,    51, "fix interrogation bug",                       1, gk1InterrogationBugSignature,     gk1InterrogationBugPatch },
 	{  true,    93, "fix inventory on restart",                    1, gk1RestartInventorySignature,     gk1RestartInventoryPatch },
 	{  true,   211, "fix day 1 grace phone speech timing",         1, gk1Day1GracePhoneSignature,       gk1Day1GracePhonePatch },
@@ -3389,7 +3396,6 @@ static const SciScriptPatcherEntry gk1Signatures[] = {
 	{  true,   710, "fix day 9 mummy animation (floppy)",          1, gk1MummyAnimateFloppySignature,   gk1MummyAnimateFloppyPatch },
 	{  true,   710, "fix day 9 mummy animation (cd)",              1, gk1MummyAnimateCDSignature,       gk1MummyAnimateCDPatch },
 	{  true,   800, "fix day 10 honfour unlock door lockup",       1, gk1HonfourUnlockDoorSignature,    gk1HonfourUnlockDoorPatch },
-	{  true, 64908, "disable video benchmarking",                  1, sci2BenchmarkSignature,           sci2BenchmarkPatch },
 	{  true, 64990, "increase number of save games (1/2)",         1, sci2NumSavesSignature1,           sci2NumSavesPatch1 },
 	{  true, 64990, "increase number of save games (2/2)",         1, sci2NumSavesSignature2,           sci2NumSavesPatch2 },
 	{  true, 64990, "disable change directory button",             1, sci2ChangeDirSignature,           sci2ChangeDirPatch },
@@ -5245,10 +5251,35 @@ static const uint16 kq7SnakeOilSalesmanPatch[] = {
 	PATCH_END
 };
 
+// KQ7 allows a maximum of 10 save games but English version 2.00 introduced a
+//  script bug which removed the check that enforces this. We add the missing
+//  check so that the game doesn't break. Sierra later released English version
+//  2.00b whose only change was to fix this.
+//
+// Applies to: English PC 2.00
+// Responsible method: startBut:doVerb
+static const uint16 kq7TooManySavesSignature[] = {
+	0x47, 0x15, 0x00, SIG_UINT16(0x0000),   // calle proc21_0 [ get save count ]
+	0xa5, 0x00,                             // sat 00 [ unused ]
+	SIG_MAGICDWORD,
+	0x35, 0x00,                             // ldi 00
+	0x31, 0x16,                             // bnt 16 [ allow save ]
+	SIG_END
+};
+
+static const uint16 kq7TooManySavesPatch[] = {
+	PATCH_ADDTOOFFSET(+5),
+	0x36,                                   // push
+	0x35, 0x0a,                             // ldi 0a
+	0x20,                                   // ge? [ save count >= 10 ]
+	PATCH_END
+};
+
 //          script, description,                                      signature                                 patch
 static const SciScriptPatcherEntry kq7Signatures[] = {
 	{  true,     0, "disable video benchmarking",                  1, kq7BenchmarkSignature,                    kq7BenchmarkPatch },
 	{  true,     0, "remove hardcoded spin loop",                  1, kq7PragmaFailSpinSignature,               kq7PragmaFailSpinPatch },
+	{  true,    30, "fix allowing too many saves",                 1, kq7TooManySavesSignature,                 kq7TooManySavesPatch },
 	{  true,  5300, "fix snake oil salesman disposal",             1, kq7SnakeOilSalesmanSignature,             kq7SnakeOilSalesmanPatch },
 	{  true,  6100, "fix extra ambrosia",                          1, kq7ExtraAmbrosiaSignature,                kq7ExtraAmbrosiaPatch },
 	{  true,    31, "enable subtitles (1/3)",                      1, kq7SubtitleFixSignature1,                 kq7SubtitleFixPatch1 },
@@ -6165,8 +6196,8 @@ static const uint16 larry6HiresVolumeResetPatch[] = {
 static const SciScriptPatcherEntry larry6HiresSignatures[] = {
 	{  true,    71, "disable volume reset on startup (1/2)",       1, sci2VolumeResetSignature,         sci2VolumeResetPatch },
 	{  true,    71, "disable volume reset on startup (2/2)",       1, larry6HiresVolumeResetSignature,  larry6HiresVolumeResetPatch },
+	{  true,    71, "disable video benchmarking",                  1, sci2BenchmarkSignature,           sci2BenchmarkPatch },
 	{  true,   270, "fix incorrect setScale call",                 1, larry6HiresSetScaleSignature,     larry6HiresSetScalePatch },
-	{  true, 64908, "disable video benchmarking",                  1, sci2BenchmarkSignature,           sci2BenchmarkPatch },
 	{  true, 64990, "increase number of save games (1/2)",         1, sci2NumSavesSignature1,           sci2NumSavesPatch1 },
 	{  true, 64990, "increase number of save games (2/2)",         1, sci2NumSavesSignature2,           sci2NumSavesPatch2 },
 	{  true, 64990, "disable change directory button",             1, sci2ChangeDirSignature,           sci2ChangeDirPatch },
@@ -8456,6 +8487,7 @@ static const SciScriptPatcherEntry phantasmagoriaSignatures[] = {
 	{  true,    23, "make cursor red after clicking quit",         1, phant1RedQuitCursorSignature,    phant1RedQuitCursorPatch },
 	{  true,    26, "fix video 1920 censorship",                   1, phant1Video1920CensorSignature,  phant1Video1920CensorPatch },
 	{  true,    26, "fix video 2020 censorship",                   1, phant1Video2020CensorSignature,  phant1Video2020CensorPatch },
+	{  true,    33, "disable video benchmarking",                  1, sci2BenchmarkSignature,          sci2BenchmarkPatch },
 	{  true,   901, "fix invalid array construction",              1, sci21IntArraySignature,          sci21IntArrayPatch },
 	{  true,  1111, "ignore audio settings from save game",        1, phant1SavedVolumeSignature,      phant1SavedVolumePatch },
 	{  true, 20200, "fix broken rat init in sEnterFromAlcove",     1, phant1RatSignature,              phant1RatPatch },
@@ -8464,7 +8496,6 @@ static const SciScriptPatcherEntry phantasmagoriaSignatures[] = {
 	{  true, 45950, "reset stab don flag",                         1, phant1ResetStabDonFlagSignature, phant1ResetStabDonFlagPatch },
 	{  true, 45951, "copy chase file instead of rename",           1, phant1CopyChaseFileSignature,    phant1CopyChaseFilePatch },
 	{  true, 46980, "fix chapel chase west exit",                  1, phant1ChapelWestExitSignature,   phant1ChapelWestExitPatch },
-	{  true, 64908, "disable video benchmarking",                  1, sci2BenchmarkSignature,          sci2BenchmarkPatch },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -9574,6 +9605,7 @@ static const uint16 pq4LastActionHeroTimerPatch[] = {
 
 //          script, description,                                          signature                                           patch
 static const SciScriptPatcherEntry pq4Signatures[] = {
+	{  true,     6, "disable video benchmarking",                      1, sci2BenchmarkSignature,                             sci2BenchmarkPatch },
 	{  true,     9, "add speech+subtitles to in-game UI",              1, pq4CdSpeechAndSubtitlesSignature,                   pq4CdSpeechAndSubtitlesPatch },
 	{  true,   315, "fix missing points showing barbie the red shoe",  1, pq4BittyKittyShowBarieRedShoeSignature,             pq4BittyKittyShowBarbieRedShoePatch },
 	{  true,   390, "change floppy city hall use gun timer",           1, pq4FloppyCityHallDrawGunTimerSignature,             pq4FloppyCityHallDrawGunTimerPatch },
@@ -9581,7 +9613,6 @@ static const SciScriptPatcherEntry pq4Signatures[] = {
 	{  true,   390, "change floppy city hall say 'turn around' timer", 1, pq4FloppyCityHallTellEnemyTurnAroundTimerSignature, pq4FloppyCityHallTellEnemyTurnAroundTimerPatch },
 	{  true,   390, "change floppy city hall use handcuffs timer",     1, pq4FloppyCityHallCuffEnemyTimerSignature,           pq4FloppyCityHallCuffEnemyTimerPatch },
 	{  true,   755, "change last action sequence timer",               1, pq4LastActionHeroTimerSignature,                    pq4LastActionHeroTimerPatch },
-	{  true, 64908, "disable video benchmarking",                      1, sci2BenchmarkSignature,                             sci2BenchmarkPatch },
 	{  true, 64918, "fix Str::strip in floppy version",                1, sci2BrokenStrStripSignature,                        sci2BrokenStrStripPatch },
 	{  true, 64990, "increase number of save games (1/2)",             1, sci2NumSavesSignature1,                             sci2NumSavesPatch1 },
 	{  true, 64990, "increase number of save games (2/2)",             1, sci2NumSavesSignature2,                             sci2NumSavesPatch2 },
@@ -11319,6 +11350,32 @@ static const uint16 qfg3PatchJohariManuMapBugs[] = {
 	PATCH_END
 };
 
+// The NRS fan-patch, which is included with the GOG release, has a script bug
+//  which errors when angering the Guardian in room 770. This can be triggered
+//  by taking a second gem. The patch changes ego's moveSpeed from 0 to 2 in the
+//  script kickHimOut but it also mistakenly changes another 0 to 2 in the same
+//  line of code. Ego:setMotion(0) becomes Ego:setMotion(2) and errors because
+//  Actor:setMotion expects an object when passed anything other than 0.
+//
+// We fix this by reverting the accidental setMotion patch.
+//
+// Applies to: Any version with NRS patches 770.HEP/SCR, such as GOG
+// Responsible method: kickHimOut:changeState(0)
+// Fixes bug: #11411
+static const uint16 qfg3SignatureNrsAngerGuardian[] = {
+	0x38, SIG_MAGICDWORD,               // pushi setMotion
+	      SIG_SELECTOR16(setMotion),
+	0x78,                               // push1
+	0x7a,                               // push2
+	SIG_END
+};
+
+static const uint16 qfg3PatchNrsAngerGuardian[] = {
+	PATCH_ADDTOOFFSET(+4),
+	0x76,                               // push0
+	PATCH_END
+};
+
 //          script, description,                                      signature                    patch
 static const SciScriptPatcherEntry qfg3Signatures[] = {
 	{  true,   944, "import dialog continuous calls",                     1, qfg3SignatureImportDialog,           qfg3PatchImportDialog },
@@ -11337,6 +11394,7 @@ static const SciScriptPatcherEntry qfg3Signatures[] = {
 	{  true,   750, "hero goes out of bounds in room 750",                2, qfg3SignatureRoom750Bounds3,         qfg3PatchRoom750Bounds3 },
 	{  true,    29, "icon bar crash when using chest",                    1, qfg3SignatureChestIconBar,           qfg3PatchChestIconBar },
 	{  true,   170, "johari/manu map crash and message bugs",             2, qfg3SignatureJohariManuMapBugs,      qfg3PatchJohariManuMapBugs },
+	{  true,   770, "NRS: anger guardian crash",                          1, qfg3SignatureNrsAngerGuardian,       qfg3PatchNrsAngerGuardian },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -17710,22 +17768,6 @@ static const SciScriptPatcherEntry sq5Signatures[] = {
 #pragma mark -
 #pragma mark RAMA
 
-// RAMA has custom video benchmarking code that needs to be disabled; see
-// sci2BenchmarkSignature
-static const uint16 ramaBenchmarkSignature[] = {
-	0x38, SIG_SELECTOR16(view), // pushi view
-	SIG_MAGICDWORD,
-	0x78,                       // push1
-	0x38, SIG_UINT16(0xfdd4),   // pushi 64980
-	SIG_END
-};
-
-static const uint16 ramaBenchmarkPatch[] = {
-	0x34, PATCH_UINT16(0x2710), // ldi 10000
-	0x48,                       // ret
-	PATCH_END
-};
-
 // RAMA uses a custom save game format that game scripts read and write
 // manually. The save game format serialises object references, which SSCI could
 // be done just by writing int16s (since object references were just 16-bit
@@ -17824,10 +17866,11 @@ static const uint16 ramaChangeDirPatch[] = {
 };
 
 static const SciScriptPatcherEntry ramaSignatures[] = {
+	{  true,     0, "disable video benchmarking",                     1, sci2BenchmarkSignature,          sci2BenchmarkReversePatch },
+	{  true,    15, "disable video benchmarking",                     1, sci2BenchmarkSignature,          sci2BenchmarkReversePatch },
 	{  true,    55, "fix bad DocReader::init priority calculation",   1, ramaDocReaderInitSignature,      ramaDocReaderInitPatch },
 	{  true,    85, "fix SaveManager to use normal readWord calls",   1, ramaSerializeRegTSignature1,     ramaSerializeRegTPatch1 },
 	{  true,   201, "fix crash restoring save games using NukeTimer", 1, ramaNukeTimerSignature,          ramaNukeTimerPatch },
-	{  true, 64908, "disable video benchmarking",                     1, ramaBenchmarkSignature,          ramaBenchmarkPatch },
 	{  true, 64990, "disable change directory button",                1, ramaChangeDirSignature,          ramaChangeDirPatch },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
@@ -17887,10 +17930,10 @@ static const uint16 shiversGodsIxupiPlaySoundPatch[] = {
 
 //          script, description,                                      signature                           patch
 static const SciScriptPatcherEntry shiversSignatures[] = {
+	{  true,   942, "disable video benchmarking",                  1, sci2BenchmarkSignature,             sci2BenchmarkPatch },
 	{  true,   990, "fix volume & brightness sliders",             2, shiversEventSuperCallSignature,     shiversEventSuperCallPatch },
 	{  true, 23090, "fix bad Ixupi sound call",                    1, shiversGodsIxupiPlaySoundSignature, shiversGodsIxupiPlaySoundPatch },
 	{  true, 35170, "fix CCTV joystick interaction",               1, shiversEventSuperCallSignature,     shiversEventSuperCallPatch },
-	{  true, 64908, "disable video benchmarking",                  1, sci2BenchmarkSignature,             sci2BenchmarkPatch },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
 
@@ -17929,18 +17972,6 @@ static const uint16 sq6SlowTransitionSignature2[] = {
 static const uint16 sq6SlowTransitionPatch2[] = {
 	0x38, PATCH_UINT16(0x001e),         // pushi 30
 	PATCH_END
-};
-
-// SQ6 has custom video benchmarking code that needs to be disabled; see
-// sci2BenchmarkSignature. (The sci2BenchmarkPatch is suitable for use with
-// SQ6 as well.)
-static const uint16 sq6BenchmarkSignature[] = {
-	SIG_MAGICDWORD,
-	0x38, SIG_SELECTOR16(init),  // pushi init
-	0x76,                        // push0
-	0x7e, SIG_ADDTOOFFSET(+2),   // line
-	0x38, SIG_SELECTOR16(posn),  // pushi posn
-	SIG_END
 };
 
 // SQ6 advertises a maximum score of 500 but the game is missing two points.
@@ -18096,12 +18127,12 @@ static const SciScriptPatcherEntry sq6Signatures[] = {
 	{  true,    15, "fix hookah hose missing point",               1, sq6HookahHosePointSignature,     sq6HookahHosePointPatch },
 	{  true,    15, "fix invalid array construction",              1, sci21IntArraySignature,          sci21IntArrayPatch },
 	{  true,    22, "fix invalid array construction",              1, sci21IntArraySignature,          sci21IntArrayPatch },
+	{  true,    33, "disable video benchmarking",                  1, sci2BenchmarkSignature,          sci2BenchmarkPatch },
 	{  true,   410, "fix slow transitions",                        1, sq6SlowTransitionSignature2,     sq6SlowTransitionPatch2 },
 	{  true,   460, "fix invalid array construction",              1, sci21IntArraySignature,          sci21IntArrayPatch },
 	{  true,   500, "fix slow transitions",                        1, sq6SlowTransitionSignature1,     sq6SlowTransitionPatch1 },
 	{  true,   510, "fix invalid array construction",              1, sci21IntArraySignature,          sci21IntArrayPatch },
 	{  true,   690, "fix duplicate points",                        1, sq6DuplicatePointsSignature,     sq6DuplicatePointsPatch },
-	{  true, 64908, "disable video benchmarking",                  1, sq6BenchmarkSignature,           sci2BenchmarkPatch },
 	{  true, 64990, "increase number of save games (1/2)",         1, sci2NumSavesSignature1,          sci2NumSavesPatch1 },
 	{  true, 64990, "increase number of save games (2/2)",         1, sci2NumSavesSignature2,          sci2NumSavesPatch2 },
 	{  true, 64990, "disable change directory button",             1, sci2ChangeDirSignature,          sci2ChangeDirPatch },

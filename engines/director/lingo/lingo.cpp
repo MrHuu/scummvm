@@ -21,6 +21,7 @@
  */
 
 #include "common/file.h"
+#include "common/config-manager.h"
 #include "common/str-array.h"
 
 #include "director/director.h"
@@ -30,6 +31,7 @@
 #include "director/frame.h"
 #include "director/score.h"
 #include "director/sprite.h"
+#include "director/util.h"
 
 namespace Director {
 
@@ -37,11 +39,15 @@ Lingo *g_lingo;
 
 Symbol::Symbol() {
 	type = VOID;
-	u.s = NULL;
+	u.s = nullptr;
 	nargs = 0;
 	maxArgs = 0;
 	parens = true;
 	global = false;
+	argNames = nullptr;
+	varNames = nullptr;
+	ctx = nullptr;
+	archiveIndex = 0;
 }
 
 Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
@@ -49,6 +55,9 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 
 	_currentScript = 0;
 	_currentScriptType = kMovieScript;
+	_currentScriptContext = nullptr;
+	_currentScriptFunction = 0;
+
 	_currentEntityId = 0;
 	_pc = 0;
 	_returning = false;
@@ -88,10 +97,21 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 }
 
 Lingo::~Lingo() {
+	cleanupBuiltins();
+
+	if (_localvars)
+		for (SymbolHash::iterator it = _localvars->begin(); it != _localvars->end(); ++it)
+			delete it->_value;
+
+	for (SymbolHash::iterator it = _globalvars.begin(); it != _globalvars.end(); ++it)
+		delete it->_value;
+
+	for (Common::HashMap<uint32, Symbol *>::iterator it = _handlers.begin(); it != _handlers.end(); ++it)
+		delete it->_value;
 }
 
 ScriptContext *Lingo::getScriptContext(ScriptType type, uint16 id) {
-	if (type > ARRAYSIZE(_archives[_archiveIndex].scriptContexts) ||
+	if (type >= ARRAYSIZE(_archives[_archiveIndex].scriptContexts) ||
 			!_archives[_archiveIndex].scriptContexts[type].contains(id)) {
 		return NULL;
 	}
@@ -152,9 +172,9 @@ void Lingo::addCode(const char *code, ScriptType type, uint16 id) {
 
 	if (getScriptContext(type, id)) {
 		// We can't undefine context data because it could be used in e.g. symbols.
-		// Abort on double definitions.
-		error("Script already defined for type %d, id %d", id, type);
-		return;
+		// Although it has a legit case when kTheScriptText re sets code.
+		// Warn on double definitions.
+		warning("Script already defined for type %d, id %d", id, type);
 	}
 
 	_currentScriptContext = new ScriptContext;
@@ -314,44 +334,38 @@ void Lingo::restartLingo() {
 int Lingo::alignTypes(Datum &d1, Datum &d2) {
 	int opType = VOID;
 
+	if (d1.type == REFERENCE)
+		d1.makeString();
+
+	if (d2.type == REFERENCE)
+		d2.makeString();
+
 	if (d1.type == STRING) {
 		char *endPtr = 0;
-		int i = strtol(d1.u.s->c_str(), &endPtr, 10);
+		double d = strtod(d1.u.s->c_str(), &endPtr);
 		if (*endPtr == 0) {
-			d1.type = INT;
-			d1.u.i = i;
+			d1.type = FLOAT;
+			d1.u.f = d;
 		} else {
-			double d = strtod(d1.u.s->c_str(), &endPtr);
-			if (*endPtr == 0) {
-				d1.type = FLOAT;
-				d1.u.f = d;
-			} else {
-				warning("Unable to parse '%s' as a number", d1.u.s->c_str());
-			}
+			warning("Unable to parse '%s' as a number", d1.u.s->c_str());
 		}
 	}
 	if (d2.type == STRING) {
 		char *endPtr = 0;
-		int i = strtol(d2.u.s->c_str(), &endPtr, 10);
+		double d = strtod(d2.u.s->c_str(), &endPtr);
 		if (*endPtr == 0) {
-			d2.type = INT;
-			d2.u.i = i;
+			d2.type = FLOAT;
+			d2.u.f = d;
 		} else {
-			double d = strtod(d2.u.s->c_str(), &endPtr);
-			if (*endPtr == 0) {
-				d2.type = FLOAT;
-				d2.u.f = d;
-			} else {
-				warning("Unable to parse '%s' as a number", d2.u.s->c_str());
-			}
+			warning("Unable to parse '%s' as a number", d2.u.s->c_str());
 		}
 	}
 
 
 	if (d1.type == FLOAT || d2.type == FLOAT) {
 		opType = FLOAT;
-		d1.toFloat();
-		d2.toFloat();
+		d1.makeFloat();
+		d2.makeFloat();
 	} else if (d1.type == INT && d2.type == INT) {
 		opType = INT;
 	} else {
@@ -361,10 +375,10 @@ int Lingo::alignTypes(Datum &d1, Datum &d2) {
 	return opType;
 }
 
-int Datum::toInt() {
+int Datum::makeInt() {
 	switch (type) {
 	case REFERENCE:
-		toString();
+		makeString();
 		// fallthrough
 	case STRING:
 		{
@@ -385,10 +399,13 @@ int Datum::toInt() {
 		// no-op
 		break;
 	case FLOAT:
-		u.i = (int)u.f;
-		break;
+		{
+			int tmp = (int)u.f;
+			u.i = tmp;
+			break;
+		}
 	default:
-		warning("Incorrect operation toInt() for type: %s", type2str());
+		warning("Incorrect operation makeInt() for type: %s", type2str());
 	}
 
 	type = INT;
@@ -396,10 +413,10 @@ int Datum::toInt() {
 	return u.i;
 }
 
-double Datum::toFloat() {
+double Datum::makeFloat() {
 	switch (type) {
 	case REFERENCE:
-		toString();
+		makeString();
 		// fallthrough
 	case STRING:
 		{
@@ -417,13 +434,16 @@ double Datum::toFloat() {
 		u.f = 0.0;
 		break;
 	case INT:
-		u.f = (double)u.i;
+		{
+			double tmp = (double)u.i;
+			u.f = tmp;
+		}
 		break;
 	case FLOAT:
 		// no-op
 		break;
 	default:
-		warning("Incorrect operation toFloat() for type: %s", type2str());
+		warning("Incorrect operation makeFloat() for type: %s", type2str());
 	}
 
 	type = FLOAT;
@@ -431,8 +451,8 @@ double Datum::toFloat() {
 	return u.f;
 }
 
-Common::String *Datum::toString() {
-	Common::String *s = new Common::String;
+Common::String *Datum::makeString(bool printonly) {
+	Common::String *s = new Common::String();
 	switch (type) {
 	case INT:
 		*s = Common::String::format("%d", u.i);
@@ -445,42 +465,29 @@ Common::String *Datum::toString() {
 		break;
 	case FLOAT:
 		*s = Common::String::format(g_lingo->_floatPrecisionFormat.c_str(), u.f);
+		if (printonly)
+			*s += "f";		// 0.0f
 		break;
 	case STRING:
-		*s = *u.s;
+		if (!printonly) {
+			*s = *u.s;
+		} else {
+			*s = Common::String::format("\"%s\"", u.s->c_str());
+		}
 		break;
 	case SYMBOL:
-		switch (u.i) {
-		case INT:
-			*s = "#integer";
-			break;
-		case FLOAT:
-			*s = "#float";
-			break;
-		case STRING:
-			*s = "#string";
-			break;
-		case SYMBOL:
-			*s = "#symbol";
-			break;
-		case OBJECT:
-			*s = "#object";
-			break;
-		case VOID:
-			*s = "#void";
-			break;
-		case VAR:
-			*s = "#scumm-var";
-			break;
-		case REFERENCE:
-			*s = "#scumm-ref";
-			break;
-		default:
-			*s = Common::String::format("#unknown%d", u.i);
+		if (!printonly) {
+			*s = Common::String::format("#%s", u.s->c_str());
+		} else {
+			*s = Common::String::format("symbol: #%s", u.s->c_str());
 		}
 		break;
 	case OBJECT:
-		*s = Common::String::format("#%s", u.s->c_str());
+		if (!printonly) {
+			*s = Common::String::format("#%s", u.s->c_str());
+		} else {
+			*s = Common::String::format("object: #%s", u.s->c_str());
+		}
 		break;
 	case VOID:
 		*s = "#void";
@@ -494,14 +501,14 @@ Common::String *Datum::toString() {
 			Score *score = g_director->getCurrentScore();
 
 			if (!score) {
-				warning("toString(): No score");
+				warning("makeString(): No score");
 				*s = "";
 				break;
 			}
 
 			if (!score->_loadedCast->contains(idx)) {
 				if (!score->_loadedCast->contains(idx - score->_castIDoffset)) {
-					warning("toString(): Unknown REFERENCE %d", idx);
+					warning("makeString(): Unknown REFERENCE %d", idx);
 					*s = "";
 					break;
 				} else {
@@ -509,7 +516,11 @@ Common::String *Datum::toString() {
 				}
 			}
 
-			*s = ((TextCast *)score->_loadedCast->getVal(idx))->_ptext;
+			if (!printonly) {
+				*s = ((TextCast *)score->_loadedCast->getVal(idx))->_ptext;
+			} else {
+				*s = Common::String::format("reference: \"%s\"", ((TextCast *)score->_loadedCast->getVal(idx))->_ptext.c_str());
+			}
 		}
 		break;
 	case ARRAY:
@@ -518,14 +529,18 @@ Common::String *Datum::toString() {
 		for (uint i = 0; i < u.farr->size(); i++) {
 			if (i > 0)
 				*s += ", ";
-			*s += *u.farr->operator[](i).toString();
+			Datum d = u.farr->operator[](i);
+			*s += *d.makeString(printonly);
 		}
 
 		*s += "]";
 		break;
 	default:
-		warning("Incorrect operation toString() for type: %s", type2str());
+		warning("Incorrect operation makeString() for type: %s", type2str());
 	}
+
+	if (printonly)
+		return s;
 
 	u.s = s;
 	type = STRING;
@@ -563,6 +578,37 @@ const char *Datum::type2str(bool isk) {
 	}
 }
 
+int Datum::compareTo(Datum d) {
+	if (type == STRING && d.type == STRING) {
+		return u.s->compareTo(*d.u.s);
+	} else if (g_lingo->alignTypes(*this, d) == FLOAT) {
+		if (u.f < d.u.f) {
+			return -1;
+		} else if (u.f == d.u.f) {
+			return 0;
+		} else {
+			return 1;
+		}
+	} else {
+		if (u.i < d.u.i) {
+			return -1;
+		} else if (u.i == d.u.i) {
+			return 0;
+		} else {
+			return 1;
+		}
+	}
+}
+
+int Datum::compareToIgnoreCase(Datum d) {
+	if (type == STRING && d.type == STRING) {
+		Common::String *s1 = toLowercaseMac(u.s);
+		Common::String *s2 = toLowercaseMac(d.u.s);
+		return s1->compareTo(*s2);
+	}
+	return compareTo(d);
+}
+
 void Lingo::parseMenu(const char *code) {
 	warning("STUB: parseMenu");
 }
@@ -573,12 +619,17 @@ void Lingo::runTests() {
 	SearchMan.listMatchingMembers(fsList, "*.lingo");
 	Common::StringArray fileList;
 
-	int counter = 1;
-
-	for (Common::ArchiveMemberList::iterator it = fsList.begin(); it != fsList.end(); ++it)
-		fileList.push_back((*it)->getName());
+	// Repurpose commandline option --start-movie to run a specific lingo script.
+	if (ConfMan.hasKey("start_movie")) {
+		fileList.push_back(ConfMan.get("start_movie"));
+	} else {
+		for (Common::ArchiveMemberList::iterator it = fsList.begin(); it != fsList.end(); ++it)
+			fileList.push_back((*it)->getName());
+	}
 
 	Common::sort(fileList.begin(), fileList.end());
+
+	int counter = 1;
 
 	for (uint i = 0; i < fileList.size(); i++) {
 		Common::SeekableReadStream *const  stream = SearchMan.createReadStreamForMember(fileList[i]);

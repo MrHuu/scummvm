@@ -33,9 +33,6 @@
 #include "ultima/ultima8/audio/music_process.h"
 #include "ultima/ultima8/world/get_object.h"
 
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
-
 namespace Ultima {
 namespace Ultima8 {
 
@@ -57,7 +54,7 @@ void AvatarDeathProcess::run() {
 		return;
 	}
 
-	if (!(av->getActorFlags() & Actor::ACT_DEAD)) {
+	if (!av->hasActorFlags(Actor::ACT_DEAD)) {
 		perr << "AvatarDeathProcess: MainActor not dead" << Std::endl;
 		// avatar not dead?
 		terminate();
@@ -81,12 +78,12 @@ void AvatarDeathProcess::run() {
 	terminate();
 }
 
-void AvatarDeathProcess::saveData(ODataSource *ods) {
-	Process::saveData(ods);
+void AvatarDeathProcess::saveData(Common::WriteStream *ws) {
+	Process::saveData(ws);
 }
 
-bool AvatarDeathProcess::loadData(IDataSource *ids, uint32 version) {
-	if (!Process::loadData(ids, version)) return false;
+bool AvatarDeathProcess::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Process::loadData(rs, version)) return false;
 
 	return true;
 }

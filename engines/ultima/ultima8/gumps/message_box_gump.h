@@ -48,7 +48,7 @@ public:
 	void InitGump(Gump *newparent, bool take_focus = true) override;
 	void Close(bool no_del = false) override;
 
-	bool loadData(IDataSource *ids, uint32 version);
+	bool loadData(Common::ReadStream *rs, uint32 version);
 
 	void PaintThis(RenderSurface *, int32 lerp_factor, bool scaled) override;
 
@@ -66,7 +66,7 @@ public:
 	void ChildNotify(Gump *child, uint32 msg) override;
 
 protected:
-	void saveData(ODataSource *ods) override;
+	void saveData(Common::WriteStream *ws) override;
 };
 
 } // End of namespace Ultima8

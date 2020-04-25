@@ -26,8 +26,6 @@
 #include "ultima/ultima8/gumps/widgets/button_widget.h"
 #include "ultima/ultima8/usecode/uc_list.h"
 #include "ultima/ultima8/usecode/uc_machine.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -117,17 +115,17 @@ void AskGump::ChildNotify(Gump *child, uint32 message) {
 	}
 }
 
-void AskGump::saveData(ODataSource *ods) {
-	ItemRelativeGump::saveData(ods);
+void AskGump::saveData(Common::WriteStream *ws) {
+	ItemRelativeGump::saveData(ws);
 
-	_answers->save(ods);
+	_answers->save(ws);
 }
 
-bool AskGump::loadData(IDataSource *ids, uint32 version) {
-	if (!ItemRelativeGump::loadData(ids, version)) return false;
+bool AskGump::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!ItemRelativeGump::loadData(rs, version)) return false;
 
 	_answers = new UCList(2);
-	_answers->load(ids, version);
+	_answers->load(rs, version);
 
 	// HACK ALERT
 	int px = 0, py = 0;
@@ -138,7 +136,7 @@ bool AskGump::loadData(IDataSource *ids, uint32 version) {
 
 	for (unsigned int i = 0; i < _answers->getSize(); ++i) {
 
-		ButtonWidget *child = 0;
+		ButtonWidget *child = nullptr;
 
 		Std::list<Gump *>::iterator it;
 		for (it = _children.begin(); it != _children.end(); ++it) {

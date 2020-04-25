@@ -45,20 +45,24 @@ enum {
 
 static void cursorTimerHandler(void *refCon);
 
-MacEditableText::MacEditableText(int w, int h, MacWindowManager *wm, Common::U32String s, const MacFont *macFont, int fgcolor, int bgcolor, int maxWidth, TextAlign textAlignment, int interlinear) :
-		MacWidget(w, h, true), MacText(s, wm, macFont, fgcolor, bgcolor, maxWidth, textAlignment, interlinear) {
+MacEditableText::MacEditableText(MacWidget *parent, int x, int y, int w, int h, MacWindowManager *wm, Common::U32String s, const MacFont *macFont, int fgcolor, int bgcolor, int maxWidth, TextAlign textAlignment, int interlinear) :
+		MacWidget(parent, x, y, w, h, true), MacText(s, wm, macFont, fgcolor, bgcolor, maxWidth, textAlignment, interlinear) {
 
 	_maxWidth = maxWidth;
 
 	init();
+
+	_font = macFont;
 }
 
-MacEditableText::MacEditableText(int w, int h, MacWindowManager *wm, const Common::String &s, const MacFont *macFont, int fgcolor, int bgcolor, int maxWidth, TextAlign textAlignment, int interlinear) :
-		MacWidget(w, h, true), MacText(s, wm, macFont, fgcolor, bgcolor, maxWidth, textAlignment, interlinear) {
+MacEditableText::MacEditableText(MacWidget *parent, int x, int y, int w, int h, MacWindowManager *wm, const Common::String &s, const MacFont *macFont, int fgcolor, int bgcolor, int maxWidth, TextAlign textAlignment, int interlinear) :
+		MacWidget(parent, x, y, w, h, true), MacText(s, wm, macFont, fgcolor, bgcolor, maxWidth, textAlignment, interlinear) {
 
 	_maxWidth = maxWidth;
 
 	init();
+
+	_font = macFont;
 }
 
 void MacEditableText::init() {
@@ -70,6 +74,8 @@ void MacEditableText::init() {
 	_scrollPos = 0;
 	_editable = true;
 	_selectable = true;
+
+	_menu = nullptr;
 
 	_cursorX = 0;
 	_cursorY = 0;
@@ -83,16 +89,31 @@ void MacEditableText::init() {
 	_cursorRect = new Common::Rect(0, 0, 1, kCursorHeight);
 
 	_cursorSurface = new ManagedSurface(1, kCursorHeight);
-	_cursorSurface->fillRect(*_cursorRect, _wm->_colorBlack);
+	_cursorSurface->clear(_wm->_colorBlack);
 
-	g_system->getTimerManager()->installTimerProc(&cursorTimerHandler, 200000, this, "macEditableText");
+	_composeSurface = new ManagedSurface(_dims.width(), _dims.height());
+	_composeSurface->clear(_wm->_colorWhite);
 }
 
 MacEditableText::~MacEditableText() {
+	setActive(false);
+
 	delete _cursorRect;
 	delete _cursorSurface;
+	delete _composeSurface;
+}
 
-	g_system->getTimerManager()->removeTimerProc(&cursorTimerHandler);
+void MacEditableText::setActive(bool active) {
+	if (_active == active)
+		return;
+
+	MacWidget::setActive(active);
+
+	if (_active) {
+		g_system->getTimerManager()->installTimerProc(&cursorTimerHandler, 200000, this, "macEditableText");
+	} else {
+		g_system->getTimerManager()->removeTimerProc(&cursorTimerHandler);
+	}
 }
 
 void MacEditableText::resize(int w, int h) {
@@ -142,14 +163,14 @@ const MacFont *MacEditableText::getTextFont() {
 	return _font;
 }
 
-bool MacEditableText::draw(ManagedSurface *g, bool forceRedraw) {
+bool MacEditableText::draw(bool forceRedraw) {
 	if (!_scrollbarIsDirty && !_contentIsDirty && !_cursorDirty && !_inputIsDirty && !forceRedraw)
 		return false;
 
 	if (_scrollbarIsDirty || forceRedraw) {
 		drawScrollbar();
 
-		_composeSurface.clear(_wm->_colorWhite);
+		_composeSurface->clear(_wm->_colorWhite);
 	}
 
 	if (_inputIsDirty || forceRedraw) {
@@ -158,21 +179,31 @@ bool MacEditableText::draw(ManagedSurface *g, bool forceRedraw) {
 	}
 
 	_contentIsDirty = false;
+	_cursorDirty = false;
 
 	// Compose
-	MacText::draw(&_composeSurface, 0, _scrollPos, _surface->w - 2, _scrollPos + _surface->h - 2, kConWOverlap - 2, kConWOverlap - 2);
+	MacText::draw(_composeSurface, 0, _scrollPos, _surface->w, _scrollPos + _surface->h, kConWOverlap - 2, kConWOverlap - 2);
 
 	if (_cursorState)
-		_composeSurface.blitFrom(*_cursorSurface, *_cursorRect, Common::Point(_cursorX + kConWOverlap - 2, _cursorY + kConHOverlap - 2));
+		_composeSurface->blitFrom(*_cursorSurface, *_cursorRect, Common::Point(_cursorX + kConWOverlap - 2, _cursorY + kConHOverlap - 2));
 
 	if (_selectedText.endY != -1)
 		drawSelection();
 
-	//_composeSurface.transBlitFrom(_borderSurface, kColorGreen);
+	return true;
+}
 
-	g->transBlitFrom(_composeSurface, _composeSurface.getBounds(), Common::Point(_dims.left - 2, _dims.top - 2), kColorGreen2);
+bool MacEditableText::draw(ManagedSurface *g, bool forceRedraw) {
+	if (!draw(forceRedraw))
+		return false;
+
+	g->transBlitFrom(*_composeSurface, _composeSurface->getBounds(), Common::Point(_dims.left - 2, _dims.top - 2), kColorGreen2);
 
 	return true;
+}
+
+void MacEditableText::blit(ManagedSurface *g, Common::Rect &dest) {
+	g->transBlitFrom(*_composeSurface, _composeSurface->getBounds(), dest, kColorGreen2);
 }
 
 void MacEditableText::drawSelection() {
@@ -224,7 +255,7 @@ void MacEditableText::drawSelection() {
 			numLines--;
 		}
 
-		byte *ptr = (byte *)_composeSurface.getBasePtr(x1 + kConWOverlap - 2, y + kConWOverlap - 2);
+		byte *ptr = (byte *)_composeSurface->getBasePtr(x1 + kConWOverlap - 2, y + kConWOverlap - 2);
 
 		for (int x = x1; x < x2; x++, ptr++)
 			if (*ptr == _wm->_colorBlack)
@@ -291,14 +322,9 @@ Common::U32String MacEditableText::cutSelection() {
 }
 
 bool MacEditableText::processEvent(Common::Event &event) {
-	WindowClick click = kBorderInner; //_parent->isInBorder(event.mouse.x, event.mouse.y);
-
 	if (event.type == Common::EVENT_KEYDOWN) {
 		if (!_editable)
 			return false;
-
-		// Make the parent window active
-		_wm->setActive(_parent->getId());
 
 		if (event.kbd.flags & (Common::KBD_ALT | Common::KBD_CTRL | Common::KBD_META)) {
 			return false;
@@ -344,73 +370,41 @@ bool MacEditableText::processEvent(Common::Event &event) {
 		return true;
 	}
 
-	if (click == kBorderScrollUp || click == kBorderScrollDown) {
-		if (event.type == Common::EVENT_LBUTTONDOWN) {
-			int consoleHeight = getDimensions().height();
-			int textFullSize = MacText::getTextHeight();
-			float scrollPos = (float)_scrollPos / textFullSize;
-			float scrollSize = (float)consoleHeight / textFullSize;
-
-			setScroll(scrollPos, scrollSize);
-
-			return true;
-		} else if (event.type == Common::EVENT_LBUTTONUP) {
-			switch (click) {
-			case kBorderScrollUp:
-				scroll(-1);
-				break;
-			case kBorderScrollDown:
-				scroll(1);
-				break;
-			default:
-				return false;
-			}
-
-			return true;
-		}
-
+	if (!_selectable)
 		return false;
-	}
 
-	if (click == kBorderInner) {
-		if (!_selectable)
-			return false;
+	if (event.type == Common::EVENT_LBUTTONDOWN) {
+		startMarking(event.mouse.x, event.mouse.y);
 
-		if (event.type == Common::EVENT_LBUTTONDOWN) {
-			startMarking(event.mouse.x, event.mouse.y);
+		return true;
+	} else if (event.type == Common::EVENT_LBUTTONUP && _menu) {
+		if (_inTextSelection) {
+			_inTextSelection = false;
 
-			return true;
-		} else if (event.type == Common::EVENT_LBUTTONUP && _menu) {
-			if (_inTextSelection) {
-				_inTextSelection = false;
+			if (_selectedText.endY == -1 ||
+					(_selectedText.endX == _selectedText.startX && _selectedText.endY == _selectedText.startY)) {
+				_selectedText.startY = _selectedText.endY = -1;
+				_contentIsDirty = true;
+				_menu->enableCommand("Edit", "Copy", false);
+			} else {
+				_menu->enableCommand("Edit", "Copy", true);
 
-				if (_selectedText.endY == -1 ||
-						(_selectedText.endX == _selectedText.startX && _selectedText.endY == _selectedText.startY)) {
-					_selectedText.startY = _selectedText.endY = -1;
-					_contentIsDirty = true;
-					_menu->enableCommand("Edit", "Copy", false);
-				} else {
-					_menu->enableCommand("Edit", "Copy", true);
+				bool cutAllowed = isCutAllowed();
 
-					bool cutAllowed = isCutAllowed();
-
-					_menu->enableCommand("Edit", "Cut", cutAllowed);
-					_menu->enableCommand("Edit", "Clear", cutAllowed);
-				}
-			}
-
-			return true;
-		} else if (event.type == Common::EVENT_MOUSEMOVE) {
-			if (_inTextSelection) {
-				updateTextSelection(event.mouse.x, event.mouse.y);
-				return true;
+				_menu->enableCommand("Edit", "Cut", cutAllowed);
+				_menu->enableCommand("Edit", "Clear", cutAllowed);
 			}
 		}
 
-		return false;
+		return true;
+	} else if (event.type == Common::EVENT_MOUSEMOVE) {
+		if (_inTextSelection) {
+			updateTextSelection(event.mouse.x, event.mouse.y);
+			return true;
+		}
 	}
 
-	return _parent->processEvent(event);
+	return false;
 }
 
 void MacEditableText::scroll(int delta) {
@@ -460,9 +454,6 @@ void MacEditableText::updateTextSelection(int x, int y) {
 void MacEditableText::undrawInput() {
 	for (uint i = 0; i < _inputTextHeight; i++)
 		MacText::removeLastLine();
-
-	if (_inputTextHeight)
-		appendText("\n", _font, true);
 
 	_inputTextHeight = 0;
 }

@@ -39,8 +39,6 @@
 #include "ultima/ultima8/graphics/fonts/font.h"
 #include "ultima/ultima8/ultima8.h"
 #include "ultima/ultima8/graphics/render_surface.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -167,11 +165,11 @@ ProcId MessageBoxGump::Show(Std::string _title, Std::string _message, uint32 tit
 	return gump->GetNotifyProcess()->getPid();
 }
 
-void MessageBoxGump::saveData(ODataSource *ods) {
+void MessageBoxGump::saveData(Common::WriteStream *ws) {
 	CANT_HAPPEN_MSG("Trying to load ModalGump");
 }
 
-bool MessageBoxGump::loadData(IDataSource *ids, uint32 version) {
+bool MessageBoxGump::loadData(Common::ReadStream *rs, uint32 version) {
 	CANT_HAPPEN_MSG("Trying to load ModalGump");
 
 	return false;

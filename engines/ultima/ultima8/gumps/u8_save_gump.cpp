@@ -35,8 +35,6 @@
 #include "ultima/ultima8/gumps/paged_gump.h"
 #include "ultima/ultima8/world/get_object.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 #include "common/savefile.h"
 #include "common/translation.h"
 
@@ -69,7 +67,7 @@ void U8SaveGump::InitGump(Gump *newparent, bool take_focus) {
 
 	Shape *entryShape;
 	entryShape = GameData::get_instance()->getShape(entry_id);
-	ShapeFrame *sf = entryShape->getFrame(entry_id._frameNum);
+	const ShapeFrame *sf = entryShape->getFrame(entry_id._frameNum);
 	int entrywidth = sf->_width;
 	int entryheight = sf->_height;
 
@@ -328,7 +326,8 @@ Gump *U8SaveGump::showLoadSaveGump(Gump *parent, bool save) {
 		// can't _save if game over
 		// FIXME: this check should probably be in Game or GUIApp
 		MainActor *av = getMainActor();
-		if (!av || (av->getActorFlags() & Actor::ACT_DEAD)) return 0;
+		if (!av || av->hasActorFlags(Actor::ACT_DEAD))
+			return nullptr;
 	}
 
 	PagedGump *gump = new PagedGump(34, -38, 3, 35);

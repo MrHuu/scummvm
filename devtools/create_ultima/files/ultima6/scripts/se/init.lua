@@ -4,13 +4,42 @@ local lua_file = nil
 lua_file = nuvie_load("common/common.lua"); lua_file();
 
 function dbg(msg_string)
-	io.stderr:write(msg_string)
+	--io.stderr:write(msg_string)
 end
 
 function load_game()
 end
 
 function save_game()
+end
+
+local g_tile_to_object_map = {
+-- Trees
+[50] = 5000, [51] = 5000, [64] = 5000, [65] = 5000, [66] = 5000,
+[67] = 5000, [68] = 5000, [69] = 5000, [70] = 5000, [71] = 5000,
+[72] = 5000, [192] = 5000, [193] = 5000, [194] = 5000, [195] = 5000,
+[198] = 5000, [179] = 5000, [180] = 5000, [130] = 5000,
+-- Oven Fire
+[16] = 5001, [17] = 5001, [18] = 5001, [19] = 5001, [20] = 5001,
+[21] = 5001, [22] = 5001, [23] = 5001, [24] = 5001, [25] = 5001,
+[26] = 5001, [27] = 5001, [170] = 5001, [171] = 5001,
+-- Yucca Plant
+[52] = 5002,
+}
+
+function get_tile_to_object_mapping(tile_num)
+    return g_tile_to_object_map[tile_num]
+end
+
+local g_is_object_a_tile = {
+[5000] = true, [5001] = true, [5002] = true
+}
+
+function is_tile_object(obj_num)
+    if g_is_object_a_tile[obj_num] ~= nil then
+        return true
+    end
+    return false
 end
 
 local g_container_obj_tbl = {
@@ -29,7 +58,7 @@ function search(obj)
    if obj.on_map == false then
       return
    end
-   
+
    local found_obj = false
    local child
    local first_loop = true
@@ -51,18 +80,18 @@ function search(obj)
       script_wait(50)
       first_loop = false
    end
-   
+
    if prev_obj ~= nil then
       printfl("SEARCH_LAST_OBJ", prev_obj.look_string)
       Obj.moveToMap(prev_obj, obj.x, obj.y, obj.z)
    end
-   
+
    if found_obj == false then
       printl("SEARCHING_HERE_YOU_FIND_NOTHING")
    else
       print(".\n")
    end
-   
+
 end
 
 --tile_num, readied location
@@ -132,8 +161,8 @@ function obj_get_readiable_location(obj)
 	if g_readiable_objs_tbl[obj.tile_num] ~= nil then
 		return g_readiable_objs_tbl[obj.tile_num]
 	end
-	
-	return -1	
+
+	return -1
 end
 
 function create_object_needs_quan(obj_n)
@@ -152,7 +181,7 @@ if type(actor_load) == "function" then
 	actor_load()
 else
 	if type(actor_load) == "string" then
-		io.stderr:write(actor_load);
+		--io.stderr:write(actor_load);
 	end
 end
 

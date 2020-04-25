@@ -43,8 +43,6 @@
 #include "ultima/ultima8/gumps/widgets/edit_widget.h"
 #include "ultima/ultima8/gumps/u8_save_gump.h"
 #include "ultima/ultima8/world/get_object.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 #include "ultima/ultima8/meta_engine.h"
 #include "engines/dialogs.h"
 
@@ -108,15 +106,11 @@ void MenuGump::InitGump(Gump *newparent, bool take_focus) {
 	ModalGump::InitGump(newparent, take_focus);
 
 	_shape = GameData::get_instance()->getGumps()->getShape(gumpShape);
-	ShapeFrame *sf = _shape->getFrame(0);
-	assert(sf);
-
-	_dims.w = sf->_width;
-	_dims.h = sf->_height;
+	UpdateDimsFromShape();
 
 	Shape *logoShape;
 	logoShape = GameData::get_instance()->getGumps()->getShape(paganShape);
-	sf = logoShape->getFrame(0);
+	const ShapeFrame *sf = logoShape->getFrame(0);
 	assert(sf);
 
 	Gump *logo = new Gump(42, 10, sf->_width, sf->_height);
@@ -187,7 +181,7 @@ bool MenuGump::OnKeyDown(int key, int mod) {
 		if (key == Common::KEYCODE_ESCAPE) {
 			// FIXME: this check should probably be in Game or GUIApp
 			MainActor *av = getMainActor();
-			if (av && !(av->getActorFlags() & Actor::ACT_DEAD))
+			if (av && !av->hasActorFlags(Actor::ACT_DEAD))
 				Close(); // don't allow closing if dead/game over
 		} else if (key >= Common::KEYCODE_1 && key <= Common::KEYCODE_9) {
 			selectEntry(key - Common::KEYCODE_1 + 1);
@@ -223,7 +217,7 @@ void MenuGump::selectEntry(int entry) {
 
 	switch (entry) {
 	case 1: // Intro
-		Game::get_instance()->playIntroMovie();
+		Game::get_instance()->playIntroMovie(true);
 		break;
 	case 2:
 	case 3: // Read/Write Diary
@@ -245,7 +239,7 @@ void MenuGump::selectEntry(int entry) {
 		if (quotes) Game::get_instance()->playQuotes();
 		break;
 	case 8: // End Game
-		if (endgame) Game::get_instance()->playEndgameMovie();
+		if (endgame) Game::get_instance()->playEndgameMovie(true);
 		break;
 	default:
 		break;

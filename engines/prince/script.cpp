@@ -442,6 +442,17 @@ Interpreter::Interpreter(PrinceEngine *vm, Script *script, InterpreterFlags *fla
 	_fgOpcodePC = _script->getStartGameOffset();
 	_bgOpcodePC = 0;
 
+	_currentInstruction = 0;
+	_lastOpcode = 0;
+	_lastInstruction = 0;
+
+	_string = nullptr;
+	_currentString = 0;
+
+	_stringStack.string = nullptr;
+	_stringStack.dialogData = nullptr;
+	_stringStack.currentString = 0;
+
 	memset(_stringBuf, 1, 1024);
 }
 
@@ -1014,7 +1025,7 @@ void Interpreter::O_GETMOBTEXT() {
 	int32 mob = readScriptFlagValue();
 	debugInterpreter("O_GETMOBTEXT mob %d", mob);
 	_currentString = _vm->_locationNr * 100 + mob + 60001;
-	strncpy((char *)_stringBuf, _vm->_mobList[mob]._examText.c_str(), 1024);
+	strncpy((char *)_stringBuf, _vm->_mobList[mob]._examText.c_str(), 1023);
 	_string = _stringBuf;
 }
 
@@ -1831,7 +1842,7 @@ void Interpreter::O_DISABLENAK() {
 void Interpreter::O_GETMOBNAME() {
 	int32 modId = readScriptFlagValue();
 	debugInterpreter("O_GETMOBNAME modId %d", modId);
-	strncpy((char *)_stringBuf, _vm->_mobList[modId]._name.c_str(), 1024);
+	strncpy((char *)_stringBuf, _vm->_mobList[modId]._name.c_str(), 1023);
 	_string = _stringBuf;
 }
 

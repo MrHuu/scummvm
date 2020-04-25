@@ -25,6 +25,7 @@
 #define ULTIMA8_ULTIMA8
 
 #include "common/scummsys.h"
+#include "common/stream.h"
 #include "common/system.h"
 #include "common/archive.h"
 #include "common/error.h"
@@ -49,8 +50,8 @@
 namespace Ultima {
 namespace Ultima8 {
 
-#define DEFAULT_SCREEN_WIDTH 640
-#define DEFAULT_SCREEN_HEIGHT 480
+#define DEFAULT_SCREEN_WIDTH 320
+#define DEFAULT_SCREEN_HEIGHT 200
 
 class Debugger;
 class Kernel;
@@ -70,8 +71,6 @@ class ObjectManager;
 class FontManager;
 class Mouse;
 class AvatarMoverProcess;
-class IDataSource;
-class ODataSource;
 class Texture;
 class AudioMixer;
 
@@ -143,13 +142,13 @@ private:
 
 private:
 	//! write savegame info (time, ..., game-specifics)
-	void writeSaveInfo(ODataSource *ods);
+	void writeSaveInfo(Common::WriteStream *ws);
 
 	//! save CoreApp/Ultima8Engine data
-	void save(ODataSource *ods);
+	void save(Common::WriteStream *ws);
 
 	//! load CoreApp/Ultima8Engine data
-	bool load(IDataSource *ids, uint32 version);
+	bool load(Common::ReadStream *rs, uint32 version);
 
 	//! reset engine (including World, UCMachine, a.o.)
 	void resetEngine();

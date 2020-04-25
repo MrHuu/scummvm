@@ -70,16 +70,16 @@ public:
 
 	MacMenuSubMenu *getSubmenu(MacMenuSubMenu *submenu, int index);
 
-	bool draw(ManagedSurface *g, bool forceRedraw = false);
+	virtual bool draw(ManagedSurface *g, bool forceRedraw = false);
+	virtual bool draw(bool forceRedraw = false) { return false; }
+	virtual void blit(ManagedSurface *g, Common::Rect &dest) {}
+
 	bool processEvent(Common::Event &event);
 
 	void enableCommand(int menunum, int action, bool state);
 	void enableCommand(const char *menuitem, const char *menuaction, bool state);
 	void enableCommand(const Common::U32String &menuitem, const Common::U32String &menuaction, bool state);
 	void disableAllMenus();
-
-	void setActive(bool active) { _menuActivated = active; }
-	bool hasAllFocus() { return _menuActivated; }
 
 	bool isVisible() { return _isVisible; }
 	void setVisible(bool visible) { _isVisible = visible; _contentIsDirty = true; }
@@ -118,7 +118,6 @@ private:
 
 	const Font *_font;
 
-	bool _menuActivated;
 	bool _isVisible;
 
 	bool _dimensionsDirty;

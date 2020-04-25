@@ -58,6 +58,37 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 		0
 	},
 
+
+	{
+		// Ultima IV - Quest of the Avatar
+		{
+			"ultima4",
+			0,
+			AD_ENTRY1s("britain.ult", "304fe52ce5f34b9181052363d74d7505", 1280),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_UNSTABLE,
+			GUIO0()
+		},
+		GAME_ULTIMA4,
+		0
+	},
+
+	{
+		// Ultima IV - Quest of the Avatar
+		{
+			"ultima4_enh",
+			0,
+			AD_ENTRY1s("britain.ult", "304fe52ce5f34b9181052363d74d7505", 1280),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_UNSTABLE,
+			GUIO0()
+		},
+		GAME_ULTIMA4,
+		GF_VGA_ENHANCED
+	},
+
 	// GOG Ultima VI
 	{
 		{
@@ -153,6 +184,41 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 		GAME_ULTIMA8,
 		0
 	},
+
+	/*
+	// Crusader games use basically the same engine as ultima8, but still
+	// need a lot of work.
+
+	// GOG Crusader - No Remorse
+	{
+		{
+			"remorse",
+			"",
+			AD_ENTRY1s("eusecode.flx", "0a0f64507adc4f280129c735ee9cad42", 556613),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOMIDI)
+		},
+		GAME_CRUSADER_REM,
+		0
+	},
+
+	// GOG Crusader - No Regret
+	{
+		{
+			"regret",
+			"",
+			AD_ENTRY1s("eusecode.flx", "1bb360156b7240a1f05eb9bda01c54db", 481652),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOMIDI)
+		},
+		GAME_CRUSADER_REG,
+		0
+	},
+	*/
 
 	// GOG Martian Dreams
 	{

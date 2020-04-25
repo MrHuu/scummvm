@@ -50,16 +50,6 @@ enum {
 };
 
 enum {
-	kFontStyleBold = 1,
-	kFontStyleItalic = 2,
-	kFontStyleUnderline = 4,
-	kFontStyleOutline = 8,
-	kFontStyleShadow = 16,
-	kFontStyleCondensed = 32,
-	kFontStyleExtended = 64
-};
-
-enum {
 	kGrayed = 1,
 	kInactive = 2,
 	kPopUp = 16,
@@ -123,8 +113,6 @@ MacMenu::MacMenu(int id, const Common::Rect &bounds, MacWindowManager *wm)
 	_bbox.top = 0;
 	_bbox.right = _screen.w;
 	_bbox.bottom = kMenuHeight;
-
-	_menuActivated = false;
 
 	_dimensionsDirty = true;
 
@@ -528,19 +516,19 @@ void MacMenu::createSubMenuFromString(int id, const char *str, int commandId) {
 			while (item.size() >= 2 && item[item.size() - 2] == '<') {
 				char c = item.lastChar();
 				if (c == 'B') {
-					style |= kFontStyleBold;
+					style |= kMacFontBold;
 				} else if (c == 'I') {
-					style |= kFontStyleItalic;
+					style |= kMacFontItalic;
 				} else if (c == 'U') {
-					style |= kFontStyleUnderline;
+					style |= kMacFontUnderline;
 				} else if (c == 'O') {
-					style |= kFontStyleOutline;
+					style |= kMacFontOutline;
 				} else if (c == 'S') {
-					style |= kFontStyleShadow;
+					style |= kMacFontShadow;
 				} else if (c == 'C') {
-					style |= kFontStyleCondensed;
+					style |= kMacFontCondense;
 				} else if (c == 'E') {
-					style |= kFontStyleExtended;
+					style |= kMacFontExtend;
 				}
 				item.deleteLastChar();
 				item.deleteLastChar();
@@ -874,7 +862,9 @@ void MacMenu::renderSubmenu(MacMenuSubMenu *menu, bool recursive) {
 				_font->drawString(s, unicodeText, tx, ty, r->width(), color);
 				underlineAccelerator(s, _font, unicodeText, tx, ty, shortcutPos, color);
 			} else {
-				_font->drawString(s, text, tx, ty, r->width(), color);
+				const Font *font = getMenuFont(menu->items[i]->style);
+
+				font->drawString(s, text, tx, ty, r->width(), color);
 			}
 
 			if (!acceleratorText.empty() && shortcutPos == -1)
@@ -990,10 +980,10 @@ bool MacMenu::mouseClick(int x, int y) {
 			}
 		}
 
-		if (!_menuActivated)
+		if (!_active)
 			_wm->activateMenu();
 
-		_menuActivated = true;
+		setActive(true);
 
 		_contentIsDirty = true;
 		_wm->setFullRefresh(true);
@@ -1010,7 +1000,7 @@ bool MacMenu::mouseClick(int x, int y) {
 		return true;
 	}
 
-	if (!_menuActivated)
+	if (!_active)
 		return false;
 
 	if (_menustack.size() > 0 && _menustack.back()->bbox.contains(x, y)) {
@@ -1091,7 +1081,7 @@ bool MacMenu::mouseClick(int x, int y) {
 }
 
 bool MacMenu::mouseMove(int x, int y) {
-	if (_menuActivated) {
+	if (_active) {
 		if (mouseClick(x, y))
 			return true;
 	} else if ((_wm->_mode & kWMModeAutohideMenu) && !_bbox.contains(x, y)) {
@@ -1123,8 +1113,8 @@ bool MacMenu::checkCallback(bool unicode) {
 }
 
 bool MacMenu::mouseRelease(int x, int y) {
-	if (_menuActivated) {
-		_menuActivated = false;
+	if (_active) {
+		setActive(false);
 		if (_wm->_mode & kWMModeAutohideMenu)
 			_isVisible = false;
 
@@ -1250,7 +1240,7 @@ void MacMenu::disableAllMenus() {
 void MacMenu::eventLoop() {
 	_contentIsDirty = true;
 
-	while (_menuActivated) {
+	while (_active) {
 		Common::Event event;
 
 		while (g_system->getEventManager()->pollEvent(event)) {
@@ -1259,7 +1249,7 @@ void MacMenu::eventLoop() {
 			draw(_wm->_screen);
 		}
 
-		if (_menuActivated) {
+		if (_active) {
 			g_system->updateScreen();
 			g_system->delayMillis(10);
 		}

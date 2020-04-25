@@ -44,8 +44,6 @@
 #include "ultima/ultima8/world/loop_script.h"
 #include "ultima/ultima8/world/actors/avatar_gravity_process.h"
 #include "ultima/ultima8/audio/music_process.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -61,7 +59,7 @@ MainActor::~MainActor() {
 }
 
 GravityProcess *MainActor::ensureGravityProcess() {
-	AvatarGravityProcess *p = 0;
+	AvatarGravityProcess *p;
 	if (_gravityPid) {
 		p = p_dynamic_cast<AvatarGravityProcess *>(
 		        Kernel::get_instance()->getProcess(_gravityPid));
@@ -393,32 +391,32 @@ void MainActor::getWeaponOverlay(const WeaponOverlayFrame *&frame_, uint32 &shap
 	if (frame_ == 0) shape_ = 0;
 }
 
-void MainActor::saveData(ODataSource *ods) {
-	Actor::saveData(ods);
+void MainActor::saveData(Common::WriteStream *ws) {
+	Actor::saveData(ws);
 	uint8 jt = _justTeleported ? 1 : 0;
-	ods->write1(jt);
-	ods->write4(_accumStr);
-	ods->write4(_accumDex);
-	ods->write4(_accumInt);
+	ws->writeByte(jt);
+	ws->writeUint32LE(_accumStr);
+	ws->writeUint32LE(_accumDex);
+	ws->writeUint32LE(_accumInt);
 	uint8 namelength = static_cast<uint8>(_name.size());
-	ods->write1(namelength);
+	ws->writeByte(namelength);
 	for (unsigned int i = 0; i < namelength; ++i)
-		ods->write1(static_cast<uint8>(_name[i]));
+		ws->writeByte(static_cast<uint8>(_name[i]));
 
 }
 
-bool MainActor::loadData(IDataSource *ids, uint32 version) {
-	if (!Actor::loadData(ids, version)) return false;
+bool MainActor::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Actor::loadData(rs, version)) return false;
 
-	_justTeleported = (ids->read1() != 0);
-	_accumStr = static_cast<int32>(ids->read4());
-	_accumDex = static_cast<int32>(ids->read4());
-	_accumInt = static_cast<int32>(ids->read4());
+	_justTeleported = (rs->readByte() != 0);
+	_accumStr = static_cast<int32>(rs->readUint32LE());
+	_accumDex = static_cast<int32>(rs->readUint32LE());
+	_accumInt = static_cast<int32>(rs->readUint32LE());
 
-	uint8 namelength = ids->read1();
+	uint8 namelength = rs->readByte();
 	_name.resize(namelength);
 	for (unsigned int i = 0; i < namelength; ++i)
-		_name[i] = ids->read1();
+		_name[i] = rs->readByte();
 
 	return true;
 }

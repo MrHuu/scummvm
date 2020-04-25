@@ -27,9 +27,6 @@
 #include "ultima/ultima8/world/actors/pathfinder.h"
 #include "ultima/ultima8/world/get_object.h"
 
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
-
 namespace Ultima {
 namespace Ultima8 {
 
@@ -131,7 +128,7 @@ void PathfinderProcess::run() {
 	Actor *actor = getActor(_itemNum);
 	assert(actor);
 	// if not in the fastarea, do nothing
-	if (!(actor->getFlags() & Item::FLG_FASTAREA)) return;
+	if (!actor->hasFlags(Item::FLG_FASTAREA)) return;
 
 
 	bool ok = true;
@@ -174,7 +171,7 @@ void PathfinderProcess::run() {
 	// FIXME: this should happen before the pathfinder is actually called,
 	// since the running animation may move the actor, which could break
 	// the found _path.
-	if (actor->getActorFlags() & Actor::ACT_ANIMLOCK) {
+	if (actor->hasActorFlags(Actor::ACT_ANIMLOCK)) {
 		perr << "PathfinderProcess: ANIMLOCK, waiting" << Std::endl;
 		return;
 	}
@@ -245,38 +242,38 @@ void PathfinderProcess::run() {
 	waitFor(animpid);
 }
 
-void PathfinderProcess::saveData(ODataSource *ods) {
-	Process::saveData(ods);
+void PathfinderProcess::saveData(Common::WriteStream *ws) {
+	Process::saveData(ws);
 
-	ods->write2(_targetItem);
-	ods->write2(static_cast<uint16>(_targetX));
-	ods->write2(static_cast<uint16>(_targetY));
-	ods->write2(static_cast<uint16>(_targetZ));
-	ods->write1(_hitMode ? 1 : 0);
-	ods->write2(static_cast<uint16>(_currentStep));
+	ws->writeUint16LE(_targetItem);
+	ws->writeUint16LE(static_cast<uint16>(_targetX));
+	ws->writeUint16LE(static_cast<uint16>(_targetY));
+	ws->writeUint16LE(static_cast<uint16>(_targetZ));
+	ws->writeByte(_hitMode ? 1 : 0);
+	ws->writeUint16LE(static_cast<uint16>(_currentStep));
 
-	ods->write2(static_cast<uint16>(_path.size()));
+	ws->writeUint16LE(static_cast<uint16>(_path.size()));
 	for (unsigned int i = 0; i < _path.size(); ++i) {
-		ods->write2(static_cast<uint16>(_path[i]._action));
-		ods->write2(static_cast<uint16>(_path[i]._direction));
+		ws->writeUint16LE(static_cast<uint16>(_path[i]._action));
+		ws->writeUint16LE(static_cast<uint16>(_path[i]._direction));
 	}
 }
 
-bool PathfinderProcess::loadData(IDataSource *ids, uint32 version) {
-	if (!Process::loadData(ids, version)) return false;
+bool PathfinderProcess::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Process::loadData(rs, version)) return false;
 
-	_targetItem = ids->read2();
-	_targetX = ids->read2();
-	_targetY = ids->read2();
-	_targetZ = ids->read2();
-	_hitMode = (ids->read1() != 0);
-	_currentStep = ids->read2();
+	_targetItem = rs->readUint16LE();
+	_targetX = rs->readUint16LE();
+	_targetY = rs->readUint16LE();
+	_targetZ = rs->readUint16LE();
+	_hitMode = (rs->readByte() != 0);
+	_currentStep = rs->readUint16LE();
 
-	unsigned int pathsize = ids->read2();
+	unsigned int pathsize = rs->readUint16LE();
 	_path.resize(pathsize);
 	for (unsigned int i = 0; i < pathsize; ++i) {
-		_path[i]._action = static_cast<Animation::Sequence>(ids->read2());
-		_path[i]._direction = ids->read2();
+		_path[i]._action = static_cast<Animation::Sequence>(rs->readUint16LE());
+		_path[i]._direction = rs->readUint16LE();
 	}
 
 	return true;

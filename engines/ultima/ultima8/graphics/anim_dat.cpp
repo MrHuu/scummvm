@@ -39,24 +39,26 @@ AnimDat::AnimDat() {
 AnimDat::~AnimDat() {
 	for (unsigned int i = 0; i < _anims.size(); i++)
 		delete _anims[i];
-	_anims.clear();
 }
 
 ActorAnim *AnimDat::getAnim(uint32 shape) const {
-	if (shape >= _anims.size()) return 0;
+	if (shape >= _anims.size())
+		return nullptr;
 
 	return _anims[shape];
 }
 
 AnimAction *AnimDat::getAnim(uint32 shape, uint32 action) const {
-	if (shape >= _anims.size()) return 0;
-	if (_anims[shape] == 0) return 0;
+	if (shape >= _anims.size())
+		return nullptr;
+	if (_anims[shape] == 0)
+		return nullptr;
 
 	return _anims[shape]->getAction(action);
 }
 
 
-void AnimDat::load(IDataSource *ds) {
+void AnimDat::load(Common::SeekableReadStream *rs) {
 	AnimFrame f;
 
 	// CONSTANT !
@@ -67,11 +69,11 @@ void AnimDat::load(IDataSource *ds) {
 		actioncount = 256;
 
 	for (unsigned int shape = 0; shape < _anims.size(); shape++) {
-		ds->seek(4 * shape);
-		uint32 offset = ds->read4();
+		rs->seek(4 * shape);
+		uint32 offset = rs->readUint32LE();
 
 		if (offset == 0) {
-			_anims[shape] = 0;
+			_anims[shape] = nullptr;
 			continue;
 		}
 
@@ -81,8 +83,8 @@ void AnimDat::load(IDataSource *ds) {
 		a->_actions.resize(actioncount);
 
 		for (unsigned int action = 0; action < actioncount; action++) {
-			ds->seek(offset + action * 4);
-			uint32 actionoffset = ds->read4();
+			rs->seek(offset + action * 4);
+			uint32 actionoffset = rs->readUint32LE();
 
 			if (actionoffset == 0) {
 				a->_actions[action] = 0;
@@ -94,12 +96,12 @@ void AnimDat::load(IDataSource *ds) {
 			a->_actions[action]->_shapeNum = shape;
 			a->_actions[action]->_action = action;
 
-			ds->seek(actionoffset);
-			uint32 actionsize = ds->read1();
+			rs->seek(actionoffset);
+			uint32 actionsize = rs->readByte();
 			a->_actions[action]->_size = actionsize;
-			a->_actions[action]->_flags = ds->read1();
-			a->_actions[action]->_frameRepeat = ds->read1();
-			a->_actions[action]->_flags |= ds->read1() << 8;
+			a->_actions[action]->_flags = rs->readByte();
+			a->_actions[action]->_frameRepeat = rs->readByte();
+			a->_actions[action]->_flags |= rs->readByte() << 8;
 
 			unsigned int dirCount = 8;
 			if (GAME_IS_CRUSADER &&
@@ -113,28 +115,28 @@ void AnimDat::load(IDataSource *ds) {
 
 				for (unsigned int j = 0; j < actionsize; j++) {
 					if (GAME_IS_U8) {
-						f._frame = ds->read1(); // & 0x7FF;
-						uint8 x = ds->read1();
+						f._frame = rs->readByte(); // & 0x7FF;
+						uint8 x = rs->readByte();
 						f._frame += (x & 0x7) << 8;
-						f._deltaZ = ds->readXS(1);
-						f._sfx = ds->read1();
-						f._deltaDir = ds->readXS(1);
-						f._flags = ds->read1();
+						f._deltaZ = rs->readSByte();
+						f._sfx = rs->readByte();
+						f._deltaDir = rs->readSByte();
+						f._flags = rs->readByte();
 						f._flags += (x & 0xF8) << 8;
 					} else if (GAME_IS_CRUSADER) {
 						// byte 0: low byte of frame
-						f._frame = ds->read1();
+						f._frame = rs->readByte();
 						// byte 1: low nibble part of frame
-						uint8 x = ds->read1();
+						uint8 x = rs->readByte();
 						f._frame += (x & 0xF) << 8;
 						// byte 2, 3: unknown; byte 3 might contain flags
-						ds->skip(2);
+						rs->skip(2);
 						// byte 4: deltadir (signed)
-						f._deltaDir = ds->readXS(1);
+						f._deltaDir = rs->readSByte();
 						// byte 5: flags?
-						f._flags = ds->read1();
+						f._flags = rs->readByte();
 						// byte 6, 7: unknown
-						ds->skip(2);
+						rs->skip(2);
 
 						f._deltaZ = 0;
 						f._sfx = 0;

@@ -34,6 +34,7 @@
 #include "ultima/ultima8/filesys/raw_archive.h"
 #include "ultima/ultima8/world/item_factory.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
+#include "common/memstream.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -54,13 +55,13 @@ RemorseGame::~RemorseGame() {
 bool RemorseGame::loadFiles() {
 	// Load palette
 	pout << "Load Palette" << Std::endl;
-	IDataSource *pf = FileSystem::get_instance()->ReadFile("@game/static/gamepal.pal");
+	Common::SeekableReadStream *pf = FileSystem::get_instance()->ReadFile("@game/static/gamepal.pal");
 	if (!pf) {
 		perr << "Unable to load static/gamepal.pal." << Std::endl;
 		return false;
 	}
 
-	IBufferDataSource xfds(U8XFormPal, 1024);
+	Common::MemoryReadStream xfds(U8XFormPal, 1024);
 	PaletteManager::get_instance()->load(PaletteManager::Pal_Game, *pf, xfds);
 	delete pf;
 
@@ -107,11 +108,11 @@ bool RemorseGame::startInitialUsecode(int saveSlot) {
 }
 
 
-ProcId RemorseGame::playIntroMovie() {
+ProcId RemorseGame::playIntroMovie(bool fade) {
 	return 0;
 }
 
-ProcId RemorseGame::playEndgameMovie() {
+ProcId RemorseGame::playEndgameMovie(bool fade) {
 	return 0;
 }
 
@@ -119,42 +120,42 @@ void RemorseGame::playCredits() {
 
 }
 
-void RemorseGame::writeSaveInfo(ODataSource *ods) {
+void RemorseGame::writeSaveInfo(Common::WriteStream *ws) {
 #if 0
 	MainActor *av = getMainActor();
 	int32 x, y, z;
 
 	const Std::string &avname = av->getName();
 	uint8 namelength = static_cast<uint8>(avname.size());
-	ods->write1(namelength);
+	ws->writeByte(namelength);
 	for (unsigned int i = 0; i < namelength; ++i)
-		ods->write1(static_cast<uint8>(avname[i]));
+		ws->writeByte(static_cast<uint8>(avname[i]));
 
 	av->getLocation(x, y, z);
-	ods->write2(av->getMapNum());
-	ods->write4(static_cast<uint32>(x));
-	ods->write4(static_cast<uint32>(y));
-	ods->write4(static_cast<uint32>(z));
+	ws->writeUint16LE(av->getMapNum());
+	ws->writeUint32LE(static_cast<uint32>(x));
+	ws->writeUint32LE(static_cast<uint32>(y));
+	ws->writeUint32LE(static_cast<uint32>(z));
 
-	ods->write2(av->getStr());
-	ods->write2(av->getInt());
-	ods->write2(av->getDex());
-	ods->write2(av->getHP());
-	ods->write2(av->getMaxHP());
-	ods->write2(av->getMana());
-	ods->write2(av->getMaxMana());
-	ods->write2(av->getArmourClass());
-	ods->write2(av->getTotalWeight());
+	ws->writeUint16LE(av->getStr());
+	ws->writeUint16LE(av->getInt());
+	ws->writeUint16LE(av->getDex());
+	ws->writeUint16LE(av->getHP());
+	ws->writeUint16LE(av->getMaxHP());
+	ws->writeUint16LE(av->getMana());
+	ws->writeUint16LE(av->getMaxMana());
+	ws->writeUint16LE(av->getArmourClass());
+	ws->writeUint16LE(av->getTotalWeight());
 
 	for (unsigned int i = 1; i <= 6; i++) {
 		const uint16 objid = av->getEquip(i);
 		const Item *item = getItem(objid);
 		if (item) {
-			ods->write4(item->getShape());
-			ods->write4(item->getFrame());
+			ws->writeUint32LE(item->getShape());
+			ws->writeUint32LE(item->getFrame());
 		} else {
-			ods->write4(0);
-			ods->write4(0);
+			ws->writeUint32LE(0);
+			ws->writeUint32LE(0);
 		}
 	}
 #endif

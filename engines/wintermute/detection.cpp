@@ -215,13 +215,13 @@ public:
 		return retVal;
 	}
 
-	Common::KeymapArray initKeymaps(const char *target) const {
+	Common::KeymapArray initKeymaps(const char *target) const override {
 		using namespace Common;
 
 		Keymap *engineKeyMap = new Keymap(Keymap::kKeymapTypeGame, "wintermute", "Wintermute engine");
 
 		Action *act;
-		
+
 		act = new Action("LCLK", _("Left Click"));
 		act->setLeftClickEvent();
 		act->addDefaultInputMapping("MOUSE_LEFT"); // original mouse
@@ -1147,6 +1147,20 @@ public:
 			act->setKeyEvent(KEYCODE_F1);
 			act->addDefaultInputMapping("F1"); // original keyboard
 			act->addDefaultInputMapping("JOY_LEFT"); // extra joy
+			gameKeyMap->addAction(act);
+		} else if (gameId == "mythguff") {
+			act = new Action("SCRLUP", _("Scroll up"));
+			act->setMouseWheelUpEvent();
+			act->addDefaultInputMapping("MOUSE_WHEEL_UP"); // original mouse
+			act->addDefaultInputMapping("UP"); // extra keyboard
+			act->addDefaultInputMapping("JOY_UP"); // extra joy
+			gameKeyMap->addAction(act);
+
+			act = new Action("SCRLDN", _("Scroll down"));
+			act->setMouseWheelDownEvent();
+			act->addDefaultInputMapping("MOUSE_WHEEL_DOWN"); // original mouse
+			act->addDefaultInputMapping("DOWN"); // extra keyboard
+			act->addDefaultInputMapping("JOY_DOWN"); // extra joy
 			gameKeyMap->addAction(act);
 		} else if (gameId == "oknytt") {
 			act = new Action("INV", _("Show inventory"));

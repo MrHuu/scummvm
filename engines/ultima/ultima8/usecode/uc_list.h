@@ -29,9 +29,6 @@
 namespace Ultima {
 namespace Ultima8 {
 
-class IDataSource;
-class ODataSource;
-
 // stringlists: _elementSize = 2, each element is actually a stringref
 // see for example the 0x0E opcode: there is no way to see if the
 // created list is a stringlist or not
@@ -158,8 +155,8 @@ public:
 
 	uint16 getStringIndex(uint32 index) const;
 
-	void save(ODataSource *ods);
-	bool load(IDataSource *ids, uint32 version);
+	void save(Common::WriteStream *ws);
+	bool load(Common::ReadStream *rs, uint32 version);
 
 private:
 	const Std::string &getString(uint32 index) const;

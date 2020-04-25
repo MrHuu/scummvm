@@ -25,9 +25,6 @@
 
 #include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/ultima8.h"
-
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 #include "ultima/ultima8/audio/audio_process.h"
 
 namespace Ultima {
@@ -98,11 +95,11 @@ Gump *ModalGump::OnMouseDown(int button, int32 mx, int32 my) {
 }
 
 
-void ModalGump::saveData(ODataSource *ods) {
+void ModalGump::saveData(Common::WriteStream *ws) {
 	CANT_HAPPEN_MSG("Trying to save ModalGump");
 }
 
-bool ModalGump::loadData(IDataSource *ids, uint32 version) {
+bool ModalGump::loadData(Common::ReadStream *rs, uint32 version) {
 	CANT_HAPPEN_MSG("Trying to load ModalGump");
 	return false;
 }

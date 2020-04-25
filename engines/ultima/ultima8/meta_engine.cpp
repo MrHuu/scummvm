@@ -55,6 +55,7 @@ static const KeybindingRecord KEYS[] = {
 	{ ACTION_HIGHLIGHT_ITEMS, "HIGHLIGHT_ITEMS", "Show Highlight Items", "GameMapGump::toggleHighlightItems",
 		"GameMapGump::toggleHighlightItems", "TAB", nullptr },
 	{ ACTION_TOGGLE_TOUCHING, "TOUCHING", "Show Touching Items", "GUIApp::toggleShowTouchingItems", nullptr, "h", nullptr },
+	{ ACTION_JUMP, "JUMP", "Jump (fake both-button-click)", "AvatarMoverProcess::setFakeBothButtonClick", nullptr, "SPACE", nullptr },
 
 	{ ACTION_NONE, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr }
 };
@@ -79,7 +80,7 @@ static const KeybindingRecord DEBUG_KEYS[] = {
 	{ ACTION_TOGGLE_PAINT, "TOGGLE_PAINT", "Toggle Paint Editor Items", "GUIApp::togglePaintEditorItems", nullptr, "e", nullptr },
 	{ ACTION_ENGINE_STATS, "STATS", "List engine stats", "GUIApp::engineStats", nullptr, "t", nullptr },
 	{ ACTION_FRAME_BY_FRAME, "FRAME_BY_FRAME", "Toggle Frame By Frame", "Kernel::toggleFrameByFrame", nullptr, "F12", nullptr },
-	{ ACTION_ADVANCE_FRAME, "ADVANCE_FRAME", "Advance Frame", "Kernel::advanceFrame", nullptr, "SPACE", nullptr },
+	{ ACTION_ADVANCE_FRAME, "ADVANCE_FRAME", "Advance Frame", "Kernel::advanceFrame", nullptr, "f", nullptr },
 	{ ACTION_TOGGLE_STASIS, "TOGGLE_STASIS", "Toggle Avatar In Stasis", "GUIApp::toggleAvatarInStasis", nullptr, "F10", nullptr },
 	{ ACTION_SHAPE_VIEWER, "SHAPE_VIEWER", "Show Shape Viewer", "ShapeViewerGump::U8ShapeViewer", nullptr, "F11", nullptr },
 
@@ -126,7 +127,7 @@ Common::KeymapArray MetaEngine::initKeymaps(bool isMenuActive) {
 		keymapArray.push_back(keyMap);
 
 		for (const KeybindingRecord *r = CHEAT_KEYS; r->_id; ++r) {
-			Common::Action *act = new Common::Action(r->_id, _(r->_desc));
+			act = new Common::Action(r->_id, _(r->_desc));
 			act->setCustomEngineActionEvent(r->_action);
 			act->addDefaultInputMapping(r->_key);
 			if (r->_joy)
@@ -140,7 +141,7 @@ Common::KeymapArray MetaEngine::initKeymaps(bool isMenuActive) {
 		keymapArray.push_back(keyMap);
 
 		for (const KeybindingRecord *r = DEBUG_KEYS; r->_id; ++r) {
-			Common::Action *act = new Common::Action(r->_id, _(r->_desc));
+			act = new Common::Action(r->_id, _(r->_desc));
 			act->setCustomEngineActionEvent(r->_action);
 			act->addDefaultInputMapping(r->_key);
 			if (r->_joy)

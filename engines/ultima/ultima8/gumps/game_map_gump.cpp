@@ -34,8 +34,6 @@
 #include "ultima/ultima8/world/camera_process.h"
 #include "ultima/ultima8/ultima8.h"
 #include "ultima/ultima8/graphics/shape_info.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 #include "ultima/ultima8/kernel/mouse.h"
 #include "ultima/ultima8/world/get_object.h"
 #include "ultima/ultima8/world/actors/avatar_mover_process.h"
@@ -152,13 +150,13 @@ void GameMapGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool scaled)
 					continue;
 				if (!paintEditorItems && item->getShapeInfo()->is_editor())
 					continue;
-				if (item->getFlags() & Item::FLG_INVISIBLE) {
+				if (item->hasFlags(Item::FLG_INVISIBLE)) {
 					// special case: invisible avatar _is_ drawn
 					// HACK: unless EXT_TRANSPARENT is also set.
 					// (Used for hiding the avatar when drawing a full area map)
 
 					if (item->getObjId() == 1) {
-						if (item->getExtFlags() & Item::EXT_TRANSPARENT)
+						if (item->hasExtFlags(Item::EXT_TRANSPARENT))
 							continue;
 
 						int32 x_, y_, z_;
@@ -296,7 +294,7 @@ Gump *GameMapGump::OnMouseDown(int button, int32 mx, int32 my) {
 		return this;
 	}
 
-	return 0;
+	return nullptr;
 }
 
 void GameMapGump::OnMouseUp(int button, int32 mx, int32 my) {
@@ -423,7 +421,8 @@ bool GameMapGump::StartDraggingItem(Item *item, int mx, int my) {
 	if (!avatar->canReach(item, 128)) return false;  // CONSTANT!
 
 	// get item offset
-	int32 itemx, itemy;
+	int32 itemx = 0;
+	int32 itemy = 0;
 	GetLocationOfItem(item->getObjId(), itemx, itemy);
 	Mouse::get_instance()->setDraggingOffset(mx - itemx, my - itemy);
 
@@ -576,11 +575,11 @@ void GameMapGump::RenderSurfaceChanged() {
 	Gump::RenderSurfaceChanged();
 }
 
-void GameMapGump::saveData(ODataSource *ods) {
+void GameMapGump::saveData(Common::WriteStream *ws) {
 	CANT_HAPPEN_MSG("Trying to save GameMapGump");
 }
 
-bool GameMapGump::loadData(IDataSource *ids, uint32 version) {
+bool GameMapGump::loadData(Common::ReadStream *rs, uint32 version) {
 	CANT_HAPPEN_MSG("Trying to load GameMapGump");
 
 	return false;

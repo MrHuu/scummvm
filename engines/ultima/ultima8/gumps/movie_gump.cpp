@@ -25,14 +25,13 @@
 
 #include "ultima/ultima8/filesys/raw_archive.h"
 #include "ultima/ultima8/graphics/skf_player.h"
+#include "ultima/ultima8/graphics/fade_to_modal_process.h"
 #include "ultima/ultima8/ultima8.h"
+#include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/gumps/desktop_gump.h"
 #include "ultima/ultima8/gumps/gump_notify_process.h"
 
 #include "ultima/ultima8/filesys/file_system.h"
-
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -94,19 +93,27 @@ bool MovieGump::OnKeyDown(int key, int mod) {
 }
 
 //static
-ProcId MovieGump::U8MovieViewer(RawArchive *movie, bool introMusicHack) {
-	Gump *gump = new MovieGump(320, 200, movie, introMusicHack);
-	gump->InitGump(0);
-	gump->setRelativePosition(CENTER);
-	gump->CreateNotifier();
-	return gump->GetNotifyProcess()->getPid();
+ProcId MovieGump::U8MovieViewer(RawArchive *movie, bool fade, bool introMusicHack) {
+	ModalGump *gump = new MovieGump(320, 200, movie, introMusicHack);
+	if (fade) {
+		FadeToModalProcess *p = new FadeToModalProcess(gump);
+		Kernel::get_instance()->addProcess(p);
+		return p->getPid();
+	}
+	else
+	{
+		gump->InitGump(0);
+		gump->setRelativePosition(CENTER);
+		gump->CreateNotifier();
+		return gump->GetNotifyProcess()->getPid();
+	}
 }
 
-bool MovieGump::loadData(IDataSource *ids) {
+bool MovieGump::loadData(Common::ReadStream *rs) {
 	return false;
 }
 
-void MovieGump::saveData(ODataSource *ods) {
+void MovieGump::saveData(Common::WriteStream *ws) {
 
 }
 

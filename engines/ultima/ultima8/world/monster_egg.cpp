@@ -32,10 +32,6 @@
 #include "ultima/ultima8/world/world.h"
 #include "ultima/ultima8/world/get_object.h"
 
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
-#include "ultima/ultima8/world/get_object.h"
-
 namespace Ultima {
 namespace Ultima8 {
 
@@ -90,12 +86,12 @@ uint16 MonsterEgg::hatch() {
 	return objID;
 }
 
-void MonsterEgg::saveData(ODataSource *ods) {
-	Item::saveData(ods);
+void MonsterEgg::saveData(Common::WriteStream *ws) {
+	Item::saveData(ws);
 }
 
-bool MonsterEgg::loadData(IDataSource *ids, uint32 version) {
-	if (!Item::loadData(ids, version)) return false;
+bool MonsterEgg::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Item::loadData(rs, version)) return false;
 
 	return true;
 }

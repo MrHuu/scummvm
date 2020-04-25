@@ -65,6 +65,10 @@ enum EventType {
 
 	EVENT_QUIT = 10,
 	EVENT_SCREEN_CHANGED = 11,
+
+	/** The input devices have changed, input related configuration needs to be re-applied */
+	EVENT_INPUT_CHANGED  = 35,
+
 	/**
 	 * The backend requests the agi engine's predictive dialog to be shown.
 	 * TODO: Fingolfin suggests that it would be of better value to expand
@@ -531,6 +535,14 @@ public:
 protected:
 	EventDispatcher _dispatcher;
 };
+
+/**
+ * Wrap an event source so the key down events are repeated while
+ * keys are held down.
+ *
+ * Does not take ownership of the wrapped EventSource.
+ */
+EventSource *makeKeyboardRepeatingEventSource(EventSource *eventSource);
 
 } // End of namespace Common
 

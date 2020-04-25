@@ -27,9 +27,6 @@
 #include "ultima/ultima8/world/actors/combat_process.h"
 #include "ultima/ultima8/world/get_object.h"
 
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
-
 namespace Ultima {
 namespace Ultima8 {
 
@@ -74,16 +71,16 @@ void AmbushProcess::run() {
 	terminate();
 }
 
-void AmbushProcess::saveData(ODataSource *ods) {
-	Process::saveData(ods);
+void AmbushProcess::saveData(Common::WriteStream *ws) {
+	Process::saveData(ws);
 
-	ods->write4(_delayCount);
+	ws->writeUint32LE(_delayCount);
 }
 
-bool AmbushProcess::loadData(IDataSource *ids, uint32 version) {
-	if (!Process::loadData(ids, version)) return false;
+bool AmbushProcess::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Process::loadData(rs, version)) return false;
 
-	_delayCount = ids->read4();
+	_delayCount = rs->readUint32LE();
 
 	return true;
 }

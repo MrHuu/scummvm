@@ -24,8 +24,6 @@
 #include "ultima/ultima8/gumps/desktop_gump.h"
 #include "ultima/ultima8/graphics/render_surface.h"
 #include "ultima/ultima8/ultima8.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 #include "ultima/ultima8/gumps/modal_gump.h"
 #include "ultima/ultima8/gumps/target_gump.h"
 
@@ -111,11 +109,11 @@ void DesktopGump::RenderSurfaceChanged() {
 	Gump::RenderSurfaceChanged();
 }
 
-void DesktopGump::saveData(ODataSource *ods) {
+void DesktopGump::saveData(Common::WriteStream *ws) {
 	CANT_HAPPEN_MSG("Trying to save DesktopGump");
 }
 
-bool DesktopGump::loadData(IDataSource *ids, uint32 version) {
+bool DesktopGump::loadData(Common::ReadStream *rs, uint32 version) {
 	CANT_HAPPEN_MSG("Trying to save DesktopGump");
 
 	return false;

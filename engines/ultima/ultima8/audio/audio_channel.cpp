@@ -30,19 +30,9 @@
 namespace Ultima {
 namespace Ultima8 {
 
-// We divide the data by 2, to prevent overshots. Imagine this _sample pattern:
-// 0, 65535, 65535, 0. Now you want to compute a value between the two 65535.
-// Obviously, it will be *bigger* than 65535 (it can get to about 80,000).
-// It is possibly to clamp it, but that leads to a distored wave form. Compare
-// this to turning up the volume of your stereo to much, it will start to sound
-// bad at a certain level (depending on the power of your stereo, your speakers
-// etc, this can be quite loud, though ;-). Hence we reduce the original range.
-// A factor of roughly 1/1.2 = 0.8333 is sufficient. Since we want to avoid
-// floating point, we approximate that by 27/32
-#define RANGE_REDUX(x)  (((x) * 27) >> 5)
 
 AudioChannel::AudioChannel(Audio::Mixer *mixer, uint32 sampleRate, bool stereo) :
-		_mixer(mixer), _decompressorSize(0), _frameSize(0), _loop(0), _sample(0),
+		_mixer(mixer), _decompressorSize(0), _frameSize(0), _loop(0), _sample(nullptr),
 		_frameEvenOdd(0), _paused(false), _priority(0) {
 }
 
@@ -95,21 +85,23 @@ void AudioChannel::playSample(AudioSample *sample, int loop, int priority, bool 
 		new Audio::LoopingAudioStream(audioStream, _loop);
 
 	// Play it
-	_mixer->playStream(Audio::Mixer::kPlainSoundType, &_soundHandle, stream);
+	int vol = (_lVol + _rVol) / 2;
+	int balance = (_rVol - _lVol);
+	_mixer->playStream(Audio::Mixer::kPlainSoundType, &_soundHandle, stream, -1, vol, balance);
 	if (paused)
 		_mixer->pauseHandle(_soundHandle, true);
 }
 
 bool AudioChannel::isPlaying() {
 	if (!_mixer->isSoundHandleActive(_soundHandle))
-		_sample = 0;
+		_sample = nullptr;
 
-	return _sample != 0;
+	return _sample != nullptr;
 }
 
 void AudioChannel::stop() {
 	_mixer->stopHandle(_soundHandle);
-	_sample = 0;
+	_sample = nullptr;
 }
 
 void AudioChannel::setPaused(bool paused) {

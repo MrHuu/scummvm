@@ -32,7 +32,7 @@
 namespace Ultima {
 namespace Ultima8 {
 
-Game *Game::_game = 0;
+Game *Game::_game = nullptr;
 
 Game::Game() {
 	_game = this;
@@ -40,7 +40,7 @@ Game::Game() {
 
 Game::~Game() {
 	assert(_game == this);
-	_game = 0;
+	_game = nullptr;
 }
 
 
@@ -55,7 +55,7 @@ Game *Game::createGame(GameInfo *info) {
 		CANT_HAPPEN_MSG("createGame: invalid _game");
 	}
 
-	return 0;
+	return nullptr;
 }
 
 uint32 Game::I_playEndgame(const uint8 *args, unsigned int /*argsize*/) {
@@ -69,7 +69,7 @@ uint32 Game::I_playEndgame(const uint8 *args, unsigned int /*argsize*/) {
 	Process *menuproc = new MainMenuProcess();
 	Kernel::get_instance()->addProcess(menuproc);
 
-	ProcId moviepid = Game::get_instance()->playEndgameMovie();
+	ProcId moviepid = Game::get_instance()->playEndgameMovie(false);
 	Process *movieproc = Kernel::get_instance()->getProcess(moviepid);
 	if (movieproc) {
 		menuproc->waitFor(movieproc);

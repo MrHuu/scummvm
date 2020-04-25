@@ -33,8 +33,6 @@
 #include "ultima/ultima8/usecode/uc_list.h"
 #include "ultima/ultima8/world/loop_script.h"
 #include "ultima/ultima8/world/get_object.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 #include "ultima/ultima8/kernel/core_app.h"
 
 namespace Ultima {
@@ -66,8 +64,8 @@ bool AnimationTracker::init(Actor *actor_, Animation::Sequence action_,
 	if (state_ == 0) {
 		_animAction->getAnimRange(actor_, _dir, _startFrame, _endFrame);
 		actor_->getLocation(_x, _y, _z);
-		_flipped = (actor_->getFlags() & Item::FLG_FLIPPED) != 0;
-		_firstStep = (actor_->getActorFlags() & Actor::ACT_FIRSTSTEP) != 0;
+		_flipped = actor_->hasFlags(Item::FLG_FLIPPED);
+		_firstStep = actor_->hasActorFlags(Actor::ACT_FIRSTSTEP);
 	} else {
 		_animAction->getAnimRange(state_->_lastAnim, state_->_direction,
 		                         state_->_firstStep, _dir, _startFrame, _endFrame);
@@ -214,7 +212,7 @@ bool AnimationTracker::step() {
 	}
 
 	// determine footpad
-	bool actorflipped = (a->getFlags() & Item::FLG_FLIPPED) != 0;
+	bool actorflipped = a->hasFlags(Item::FLG_FLIPPED);
 	int32 xd, yd, zd;
 	a->getFootpadWorld(xd, yd, zd);
 	if (actorflipped != _flipped) {
@@ -314,13 +312,13 @@ bool AnimationTracker::step() {
 				descentdelta = -20;         // Descend
 
 			if (descentdelta) {
-				if (dy == 0 && dx != 0 && !(support->getFlags() & Item::FLG_FLIPPED)) {
+				if (dy == 0 && dx != 0 && !support->hasFlags(Item::FLG_FLIPPED)) {
 					// Moving left or right on horizontal bridge
 					// descentdelta = 60*dy/dx
 					// 60*dy = descentdelta * dx
 					// dy = descentdelta * dx / 60;
 					ty += descentdelta * dx / 60;
-				} else if (dx == 0 && dy != 0 && (support->getFlags() & Item::FLG_FLIPPED)) {
+				} else if (dx == 0 && dy != 0 && support->hasFlags(Item::FLG_FLIPPED)) {
 					// Moving up or down on vertical bridge
 					tx += descentdelta * dy / 60;
 				}
@@ -559,86 +557,86 @@ void AnimationTracker::getSpeed(int32 &dx, int32 &dy, int32 &dz) const {
 }
 
 
-void AnimationTracker::save(ODataSource *ods) {
-	ods->write4(_startFrame);
-	ods->write4(_endFrame);
+void AnimationTracker::save(Common::WriteStream *ws) {
+	ws->writeUint32LE(_startFrame);
+	ws->writeUint32LE(_endFrame);
 	uint8 ff = _firstFrame ? 1 : 0;
-	ods->write1(ff);
-	ods->write4(_currentFrame);
+	ws->writeByte(ff);
+	ws->writeUint32LE(_currentFrame);
 
-	ods->write2(_actor);
-	ods->write1(static_cast<uint8>(_dir));
+	ws->writeUint16LE(_actor);
+	ws->writeByte(static_cast<uint8>(_dir));
 
 	if (_animAction) {
-		ods->write4(_animAction->_shapeNum);
-		ods->write4(_animAction->_action);
+		ws->writeUint32LE(_animAction->_shapeNum);
+		ws->writeUint32LE(_animAction->_action);
 	} else {
-		ods->write4(0);
-		ods->write4(0);
+		ws->writeUint32LE(0);
+		ws->writeUint32LE(0);
 	}
 
-	ods->write4(static_cast<uint32>(_prevX));
-	ods->write4(static_cast<uint32>(_prevY));
-	ods->write4(static_cast<uint32>(_prevZ));
-	ods->write4(static_cast<uint32>(_x));
-	ods->write4(static_cast<uint32>(_y));
-	ods->write4(static_cast<uint32>(_z));
+	ws->writeUint32LE(static_cast<uint32>(_prevX));
+	ws->writeUint32LE(static_cast<uint32>(_prevY));
+	ws->writeUint32LE(static_cast<uint32>(_prevZ));
+	ws->writeUint32LE(static_cast<uint32>(_x));
+	ws->writeUint32LE(static_cast<uint32>(_y));
+	ws->writeUint32LE(static_cast<uint32>(_z));
 
-	ods->write2(static_cast<uint16>(_mode));
+	ws->writeUint16LE(static_cast<uint16>(_mode));
 	if (_mode == TargetMode) {
-		ods->write4(static_cast<uint32>(_targetDx));
-		ods->write4(static_cast<uint32>(_targetDy));
-		ods->write4(static_cast<uint32>(_targetDz));
-		ods->write4(static_cast<uint32>(_targetOffGroundLeft));
+		ws->writeUint32LE(static_cast<uint32>(_targetDx));
+		ws->writeUint32LE(static_cast<uint32>(_targetDy));
+		ws->writeUint32LE(static_cast<uint32>(_targetDz));
+		ws->writeUint32LE(static_cast<uint32>(_targetOffGroundLeft));
 	}
 	uint8 fs = _firstStep ? 1 : 0;
-	ods->write1(fs);
+	ws->writeByte(fs);
 	uint8 fl = _flipped ? 1 : 0;
-	ods->write1(fl);
-	ods->write4(_shapeFrame);
+	ws->writeByte(fl);
+	ws->writeUint32LE(_shapeFrame);
 
 	uint8 flag = _done ? 1 : 0;
-	ods->write1(flag);
+	ws->writeByte(flag);
 	flag = _blocked ? 1 : 0;
-	ods->write1(flag);
+	ws->writeByte(flag);
 	flag = _unsupported ? 1 : 0;
-	ods->write1(flag);
-	ods->write2(_hitObject);
+	ws->writeByte(flag);
+	ws->writeUint16LE(_hitObject);
 }
 
-bool AnimationTracker::load(IDataSource *ids, uint32 version) {
-	_startFrame = ids->read4();
-	_endFrame = ids->read4();
-	_firstFrame = (ids->read1() != 0);
-	_currentFrame = ids->read4();
+bool AnimationTracker::load(Common::ReadStream *rs, uint32 version) {
+	_startFrame = rs->readUint32LE();
+	_endFrame = rs->readUint32LE();
+	_firstFrame = (rs->readByte() != 0);
+	_currentFrame = rs->readUint32LE();
 
-	_actor = ids->read2();
-	_dir = ids->read1();
+	_actor = rs->readUint16LE();
+	_dir = rs->readByte();
 
-	uint32 shapenum = ids->read4();
-	uint32 action = ids->read4();
+	uint32 shapenum = rs->readUint32LE();
+	uint32 action = rs->readUint32LE();
 	if (shapenum == 0) {
-		_animAction = 0;
+		_animAction = nullptr;
 	} else {
 		_animAction = GameData::get_instance()->getMainShapes()->
 		             getAnim(shapenum, action);
 		assert(_animAction);
 	}
 
-	_prevX = ids->read4();
-	_prevY = ids->read4();
-	_prevZ = ids->read4();
-	_x = ids->read4();
-	_y = ids->read4();
-	_z = ids->read4();
+	_prevX = rs->readUint32LE();
+	_prevY = rs->readUint32LE();
+	_prevZ = rs->readUint32LE();
+	_x = rs->readUint32LE();
+	_y = rs->readUint32LE();
+	_z = rs->readUint32LE();
 
-	_mode = static_cast<Mode>(ids->read2());
+	_mode = static_cast<Mode>(rs->readUint16LE());
 	if (_mode == TargetMode) {
-		_targetDx = ids->read4();
-		_targetDy = ids->read4();
+		_targetDx = rs->readUint32LE();
+		_targetDy = rs->readUint32LE();
 		if (version >= 5) {
-			_targetDz = ids->read4();
-			_targetOffGroundLeft = ids->read4();
+			_targetDz = rs->readUint32LE();
+			_targetOffGroundLeft = rs->readUint32LE();
 		} else {
 			// Versions before 5 stored the only _x,_y adjustment
 			// to be made per frame. This is less accurate and ignores _z.
@@ -659,14 +657,14 @@ bool AnimationTracker::load(IDataSource *ids, uint32 version) {
 		}
 	}
 
-	_firstStep = (ids->read1() != 0);
-	_flipped = (ids->read1() != 0);
-	_shapeFrame = ids->read4();
+	_firstStep = (rs->readByte() != 0);
+	_flipped = (rs->readByte() != 0);
+	_shapeFrame = rs->readUint32LE();
 
-	_done = (ids->read1() != 0);
-	_blocked = (ids->read1() != 0);
-	_unsupported = (ids->read1() != 0);
-	_hitObject = ids->read2();
+	_done = (rs->readByte() != 0);
+	_blocked = (rs->readByte() != 0);
+	_unsupported = (rs->readByte() != 0);
+	_hitObject = rs->readUint16LE();
 
 	return true;
 }

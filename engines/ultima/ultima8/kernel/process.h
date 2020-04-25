@@ -31,8 +31,6 @@ namespace Ultima {
 namespace Ultima8 {
 
 class Debugger;
-class IDataSource;
-class ODataSource;
 
 class Process {
 	friend class Kernel;
@@ -74,6 +72,11 @@ public:
 		_flags |= PROC_TERM_DEFERRED;
 	}
 
+	//! run even when paused
+	void setRunPaused() {
+		_flags |= PROC_RUNPAUSED;
+	};
+
 	//! suspend until process '_pid' returns. If _pid is 0, suspend indefinitely
 	void waitFor(ProcId _pid);
 
@@ -83,7 +86,11 @@ public:
 	//! suspend process
 	void suspend();
 
+	//! Wake up when the process we were waiting for has finished
 	void wakeUp(uint32 result);
+
+	//! A hook to add aditional behavior on wakeup, before anything else happens
+	virtual void onWakeUp() {};
 
 	void setItemNum(ObjId it) {
 		_itemNum = it;
@@ -106,16 +113,16 @@ public:
 	virtual void dumpInfo() const;
 
 	//! save this process
-	void save(ODataSource *ods);
+	void save(Common::WriteStream *ods);
 
 	//! load Process data
-	bool loadData(IDataSource *ids, uint32 version);
+	bool loadData(Common::ReadStream *rs, uint32 version);
 
 protected:
 	//! save the Process data
-	virtual void saveData(ODataSource *ods);
+	virtual void saveData(Common::WriteStream *ws);
 
-	void writeProcessHeader(ODataSource *ods);
+	void writeProcessHeader(Common::WriteStream *ods);
 
 	//! process id
 	ProcId _pid;

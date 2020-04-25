@@ -28,6 +28,7 @@
 namespace Graphics {
 	class ManagedSurface;
 	class Font;
+	class MacWindow;
 }
 
 namespace Common {
@@ -89,6 +90,7 @@ public:
 	Sprite *getSpriteById(uint16 id);
 	void setSpriteCasts();
 	void loadSpriteImages(bool isSharedCast);
+	void loadSpriteSounds(bool isSharedCast);
 	void copyCastStxts();
 	Graphics::ManagedSurface *getSurface() { return _surface; }
 
@@ -134,11 +136,16 @@ public:
 	Graphics::ManagedSurface *_surface;
 	Graphics::ManagedSurface *_trailSurface;
 	Graphics::ManagedSurface *_backSurface;
+	Graphics::ManagedSurface *_backSurface2;
 	Graphics::Font *_font;
 	Archive *_movieArchive;
 	Common::Rect _movieRect;
 	uint16 _currentMouseDownSpriteId;
 	bool _mouseIsDown;
+	uint32 _lastEventTime;
+	uint32 _lastRollTime;
+	uint32 _lastClickTime;
+	uint32 _lastKeyTime;
 
 	bool _stopPlay;
 	uint32 _nextFrameTime;
@@ -150,6 +157,8 @@ public:
 	uint16 _castIDoffset;
 
 	int _numChannelsDisplayed;
+
+	Graphics::MacWindow *_window;
 
 private:
 	uint16 _versionMinor;
@@ -163,6 +172,7 @@ private:
 	uint16 _castArrayStart;
 	uint16 _currentFrame;
 	uint16 _nextFrame;
+	uint16 _framesRan; // used by kDebugFewFramesOnly
 	int _currentLabel;
 	uint32 _flags;
 	uint16 _castArrayEnd;

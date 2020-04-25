@@ -408,7 +408,7 @@ void XcodeProvider::setupCopyFilesBuildPhase() {
 #define DEF_LOCALLIB_STATIC_PATH(path,lib,absolute) properties[lib".a"] = FileProperty("archive.ar", lib ".a", path, (absolute ? "\"<absolute>\"" : "\"<group>\"")); \
 	ADD_SETTING_ORDER_NOVALUE(children, getHash(lib".a"), lib".a", fwOrder++);
 
-#define DEF_LOCALLIB_STATIC(lib) DEF_LOCALLIB_STATIC_PATH("/usr/local/lib/" lib ".a", lib, true)
+#define DEF_LOCALLIB_STATIC(lib) DEF_LOCALLIB_STATIC_PATH(lib ".a", lib, false)
 
 
 /**
@@ -665,12 +665,12 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 		frameworks_osx.push_back("libSDL2main.a");
 		frameworks_osx.push_back("libSDL2.a");
 		if (CONTAINS_DEFINE(setup.defines, "USE_SDL_NET"))
-			frameworks_iOS.push_back("libSDL2_net.a");
+			frameworks_osx.push_back("libSDL2_net.a");
 	} else {
 		frameworks_osx.push_back("libSDLmain.a");
 		frameworks_osx.push_back("libSDL.a");
 		if (CONTAINS_DEFINE(setup.defines, "USE_SDL_NET"))
-			frameworks_iOS.push_back("libSDL_net.a");
+			frameworks_osx.push_back("libSDL_net.a");
 	}
 
 	order = 0;

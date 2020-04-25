@@ -27,8 +27,6 @@
 #include "ultima/ultima8/world/current_map.h"
 #include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/world/get_object.h"
-#include "ultima/ultima8/filesys/idata_source.h"
-#include "ultima/ultima8/filesys/odata_source.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -111,36 +109,36 @@ uint32 SpriteProcess::I_createSprite(const uint8 *args, unsigned int argsize) {
 	return Kernel::get_instance()->addProcess(p);
 }
 
-void SpriteProcess::saveData(ODataSource *ods) {
-	Process::saveData(ods);
+void SpriteProcess::saveData(Common::WriteStream *ws) {
+	Process::saveData(ws);
 
-	ods->write4(static_cast<uint32>(_shape));
-	ods->write4(static_cast<uint32>(_frame));
-	ods->write4(static_cast<uint32>(_firstFrame));
-	ods->write4(static_cast<uint32>(_lastFrame));
-	ods->write4(static_cast<uint32>(_repeats));
-	ods->write4(static_cast<uint32>(_delay));
-	ods->write4(static_cast<uint32>(_x));
-	ods->write4(static_cast<uint32>(_y));
-	ods->write4(static_cast<uint32>(_z));
-	ods->write4(static_cast<uint32>(_delayCounter));
-	ods->write1(_initialized ? 1 : 0);
+	ws->writeUint32LE(static_cast<uint32>(_shape));
+	ws->writeUint32LE(static_cast<uint32>(_frame));
+	ws->writeUint32LE(static_cast<uint32>(_firstFrame));
+	ws->writeUint32LE(static_cast<uint32>(_lastFrame));
+	ws->writeUint32LE(static_cast<uint32>(_repeats));
+	ws->writeUint32LE(static_cast<uint32>(_delay));
+	ws->writeUint32LE(static_cast<uint32>(_x));
+	ws->writeUint32LE(static_cast<uint32>(_y));
+	ws->writeUint32LE(static_cast<uint32>(_z));
+	ws->writeUint32LE(static_cast<uint32>(_delayCounter));
+	ws->writeByte(_initialized ? 1 : 0);
 }
 
-bool SpriteProcess::loadData(IDataSource *ids, uint32 version) {
-	if (!Process::loadData(ids, version)) return false;
+bool SpriteProcess::loadData(Common::ReadStream *rs, uint32 version) {
+	if (!Process::loadData(rs, version)) return false;
 
-	_shape = static_cast<int>(ids->read4());
-	_frame = static_cast<int>(ids->read4());
-	_firstFrame = static_cast<int>(ids->read4());
-	_lastFrame = static_cast<int>(ids->read4());
-	_repeats = static_cast<int>(ids->read4());
-	_delay = static_cast<int>(ids->read4());
-	_x = static_cast<int>(ids->read4());
-	_y = static_cast<int>(ids->read4());
-	_z = static_cast<int>(ids->read4());
-	_delayCounter = static_cast<int>(ids->read4());
-	_initialized = (ids->read1() != 0);
+	_shape = static_cast<int>(rs->readUint32LE());
+	_frame = static_cast<int>(rs->readUint32LE());
+	_firstFrame = static_cast<int>(rs->readUint32LE());
+	_lastFrame = static_cast<int>(rs->readUint32LE());
+	_repeats = static_cast<int>(rs->readUint32LE());
+	_delay = static_cast<int>(rs->readUint32LE());
+	_x = static_cast<int>(rs->readUint32LE());
+	_y = static_cast<int>(rs->readUint32LE());
+	_z = static_cast<int>(rs->readUint32LE());
+	_delayCounter = static_cast<int>(rs->readUint32LE());
+	_initialized = (rs->readByte() != 0);
 
 	return true;
 }

@@ -6,6 +6,7 @@ For a more comprehensive changelog of the latest experimental code, see:
  General:
    - Autosaves are now supported for all the engines.
    - Errors are more likely to open the debugger, and be displayed, than just crash ScummVM.
+   - Games are sorted in GUI ignoring the articles.
 
  Dreamweb:
    - Added support for Russian fan-translation.
@@ -15,6 +16,19 @@ For a more comprehensive changelog of the latest experimental code, see:
 
  Sword1:
    - Added support for localized menus in Novy Disk Russian Trilogy release.
+
+ Linux port:
+   - Added option to use the system file browser instead of the ScummVM file browser.
+
+
+#### 2.1.2 "Fixing Powerful Windows" (2020-03-31)
+
+ Windows port:
+   - Fixed an issue with the Sparkle updater which lead to an infinite update loop.
+
+ MacOS X port:
+   - Fixed application freeze on start on Mac OS X 10.5 and older.
+   - Fixed application icon on Mac OS X 10.5 and older.
 
 
 #### 2.1.1 ":More sheep:" (2020-01-31)
