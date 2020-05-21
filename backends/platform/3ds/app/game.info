@@ -35,6 +35,10 @@ else ifeq ($(GAME), DIG)
 	APP_TITLE       := The Dig
 	APP_UNIQUE_ID   := 0xFF326
 
+else ifeq ($(GAME), DUCKMAN)
+	APP_TITLE       := Duckman: The Graphic Adventures of a Private Dick
+	APP_UNIQUE_ID   := 0xFF334
+
 else ifeq ($(GAME), DW)
 	APP_TITLE       := Discworld
 	APP_UNIQUE_ID   := 0xFF324
@@ -76,9 +80,17 @@ else ifeq ($(GAME), NEVERHOOD)
 	APP_UNIQUE_ID   := 0xFF32B
 	CXXFLAGS		+= -D_NEVERHOOD_MENU
 
+else ifeq ($(GAME), PERIL)
+	APP_TITLE       := The Pink Panther: Passport to Peril
+	APP_UNIQUE_ID   := 0xFF335
+
 else ifeq ($(GAME), PHANTASMAGORIA)
 	APP_TITLE       := Phantasmagoria
 	APP_UNIQUE_ID   := 0xFF332
+
+else ifeq ($(GAME), POCUS)
+	APP_TITLE       := The Pink Panther: Hokus Pokus Pink
+	APP_UNIQUE_ID   := 0xFF336
 
 else ifeq ($(GAME), QFG4)
 	APP_TITLE       := Quest for Glory 4 - Shadows Of Darkness

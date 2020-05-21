@@ -12,17 +12,6 @@ export PATH=$PORTLIBS/bin:$PATH
 export PATH=$DEVKITARM/bin:$PATH
 export PATH=$DEVKITPRO/tools/bin:$PATH
 
-## ScummVM doesn't provide the CA certificates bundle required by the cloud synchronization features.
-## https://github.com/scummvm/scummvm/blob/036d61cbd62dc7907f4eeb36764bef9f794588f4/backends/platform/3ds/README.md#42-compiling-scummvm
-## ---------------------
-FILE=./backends/platform/3ds/app/cacert.pem
-if [ ! -f "$FILE" ]; then
-	echo "$FILE does not exist"
-	wget -O "./backends/platform/3ds/app/cacert.pem" https://curl.haxx.se/ca/cacert.pem
-fi
-export DIST_3DS_EXTRA_FILES=./backends/platform/3ds/app/cacert.pem
-## ---------------------
-
 GAMEID=$1
 GAMEDAT=NONE
 
@@ -36,7 +25,7 @@ fi
 
 if [ $GAMEID = "ALL" ] ; then
 
-	for GAMEID in BBDOU BBVS COMI DIG DW DW2 FT HDB LSL1 MANIAC MONKEY MONKEY2 MYST NEVERHOOD PHANTASMAGORIA QFG4 QUEEN RIVEN SAMNMAX TENTACLE TOON
+	for GAMEID in BBDOU BBVS COMI DIG DUCKMAN DW DW2 FT HDB LSL1 MANIAC MONKEY MONKEY2 MYST NEVERHOOD PHANTASMAGORIA QFG4 QUEEN RIVEN SAMNMAX TENTACLE TOON
 	do
 		./build_custom_3ds.sh $GAMEID
 	done
@@ -44,95 +33,107 @@ if [ $GAMEID = "ALL" ] ; then
 
 elif [ $GAMEID = "BBDOU" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=illusions
+	./configure --host=3ds --disable-all-engines --enable-engine=illusions
 
 elif [ $GAMEID = "BBVS" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=bbvs
+	./configure --host=3ds --disable-all-engines --enable-engine=bbvs
 
 elif [ $GAMEID = "BLADERUNNER" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=bladerunner
+	./configure --host=3ds --disable-all-engines --enable-engine=bladerunner
 
 elif [ $GAMEID = "COMI" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=scumm-7-8
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm-7-8
 
 elif [ $GAMEID = "DIG" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=scumm-7-8
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm-7-8
+
+elif [ $GAMEID = "DUCKMAN" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=illusions
 
 elif [ $GAMEID = "DW" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=tinsel
+	./configure --host=3ds --disable-all-engines --enable-engine=tinsel
 
 elif [ $GAMEID = "DW2" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=tinsel
+	./configure --host=3ds --disable-all-engines --enable-engine=tinsel
 
 elif [ $GAMEID = "FT" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=scumm-7-8
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm-7-8
 
 elif [ $GAMEID = "HDB" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=hdb
+	./configure --host=3ds --disable-all-engines --enable-engine=hdb
 
 elif [ $GAMEID = "LSL1" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=agi
+	./configure --host=3ds --disable-all-engines --enable-engine=agi
 
 elif [ $GAMEID = "MANIAC" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=scumm
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm
 
 elif [ $GAMEID = "MONKEY" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=scumm
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm
 
 elif [ $GAMEID = "MONKEY2" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=scumm
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm
 
 elif [ $GAMEID = "MYST" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=myst
+	./configure --host=3ds --disable-all-engines --enable-engine=myst
 
 elif [ $GAMEID = "NEVERHOOD" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=neverhood
+	./configure --host=3ds --disable-all-engines --enable-engine=neverhood
 
 	GAMEDAT=neverhood.dat
 
+elif [ $GAMEID = "PERIL" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=pink
+
 elif [ $GAMEID = "PHANTASMAGORIA" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=sci32
+	./configure --host=3ds --disable-all-engines --enable-engine=sci32
+
+elif [ $GAMEID = "POCUS" ] ; then
+
+	./configure --host=3ds --disable-all-engines --enable-engine=pink
 
 elif [ $GAMEID = "QFG4" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=sci32
+	./configure --host=3ds --disable-all-engines --enable-engine=sci32
 
 elif [ $GAMEID = "QUEEN" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=queen
+	./configure --host=3ds --disable-all-engines --enable-engine=queen
 
 	GAMEDAT=queen.tbl
 
 elif [ $GAMEID = "RIVEN" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=riven
+	./configure --host=3ds --disable-all-engines --enable-engine=riven
 
 elif [ $GAMEID = "SAMNMAX" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=scumm-7-8
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm-7-8
 
 elif [ $GAMEID = "TENTACLE" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=scumm
+	./configure --host=3ds --disable-all-engines --enable-engine=scumm
 
 elif [ $GAMEID = "TOON" ] ; then
 
-	./configure --host=3ds --enable-libcurl --disable-all-engines --enable-engine=toon
+	./configure --host=3ds --disable-all-engines --enable-engine=toon
 
 	GAMEDAT=toon.dat
 
@@ -145,8 +146,8 @@ else
 	echo *ONLY single Arguments
 	echo
 	echo Arguments available: 
-	echo  BBDOU BBVS BLADERUNNER COMI DIG DW DW2 FT LSL1 MANIAC MONKEY MONKEY2 MYST NEVERHOOD
-	echo  PHANTASMAGORIA QFG4 QUEEN RIVEN SAMNMAX TENTACLE TOON
+	echo  BBDOU BBVS BLADERUNNER COMI DIG DUCKMAN DW DW2 FT LSL1 MANIAC MONKEY MONKEY2 MYST
+	echo  NEVERHOOD PERIL PHANTASMAGORIA POCUS QFG4 QUEEN RIVEN SAMNMAX TENTACLE TOON
 	echo
 	echo -------------------------------------------------------------------------------------------
 	echo
