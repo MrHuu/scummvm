@@ -36,9 +36,12 @@
 namespace Ultima {
 namespace Ultima8 {
 
-DEFINE_RUNTIME_CLASSTYPE_CODE(Gump, Object)
+DEFINE_RUNTIME_CLASSTYPE_CODE(Gump)
 
-Gump::Gump() : Object(), _parent(nullptr), _children() {
+Gump::Gump() : Object(), _parent(nullptr), _owner(0),
+	_x(0), _y(0), _flags(0), _layer(0), _index(-1),
+	_shape(nullptr), _frameNum(0), _focusChild(nullptr),
+	_notifier(0), _processResult(0) {
 }
 
 Gump::Gump(int inX, int inY, int width, int height, uint16 inOwner,
@@ -106,7 +109,7 @@ void Gump::SetNotifyProcess(GumpNotifyProcess *proc) {
 }
 
 GumpNotifyProcess *Gump::GetNotifyProcess() {
-	return p_dynamic_cast<GumpNotifyProcess *>(Kernel::get_instance()->
+	return dynamic_cast<GumpNotifyProcess *>(Kernel::get_instance()->
 	        getProcess(_notifier));
 }
 
@@ -529,13 +532,9 @@ bool Gump::GetLocationOfItem(uint16 itemid, int32 &gx, int32 &gy,
 	return false;
 }
 
-// Find a child gump of the specified type
-Gump *Gump::FindGump(const RunTimeClassType &t, bool recursive,
-                     bool no_inheritance) {
-	// If that is our type, then return us!
-	if (GetClassType() == t)
-		return this;
-	else if (!no_inheritance && IsOfType(t))
+// Find a child gump that matches the matching function 
+Gump *Gump::FindGump(const FindGumpPredicate predicate, bool recursive) {
+	if (predicate(this))
 		return this;
 
 	// Iterate all children
@@ -549,9 +548,7 @@ Gump *Gump::FindGump(const RunTimeClassType &t, bool recursive,
 		if (g->_flags & FLAG_CLOSING)
 			continue;
 
-		if (g->GetClassType() == t)
-			return g;
-		else if (!no_inheritance && g->IsOfType(t))
+		if (predicate(g))
 			return g;
 	}
 
@@ -569,7 +566,7 @@ Gump *Gump::FindGump(const RunTimeClassType &t, bool recursive,
 		if (g->_flags & FLAG_CLOSING)
 			continue;
 
-		g = g->FindGump(t, recursive, no_inheritance);
+		g = g->FindGump(predicate, recursive);
 
 		if (g)
 			return g;
@@ -695,7 +692,7 @@ void Gump::StopDraggingChild(Gump *gump) {
 // Input handling
 //
 
-Gump *Gump::OnMouseDown(int button, int32 mx, int32 my) {
+Gump *Gump::onMouseDown(int button, int32 mx, int32 my) {
 	// Convert to local coords
 	ParentToGump(mx, my);
 
@@ -710,7 +707,7 @@ Gump *Gump::OnMouseDown(int button, int32 mx, int32 my) {
 		if (g->_flags & FLAG_CLOSING || g->IsHidden()) continue;
 
 		// It's got the point
-		if (g->PointOnGump(mx, my)) handled = g->OnMouseDown(button, mx, my);
+		if (g->PointOnGump(mx, my)) handled = g->onMouseDown(button, mx, my);
 
 		if (handled) break;
 	}
@@ -718,7 +715,7 @@ Gump *Gump::OnMouseDown(int button, int32 mx, int32 my) {
 	return handled;
 }
 
-Gump *Gump::OnMouseMotion(int32 mx, int32 my) {
+Gump *Gump::onMouseMotion(int32 mx, int32 my) {
 	// Convert to local coords
 	ParentToGump(mx, my);
 
@@ -733,7 +730,7 @@ Gump *Gump::OnMouseMotion(int32 mx, int32 my) {
 		if (g->_flags & FLAG_CLOSING || g->IsHidden()) continue;
 
 		// It's got the point
-		if (g->PointOnGump(mx, my)) handled = g->OnMouseMotion(mx, my);
+		if (g->PointOnGump(mx, my)) handled = g->onMouseMotion(mx, my);
 
 		if (handled) break;
 	}
@@ -859,7 +856,7 @@ bool Gump::loadData(Common::ReadStream *rs, uint32 version) {
 	uint32 childcount = rs->readUint32LE();
 	for (unsigned int i = 0; i < childcount; ++i) {
 		Object *obj = ObjectManager::get_instance()->loadObject(rs, version);
-		Gump *child = p_dynamic_cast<Gump *>(obj);
+		Gump *child = dynamic_cast<Gump *>(obj);
 		if (!child) return false;
 
 		AddChild(child, false);

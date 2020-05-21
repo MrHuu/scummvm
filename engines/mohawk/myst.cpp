@@ -656,7 +656,7 @@ void MohawkEngine_Myst::doFrame() {
 			}
 			break;
 		case Common::EVENT_QUIT:
-		case Common::EVENT_RTL:
+		case Common::EVENT_RETURN_TO_LAUNCHER:
 			// Attempt to autosave before exiting
 			saveAutosaveIfEnabled();
 			break;
@@ -700,7 +700,7 @@ bool MohawkEngine_Myst::canDoAction(MystEventAction action) {
 		return actionsAllowed && stack->getStackId() != kDemoStack;
 	default:
 		// Not implemented yet
-		assert(false);
+		error("canDoAction(): Not implemented");
 	}
 }
 

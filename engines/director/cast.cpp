@@ -137,7 +137,7 @@ SoundCast::SoundCast(Common::ReadStreamEndian &stream, uint16 version) {
 		for (int i = 0; i < 0xe; i++) {
 			stream.readByte();
 		}
-		_looping = stream.readByte() & 0x10;
+		_looping = stream.readByte() & 0x10 ? 0 : 1;
 	}
 }
 
@@ -298,6 +298,13 @@ void TextCast::setText(const char *text) {
 		((Graphics::MacEditableText *)_widget)->clearText();
 		((Graphics::MacEditableText *)_widget)->appendTextDefault(_ftext);
 	}
+}
+
+Common::String TextCast::getText() {
+	if (_widget)
+		_ptext = ((Graphics::MacEditableText *)_widget)->getEditedString().encode();
+
+	return _ptext;
 }
 
 ShapeCast::ShapeCast(Common::ReadStreamEndian &stream, uint16 version) {

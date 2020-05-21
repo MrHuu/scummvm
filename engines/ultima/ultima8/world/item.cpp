@@ -65,14 +65,15 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(Item, Object)
+DEFINE_RUNTIME_CLASSTYPE_CODE(Item)
 
 Item::Item()
 	: _shape(0), _frame(0), _x(0), _y(0), _z(0),
 	  _flags(0), _quality(0), _npcNum(0), _mapNum(0),
 	  _extendedFlags(0), _parent(0),
 	  _cachedShape(nullptr), _cachedShapeInfo(nullptr),
-	  _gump(0), _gravityPid(0), _lastSetup(0) {
+	  _gump(0), _gravityPid(0), _lastSetup(0),
+	  _ix(0), _iy(0), _iz(0) {
 }
 
 
@@ -81,8 +82,15 @@ Item::~Item() {
 
 void Item::dumpInfo() const {
 	pout << "Item " << getObjId() << " (class "
-	     << GetClassType()._className << ", _shape "
-	     << getShape() << ", " << getFrame() << ", (";
+	     << GetClassType()._className << ", shape "
+		 << getShape();
+
+	const char *ucname = GameData::get_instance()->getMainUsecode()->get_class_name(_shape);
+	if (ucname != nullptr) {
+		pout << " (uc:" << ucname << ")";
+	}
+
+	pout << ", " << getFrame() << ", (";
 
 	if (_parent) {
 		int32 gx, gy;
@@ -94,8 +102,16 @@ void Item::dumpInfo() const {
 
 	pout << ") q:" << getQuality()
 	     << ", m:" << getMapNum() << ", n:" << getNpcNum()
-	     << ", f:" << Std::hex << getFlags() << ", ef:"
-	     << getExtFlags() << ")" << Std::dec << Std::endl;
+	     << ", f: 0x" << Std::hex << getFlags() << ", ef:0x"
+		 << getExtFlags();
+
+	ShapeInfo *info = getShapeInfo();
+	if (info) {
+		pout << " shapeinfo f:" << info->_flags << ", fam:"
+			 << info->_family << ", et:" << info->_equipType;
+	}
+
+	pout << ")" << Std::dec << Std::endl;
 }
 
 Container *Item::getParentAsContainer() const {
@@ -896,6 +912,8 @@ int32 Item::collideMove(int32 dx, int32 dy, int32 dz, bool teleport, bool force,
 		bool we_were_released = false;
 		for (it = collisions.begin(); it != collisions.end(); it++) {
 			Item *item = getItem(it->_item);
+			if (!item)
+				continue; // shouldn't happen..
 
 			// Hitting us at the start and end, don't do anything
 			if (!_parent && it->_hitTime == 0x0000 &&
@@ -1038,15 +1056,14 @@ uint32 Item::callUsecodeEvent(uint32 event, const uint8 *args, int argsize) {
 	uint32 offset = u->get_class_event(class_id, event);
 	if (!offset) return 0; // event not found
 
-#ifdef DEBUG
-	if (UCMachine::get_instance()->trace_event()) {
-		pout.Print("Item: %d calling usecode event %d @ %04X:%04X\n",
-			_objId, event, class_id, offset);
-	}
-#endif
+	/*if (GAME_IS_CRUSADER && event != 1) {
+		debug(6, "Crusader: not running event %d for item %d shape %d",
+					event, _objId, _shape);
+		return 0;
+	}*/
 
-	// FIXME: Disabled usecode except for Use events in crusader for now
-	if (GAME_IS_CRUSADER && event != 1) return 0;
+	debug(10, "Item: %d (shape %d) calling usecode event %d @ %04X:%04X",
+			_objId, _shape, event, class_id, offset);
 
 	return callUsecode(static_cast<uint16>(class_id),
 	                   static_cast<uint16>(offset),
@@ -1132,7 +1149,7 @@ uint32 Item::callUsecodeEvent_guardianBark(int16 unk) {         // event 15
 }
 
 uint32 Item::use() {
-	Actor *actor = p_dynamic_cast<Actor *>(this);
+	Actor *actor = dynamic_cast<Actor *>(this);
 	if (actor) {
 		if (actor->isDead()) {
 			// dead actor, so open/close the dead-body-_gump
@@ -1301,7 +1318,7 @@ void Item::enterFastArea() {
 	// Call usecode
 	if (!(_flags & FLG_FASTAREA)) {
 
-		Actor *actor = p_dynamic_cast<Actor *>(this);
+		Actor *actor = dynamic_cast<Actor *>(this);
 		if (actor && actor->isDead()) {
 			// dead actor, don't call the usecode
 		} else {
@@ -1335,7 +1352,7 @@ void Item::leaveFastArea() {
 	// Kill us if we are fast only, unless we're in a container
 	if ((_flags & FLG_FAST_ONLY) && !getParent()) {
 		// destroy contents if container
-		Container *c = p_dynamic_cast<Container *>(this);
+		Container *c = dynamic_cast<Container *>(this);
 		if (c) c->destroyContents();
 
 		destroy();
@@ -1453,7 +1470,7 @@ int32 Item::ascend(int delta) {
 GravityProcess *Item::ensureGravityProcess() {
 	GravityProcess *p;
 	if (_gravityPid) {
-		p = p_dynamic_cast<GravityProcess *>(
+		p = dynamic_cast<GravityProcess *>(
 		        Kernel::get_instance()->getProcess(_gravityPid));
 	} else {
 		p = new GravityProcess(this, 0);
@@ -1585,7 +1602,7 @@ bool Item::canDrag() {
 	if (si->is_fixed()) return false;
 	if (si->_weight == 0) return false;
 
-	Actor *actor = p_dynamic_cast<Actor *>(this);
+	Actor *actor = dynamic_cast<Actor *>(this);
 	if (actor) {
 		// living actors can't be moved
 		if (!actor->isDead()) return false;
@@ -1912,10 +1929,10 @@ uint32 Item::I_getShape(const uint8 *args, unsigned int /*argsize*/) {
 
 uint32 Item::I_setShape(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
-	ARG_UINT16(_shape);
+	ARG_UINT16(shape);
 	if (!item) return 0;
 
-	item->setShape(_shape);
+	item->setShape(shape);
 	return 0;
 }
 
@@ -1928,10 +1945,10 @@ uint32 Item::I_getFrame(const uint8 *args, unsigned int /*argsize*/) {
 
 uint32 Item::I_setFrame(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
-	ARG_UINT16(_frame);
+	ARG_UINT16(frame);
 	if (!item) return 0;
 
-	item->setFrame(_frame);
+	item->setFrame(frame);
 	return 0;
 }
 
@@ -2094,7 +2111,7 @@ uint32 Item::I_getTypeFlag(const uint8 *args, unsigned int /*argsize*/) {
 	if (GAME_IS_U8 && typeflag >= 64)
 		perr << "Invalid TypeFlag greater than 63 requested (" << typeflag << ") by Usecode" << Std::endl;
 	if (GAME_IS_CRUSADER && typeflag >= 72)
-		perr << "Invalid TypeFlag greater than 63 requested (" << typeflag << ") by Usecode" << Std::endl;
+		perr << "Invalid TypeFlag greater than 72 requested (" << typeflag << ") by Usecode" << Std::endl;
 
 	if (info->getTypeFlag(typeflag))
 		return 1;
@@ -2109,7 +2126,7 @@ uint32 Item::I_getStatus(const uint8 *args, unsigned int /*argsize*/) {
 	return item->getFlags();
 }
 
-uint32 Item::I_orStatus(const uint8 *args, unsigned int /*argsize*/) {
+uint32 Item::I_orStatus(const uint8 *args, unsigned int argsize) {
 	ARG_ITEM_FROM_PTR(item);
 	ARG_UINT16(mask);
 	if (!item) return 0;
@@ -2118,7 +2135,7 @@ uint32 Item::I_orStatus(const uint8 *args, unsigned int /*argsize*/) {
 	return 0;
 }
 
-uint32 Item::I_andStatus(const uint8 *args, unsigned int /*argsize*/) {
+uint32 Item::I_andStatus(const uint8 *args, unsigned int argsize) {
 	ARG_ITEM_FROM_PTR(item);
 	ARG_UINT16(mask);
 	if (!item) return 0;
@@ -2222,21 +2239,21 @@ uint32 Item::I_ask(const uint8 *args, unsigned int /*argsize*/) {
 
 uint32 Item::I_legalCreateAtPoint(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_UC_PTR(itemptr); // need to store the item id at *itemptr
-	ARG_UINT16(_shape);
-	ARG_UINT16(_frame);
+	ARG_UINT16(shape);
+	ARG_UINT16(frame);
 	ARG_WORLDPOINT(point);
 
 	// check if item can exist
 	CurrentMap *cm = World::get_instance()->getCurrentMap();
 	bool valid = cm->isValidPosition(point.getX(), point.getY(), point.getZ(),
-	                                 _shape, 0, 0, 0);
+	                                 shape, 0, 0, 0);
 	if (!valid)
 		return 0;
 
-	Item *newitem = ItemFactory::createItem(_shape, _frame, 0, 0, 0, 0, 0, true);
+	Item *newitem = ItemFactory::createItem(shape, frame, 0, 0, 0, 0, 0, true);
 	if (!newitem) {
-		perr << "I_legalCreateAtPoint failed to create item (" << _shape
-		     << "," << _frame << ")." << Std::endl;
+		perr << "I_legalCreateAtPoint failed to create item (" << shape
+		     << "," << frame << ")." << Std::endl;
 		return 0;
 	}
 	uint16 objID = newitem->getObjId();
@@ -2252,27 +2269,27 @@ uint32 Item::I_legalCreateAtPoint(const uint8 *args, unsigned int /*argsize*/) {
 
 uint32 Item::I_legalCreateAtCoords(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_UC_PTR(itemptr); // need to store the item id at *itemptr
-	ARG_UINT16(_shape);
-	ARG_UINT16(_frame);
-	ARG_UINT16(_x);
-	ARG_UINT16(_y);
-	ARG_UINT16(_z);
+	ARG_UINT16(shape);
+	ARG_UINT16(frame);
+	ARG_UINT16(x);
+	ARG_UINT16(y);
+	ARG_UINT16(z);
 
 	// check if item can exist
 	CurrentMap *cm = World::get_instance()->getCurrentMap();
-	bool valid = cm->isValidPosition(_x, _y, _z, _shape, 0, 0, 0);
+	bool valid = cm->isValidPosition(x, y, z, shape, 0, 0, 0);
 	if (!valid)
 		return 0;
 
 	// if yes, create it
-	Item *newitem = ItemFactory::createItem(_shape, _frame, 0, 0, 0, 0, 0, true);
+	Item *newitem = ItemFactory::createItem(shape, frame, 0, 0, 0, 0, 0, true);
 	if (!newitem) {
-		perr << "I_legalCreateAtCoords failed to create item (" << _shape
-		     << "," << _frame << ")." << Std::endl;
+		perr << "I_legalCreateAtCoords failed to create item (" << shape
+		     << "," << frame << ")." << Std::endl;
 		return 0;
 	}
 	uint16 objID = newitem->getObjId();
-	newitem->move(_x, _y, _z);
+	newitem->move(x, y, z);
 
 	uint8 buf[2];
 	buf[0] = static_cast<uint8>(objID);
@@ -2284,8 +2301,8 @@ uint32 Item::I_legalCreateAtCoords(const uint8 *args, unsigned int /*argsize*/) 
 
 uint32 Item::I_legalCreateInCont(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_UC_PTR(itemptr); // need to store the item id at *itemptr
-	ARG_UINT16(_shape);
-	ARG_UINT16(_frame);
+	ARG_UINT16(shape);
+	ARG_UINT16(frame);
 	ARG_CONTAINER_FROM_ID(container);
 	ARG_UINT16(unknown); // ?
 
@@ -2297,10 +2314,10 @@ uint32 Item::I_legalCreateInCont(const uint8 *args, unsigned int /*argsize*/) {
 	// Create an item and try to add it to the given container.
 	// If it fits, return id; otherwise return 0.
 
-	Item *newitem = ItemFactory::createItem(_shape, _frame, 0, 0, 0, 0, 0, true);
+	Item *newitem = ItemFactory::createItem(shape, frame, 0, 0, 0, 0, 0, true);
 	if (!newitem) {
-		perr << "I_legalCreateInCont failed to create item (" << _shape
-		     << "," << _frame << ")." << Std::endl;
+		perr << "I_legalCreateInCont failed to create item (" << shape
+		     << "," << frame << ")." << Std::endl;
 		return 0;
 	}
 
@@ -2395,10 +2412,10 @@ uint32 Item::I_isOn(const uint8 *args, unsigned int /*argsize*/) {
 }
 
 uint32 Item::I_getFamilyOfType(const uint8 *args, unsigned int /*argsize*/) {
-	ARG_UINT16(_shape);
+	ARG_UINT16(shape);
 
 	return GameData::get_instance()->getMainShapes()->
-	       getShapeInfo(_shape)->_family;
+	       getShapeInfo(shape)->_family;
 }
 
 uint32 Item::I_push(const uint8 *args, unsigned int /*argsize*/) {
@@ -2412,13 +2429,13 @@ uint32 Item::I_push(const uint8 *args, unsigned int /*argsize*/) {
 
 uint32 Item::I_create(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_UC_PTR(itemptr); // need to store the item id at *itemptr (????)
-	ARG_UINT16(_shape);
-	ARG_UINT16(_frame);
+	ARG_UINT16(shape);
+	ARG_UINT16(frame);
 
-	Item *newitem = ItemFactory::createItem(_shape, _frame, 0, 0, 0, 0, 0, true);
+	Item *newitem = ItemFactory::createItem(shape, frame, 0, 0, 0, 0, 0, true);
 	if (!newitem) {
-		perr << "I_create failed to create item (" << _shape
-		     << "," << _frame << ")." << Std::endl;
+		perr << "I_create failed to create item (" << shape
+		     << "," << frame << ")." << Std::endl;
 		return 0;
 	}
 	uint16 objID = newitem->getObjId();
@@ -2465,30 +2482,30 @@ uint32 Item::I_pop(const uint8 *args, unsigned int /*argsize*/) {
 
 uint32 Item::I_popToCoords(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_NULL32(); // ARG_ITEM_FROM_PTR(item); // unused
-	ARG_UINT16(_x);
-	ARG_UINT16(_y);
-	ARG_UINT16(_z);
+	ARG_UINT16(x);
+	ARG_UINT16(y);
+	ARG_UINT16(z);
 
 	World *w = World::get_instance();
 
 	if (w->etherealEmpty()) return 0; // no items left on stack
 
-	uint16 _objId = w->etherealPeek();
-	Item *item = getItem(_objId);
+	uint16 objId = w->etherealPeek();
+	Item *item = getItem(objId);
 	if (!item) {
-		w->etherealRemove(_objId);
+		w->etherealRemove(objId);
 		return 0; // top item was invalid
 	}
 
-	item->move(_x, _y, _z);
+	item->move(x, y, z);
 
 #if 0
-	perr << "Popping item into map: " << item->getShape() << "," << item->getFrame() << " at (" << _x << "," << _y << "," << _z << ")" << Std::endl;
+	perr << "Popping item into map: " << item->getShape() << "," << item->getFrame() << " at (" << x << "," << y << "," << z << ")" << Std::endl;
 #endif
 
 	//! Anything else?
 
-	return _objId;
+	return objId;
 }
 
 uint32 Item::I_popToContainer(const uint8 *args, unsigned int /*argsize*/) {
@@ -2550,15 +2567,15 @@ uint32 Item::I_popToEnd(const uint8 *args, unsigned int /*argsize*/) {
 
 uint32 Item::I_move(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
-	ARG_UINT16(_x);
-	ARG_UINT16(_y);
-	ARG_UINT16(_z);
+	ARG_UINT16(x);
+	ARG_UINT16(y);
+	ARG_UINT16(z);
 	if (!item) return 0;
 
 	//! What should this do to ethereal items?
 
-	item->move(_x, _y, _z);
-	//item->collideMove(_x, _y, _z, true, true);
+	item->move(x, y, z);
+	//item->collideMove(x, y, z, true, true);
 	return 0;
 }
 
@@ -2582,6 +2599,7 @@ uint32 Item::I_legalMoveToContainer(const uint8 *args, unsigned int /*argsize*/)
 	ARG_ITEM_FROM_PTR(item);
 	ARG_CONTAINER_FROM_PTR(container);
 	ARG_UINT16(unknown); // always 0
+	if (!item || !container) return 0; // shouldn't happen?
 
 	// try to move item to container checking weight and volume
 	return item->moveToContainer(container, true);
@@ -2605,10 +2623,10 @@ uint32 Item::I_getMapArray(const uint8 *args, unsigned int /*argsize*/) {
 //!!! is this correct?
 uint32 Item::I_setMapArray(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
-	ARG_UINT16(_mapNum);
+	ARG_UINT16(mapNum);
 	if (!item) return 0;
 
-	item->setMapNum(_mapNum);
+	item->setMapNum(mapNum);
 	return 0;
 }
 
@@ -2621,26 +2639,26 @@ uint32 Item::I_getNpcNum(const uint8 *args, unsigned int /*argsize*/) {
 
 uint32 Item::I_getDirToCoords(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
-	ARG_UINT16(_x);
-	ARG_UINT16(_y);
+	ARG_UINT16(x);
+	ARG_UINT16(y);
 	if (!item) return 0;
 
 	int32 ix, iy, iz;
 	item->getLocationAbsolute(ix, iy, iz);
 
-	return Get_WorldDirection(_y - iy, _x - ix);
+	return Get_WorldDirection(y - iy, x - ix);
 }
 
 uint32 Item::I_getDirFromCoords(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
-	ARG_UINT16(_x);
-	ARG_UINT16(_y);
+	ARG_UINT16(x);
+	ARG_UINT16(y);
 	if (!item) return 0;
 
 	int32 ix, iy, iz;
 	item->getLocationAbsolute(ix, iy, iz);
 
-	return Get_WorldDirection(iy - _y, ix - _x);
+	return Get_WorldDirection(iy - y, ix - x);
 }
 
 uint32 Item::I_getDirToItem(const uint8 *args, unsigned int /*argsize*/) {
@@ -2724,7 +2742,7 @@ uint32 Item::I_getSliderInput(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_SINT16(maxval);
 	ARG_SINT16(step);
 
-	UCProcess *current = p_dynamic_cast<UCProcess *>(Kernel::get_instance()->getRunningProcess());
+	UCProcess *current = dynamic_cast<UCProcess *>(Kernel::get_instance()->getRunningProcess());
 	assert(current);
 
 //	pout << "SliderGump: min=" << minval << ", max=" << maxval << ", step=" << step << Std::endl;
@@ -2811,15 +2829,15 @@ uint32 Item::I_explode(const uint8 *args, unsigned int /*argsize*/) {
 }
 
 uint32 Item::I_igniteChaos(const uint8 *args, unsigned int /*argsize*/) {
-	ARG_UINT16(_x);
-	ARG_UINT16(_y);
+	ARG_UINT16(x);
+	ARG_UINT16(y);
 	ARG_NULL8();
 
 	UCList itemlist(2);
 	LOOPSCRIPT(script, LS_SHAPE_EQUAL(592)); // all oilflasks (CONSTANT!)
 	CurrentMap *currentmap = World::get_instance()->getCurrentMap();
 	currentmap->areaSearch(&itemlist, script, sizeof(script), 0,
-	                       160, false, _x, _y); //! CHECKME: 160?
+	                       160, false, x, y); //! CHECKME: 160?
 
 	for (unsigned int i = 0; i < itemlist.getSize(); ++i) {
 		Item *item = getItem(itemlist.getuint16(i));
@@ -2837,7 +2855,7 @@ uint32 Item::I_canReach(const uint8 *args, unsigned int /*argsize*/) {
 
 	// TODO: add cheat to make this always return 1
 
-	if (item->canReach(other, range))
+	if (item && other && item->canReach(other, range))
 		return 1;
 	else
 		return 0;

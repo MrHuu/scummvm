@@ -25,6 +25,7 @@
 
 #include "common/str-array.h"
 #include "graphics/macgui/macfontmanager.h"
+#include "graphics/font.h"
 
 namespace Common {
 class U32String;
@@ -53,6 +54,8 @@ public:
 
 	static Common::StringArray *readMenuFromResource(Common::SeekableReadStream *res);
 	static MacMenu *createMenuFromPEexe(Common::PEResources *exe, MacWindowManager *wm);
+
+	void setAlignment(Graphics::TextAlign align);
 
 	void setCommandsCallback(void (*callback)(int, Common::String &, void *), void *data) { _ccallback = callback; _cdata = data; }
 	void setCommandsCallback(void (*callback)(int, Common::U32String &, void *), void *data) { _unicodeccallback = callback; _cdata = data; }
@@ -91,6 +94,7 @@ public:
 private:
 	ManagedSurface _screen;
 	ManagedSurface _tempSurface;
+	TextAlign _align;
 
 private:
 	bool checkCallback(bool unicode = false);

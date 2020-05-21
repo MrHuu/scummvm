@@ -158,6 +158,8 @@ MacWindowManager::MacWindowManager(uint32 mode) {
 	_activeWindow = -1;
 	_needsRemoval = false;
 
+	_activeWidget = nullptr;
+
 	_mode = mode;
 
 	_menu = 0;
@@ -166,7 +168,6 @@ MacWindowManager::MacWindowManager(uint32 mode) {
 
 	_engineP = nullptr;
 	_engineR = nullptr;
-	_pauseEngineCallback = nullptr;
 	_redrawEngineCallback = nullptr;
 
 	_colorBlack = 0;
@@ -210,6 +211,15 @@ void MacWindowManager::setMode(uint32 mode) {
 		_fontMan->forceBuiltinFonts();
 }
 
+void MacWindowManager::setActiveWidget(MacWidget *widget) {
+	if (_activeWidget)
+		_activeWidget->setActive(false);
+
+	_activeWidget = widget;
+
+	if (_activeWidget)
+		_activeWidget->setActive(true);
+}
 
 MacWindow *MacWindowManager::addWindow(bool scrollable, bool resizable, bool editable) {
 	MacWindow *w = new MacWindow(_lastId, scrollable, resizable, editable, this);
@@ -255,14 +265,25 @@ void MacWindowManager::activateMenu() {
 		return;
 
 	if (_mode & kWMModalMenuMode) {
-		if (!_screenCopy)
-			_screenCopy = new ManagedSurface(*_screen);	// Create a copy
-		else
-			*_screenCopy = *_screen;
-		pauseEngine(true);
+		activateScreenCopy();
 	}
 
 	_menu->setVisible(true);
+}
+
+void MacWindowManager::activateScreenCopy() {
+	if (!_screenCopy)
+		_screenCopy = new ManagedSurface(*_screen);	// Create a copy
+	else
+		*_screenCopy = *_screen;
+
+	_screenCopyPauseToken = pauseEngine();
+}
+
+void MacWindowManager::disableScreenCopy() {
+	_screenCopyPauseToken.clear();
+	*_screen = *_screenCopy; // restore screen
+	g_system->copyRectToScreen(_screenCopy->getBasePtr(0, 0), _screenCopy->pitch, 0, 0, _screenCopy->w, _screenCopy->h);
 }
 
 bool MacWindowManager::isMenuActive() {
@@ -518,6 +539,16 @@ void MacWindowManager::pushCustomCursor(const byte *data, int w, int h, int hx, 
 	CursorMan.pushCursorPalette(cursorPalette, 0, 2);
 }
 
+void MacWindowManager::pushCustomCursor(const Graphics::Cursor *cursor) {
+	CursorMan.pushCursor(cursor->getSurface(), cursor->getWidth(), cursor->getHeight(), cursor->getHotspotX(),
+	                     cursor->getHotspotY(), cursor->getKeyColor());
+
+	if (cursor->getPalette())
+		CursorMan.pushCursorPalette(cursor->getPalette(), cursor->getPaletteStartIndex(), cursor->getPaletteCount());
+	else
+		CursorMan.pushCursorPalette(cursorPalette, 0, 2);
+}
+
 void MacWindowManager::popCursor() {
 	CursorMan.popCursor();
 	CursorMan.popCursorPalette();
@@ -600,17 +631,12 @@ uint MacWindowManager::findBestColor(byte cr, byte cg, byte cb) {
 	return bestColor;
 }
 
-void MacWindowManager::pauseEngine(bool pause) {
-	if (_engineP && _pauseEngineCallback) {
-		_pauseEngineCallback(_engineP, pause);
-	} else {
-		warning("MacWindowManager::pauseEngine(): no pauseEngineCallback is set");
-	}
+PauseToken MacWindowManager::pauseEngine() {
+	return _engineP->pauseEngine();
 }
 
-void MacWindowManager::setEnginePauseCallback(void *engine, void (*pauseCallback)(void *, bool)) {
+void MacWindowManager::setEngine(Engine *engine) {
 	_engineP = engine;
-	_pauseEngineCallback = pauseCallback;
 }
 
 void MacWindowManager::setEngineRedrawCallback(void *engine, void (*redrawCallback)(void *)) {

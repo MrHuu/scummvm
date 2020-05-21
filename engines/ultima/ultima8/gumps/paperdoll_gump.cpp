@@ -41,7 +41,7 @@
 namespace Ultima {
 namespace Ultima8 {
 
-DEFINE_RUNTIME_CLASSTYPE_CODE(PaperdollGump, ContainerGump)
+DEFINE_RUNTIME_CLASSTYPE_CODE(PaperdollGump)
 
 
 
@@ -266,9 +266,11 @@ bool PaperdollGump::GetLocationOfItem(uint16 itemid, int32 &gx, int32 &gy,
                                       int32 lerp_factor) {
 
 	Item *item = getItem(itemid);
-	Item *parent_ = item->getParentAsContainer();
-	if (!parent_) return false;
-	if (parent_->getObjId() != _owner) return false;
+	if (!item)
+		return false; // item gone - shouldn't happen?
+	Item *parent = item->getParentAsContainer();
+	if (!parent || parent->getObjId() != _owner)
+		return false;
 
 	//!!! need to use lerp_factor
 
@@ -383,7 +385,7 @@ void PaperdollGump::ChildNotify(Gump *child, uint32 message) {
 	        message == ButtonWidget::BUTTON_CLICK) {
 		// check if there already is an open MiniStatsGump
 		Gump *desktop = Ultima8Engine::get_instance()->getDesktopGump();
-		Gump *statsgump = desktop->FindGump(MiniStatsGump::ClassType);
+		Gump *statsgump = desktop->FindGump<MiniStatsGump>();
 
 		if (!statsgump) {
 			Gump *gump = new MiniStatsGump(0, 0);

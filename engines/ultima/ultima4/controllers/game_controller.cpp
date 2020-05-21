@@ -29,7 +29,7 @@
 #include "ultima/ultima4/game/context.h"
 #include "ultima/ultima4/game/death.h"
 #include "ultima/ultima4/game/moongate.h"
-#include "ultima/ultima4/game/stats.h"
+#include "ultima/ultima4/views/stats.h"
 #include "ultima/ultima4/gfx/imagemgr.h"
 #include "ultima/ultima4/gfx/screen.h"
 #include "ultima/ultima4/map/annotation.h"
@@ -42,8 +42,6 @@
 
 namespace Ultima {
 namespace Ultima4 {
-
-using namespace std;
 
 GameController *g_game = nullptr;
 
@@ -67,7 +65,7 @@ void GameController::initScreen() {
 }
 
 void GameController::initScreenWithoutReloadingState() {
-	g_music->play();
+	g_music->playMapMusic();
 	imageMgr->get(BKGD_BORDERS)->_image->draw(0, 0);
 	g_context->_stats->update(); /* draw the party stats */
 
@@ -82,10 +80,9 @@ void GameController::initScreenWithoutReloadingState() {
 void GameController::init() {
 	initScreen();
 
-	// initialize the global game context, conversation and game state variables
-	g_context = new Context();
+	// initialize the state of the global game context
 	g_context->_line = TEXT_AREA_H - 1;
-	g_context->col = 0;
+	g_context->_col = 0;
 	g_context->_stats = new StatsArea();
 	g_context->_moonPhase = 0;
 	g_context->_windDirection = DIR_NORTH;
@@ -156,6 +153,7 @@ void GameController::setMap(Map *map, bool saveLocation, const Portal *portal, T
 
 	if (isCity(map)) {
 		City *city = dynamic_cast<City *>(map);
+		assert(city);
 		city->addPeople();
 	}
 }
@@ -239,7 +237,7 @@ void GameController::finishTurn() {
 			break;
 
 		if (g_context->_party->isDead()) {
-			deathStart(0);
+			g_death->start(0);
 			return;
 		} else {
 			g_screen->screenMessage("Zzzzzz\n");
@@ -249,9 +247,12 @@ void GameController::finishTurn() {
 
 	if (g_context->_location->_context == CTX_DUNGEON) {
 		Dungeon *dungeon = dynamic_cast<Dungeon *>(g_context->_location->_map);
+		assert(dungeon);
+
 		if (g_context->_party->getTorchDuration() <= 0)
 			g_screen->screenMessage("It's Dark!\n");
-		else g_context->_party->burnTorch();
+		else
+			g_context->_party->burnTorch();
 
 		/* handle dungeon traps */
 		if (dungeon->currentToken() == DUNGEON_TRAP) {
@@ -261,7 +262,7 @@ void GameController::finishTurn() {
 			// extra turn after party death and do some things
 			// that could cause a crash, like Hole up and Camp.
 			if (g_context->_party->isDead()) {
-				deathStart(0);
+				g_death->start(0);
 				return;
 			}
 		}
@@ -320,10 +321,13 @@ void GameController::update(Location *location, MoveEvent &event) {
 	case Map::DUNGEON:
 		avatarMovedInDungeon(event);
 		break;
-	case Map::COMBAT:
+	case Map::COMBAT: {
 		// FIXME: let the combat controller handle it
-		dynamic_cast<CombatController *>(eventHandler->getController())->movePartyMember(event);
+		CombatController *ctl = dynamic_cast<CombatController *>(eventHandler->getController());
+		assert(ctl);
+		ctl->movePartyMember(event);
 		break;
+	}
 	default:
 		avatarMoved(event);
 		break;
@@ -332,18 +336,22 @@ void GameController::update(Location *location, MoveEvent &event) {
 
 void GameController::setActive() {
 	// The game controller has the keybindings enabled
-	MetaEngine::setKeybindingsActive(true);
+	MetaEngine::setKeybindingMode(KBMODE_NORMAL);
 }
 
 void GameController::keybinder(KeybindingAction action) {
 	MetaEngine::executeAction(action);
 }
 
-bool GameController::keyPressed(int key) {
-	// Manually redraw the text prompt
-	g_screen->screenPrompt();
+bool GameController::mousePressed(const Common::Point &mousePos) {
+	const MouseArea *area = eventHandler->mouseAreaForPoint(mousePos.x, mousePos.y);
 
-	return KeyHandler::defaultHandler(key, nullptr);
+	if (area) {
+		keybinder(KEYBIND_INTERACT);
+		return true;
+	}
+
+	return false;
 }
 
 void GameController::initMoons() {
@@ -386,50 +394,50 @@ void GameController::updateMoons(bool showmoongates) {
 		if (showmoongates) {
 			/* update the moongates if trammel changed */
 			if (trammelSubphase == 0) {
-				gate = moongateGetGateCoordsForPhase(oldTrammel);
+				gate = g_moongates->getGateCoordsForPhase(oldTrammel);
 				if (gate)
 					g_context->_location->_map->_annotations->remove(*gate, g_context->_location->_map->translateFromRawTileIndex(0x40));
-				gate = moongateGetGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
+				gate = g_moongates->getGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
 				if (gate)
 					g_context->_location->_map->_annotations->add(*gate, g_context->_location->_map->translateFromRawTileIndex(0x40));
 			} else if (trammelSubphase == 1) {
-				gate = moongateGetGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
+				gate = g_moongates->getGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
 				if (gate) {
 					g_context->_location->_map->_annotations->remove(*gate, g_context->_location->_map->translateFromRawTileIndex(0x40));
 					g_context->_location->_map->_annotations->add(*gate, g_context->_location->_map->translateFromRawTileIndex(0x41));
 				}
 			} else if (trammelSubphase == 2) {
-				gate = moongateGetGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
+				gate = g_moongates->getGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
 				if (gate) {
 					g_context->_location->_map->_annotations->remove(*gate, g_context->_location->_map->translateFromRawTileIndex(0x41));
 					g_context->_location->_map->_annotations->add(*gate, g_context->_location->_map->translateFromRawTileIndex(0x42));
 				}
 			} else if (trammelSubphase == 3) {
-				gate = moongateGetGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
+				gate = g_moongates->getGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
 				if (gate) {
 					g_context->_location->_map->_annotations->remove(*gate, g_context->_location->_map->translateFromRawTileIndex(0x42));
 					g_context->_location->_map->_annotations->add(*gate, g_context->_location->_map->translateFromRawTileIndex(0x43));
 				}
 			} else if ((trammelSubphase > 3) && (trammelSubphase < (MOON_SECONDS_PER_PHASE * 4 * 3) - 3)) {
-				gate = moongateGetGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
+				gate = g_moongates->getGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
 				if (gate) {
 					g_context->_location->_map->_annotations->remove(*gate, g_context->_location->_map->translateFromRawTileIndex(0x43));
 					g_context->_location->_map->_annotations->add(*gate, g_context->_location->_map->translateFromRawTileIndex(0x43));
 				}
 			} else if (trammelSubphase == (MOON_SECONDS_PER_PHASE * 4 * 3) - 3) {
-				gate = moongateGetGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
+				gate = g_moongates->getGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
 				if (gate) {
 					g_context->_location->_map->_annotations->remove(*gate, g_context->_location->_map->translateFromRawTileIndex(0x43));
 					g_context->_location->_map->_annotations->add(*gate, g_context->_location->_map->translateFromRawTileIndex(0x42));
 				}
 			} else if (trammelSubphase == (MOON_SECONDS_PER_PHASE * 4 * 3) - 2) {
-				gate = moongateGetGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
+				gate = g_moongates->getGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
 				if (gate) {
 					g_context->_location->_map->_annotations->remove(*gate, g_context->_location->_map->translateFromRawTileIndex(0x42));
 					g_context->_location->_map->_annotations->add(*gate, g_context->_location->_map->translateFromRawTileIndex(0x41));
 				}
 			} else if (trammelSubphase == (MOON_SECONDS_PER_PHASE * 4 * 3) - 1) {
-				gate = moongateGetGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
+				gate = g_moongates->getGateCoordsForPhase(g_ultima->_saveGame->_trammelPhase);
 				if (gate) {
 					g_context->_location->_map->_annotations->remove(*gate, g_context->_location->_map->translateFromRawTileIndex(0x41));
 					g_context->_location->_map->_annotations->add(*gate, g_context->_location->_map->translateFromRawTileIndex(0x40));
@@ -508,7 +516,7 @@ void GameController::avatarMoved(MoveEvent &event) {
 	if (event._result & MOVE_EXIT_TO_PARENT) {
 		g_screen->screenMessage("%cLeaving...%c\n", FG_GREY, FG_WHITE);
 		exitToParentMap();
-		g_music->play();
+		g_music->playMapMusic();
 	}
 
 	/* things that happen while not on board the balloon */
@@ -523,35 +531,38 @@ void GameController::avatarMoved(MoveEvent &event) {
 }
 
 void GameController::avatarMovedInDungeon(MoveEvent &event) {
-	Dungeon *dungeon = dynamic_cast<Dungeon *>(g_context->_location->_map);
 	Direction realDir = dirNormalize((Direction)g_ultima->_saveGame->_orientation, event._dir);
+	Dungeon *dungeon = dynamic_cast<Dungeon *>(g_context->_location->_map);
+	assert(dungeon);
 
 	if (!settings._filterMoveMessages) {
 		if (event._userEvent) {
 			if (event._result & MOVE_TURNED) {
 				if (dirRotateCCW((Direction)g_ultima->_saveGame->_orientation) == realDir)
 					g_screen->screenMessage("Turn Left\n");
-				else g_screen->screenMessage("Turn Right\n");
+				else
+					g_screen->screenMessage("Turn Right\n");
+			} else {
+				// Show 'Advance' or 'Retreat' in dungeons
+				g_screen->screenMessage("%s\n", realDir == g_ultima->_saveGame->_orientation ? "Advance" : "Retreat");
 			}
-			/* show 'Advance' or 'Retreat' in dungeons */
-			else g_screen->screenMessage("%s\n", realDir == g_ultima->_saveGame->_orientation ? "Advance" : "Retreat");
 		}
 
 		if (event._result & MOVE_BLOCKED)
 			g_screen->screenMessage("%cBlocked!%c\n", FG_GREY, FG_WHITE);
 	}
 
-	/* if we're exiting the map, do this */
+	// If we're exiting the map, do this
 	if (event._result & MOVE_EXIT_TO_PARENT) {
 		g_screen->screenMessage("%cLeaving...%c\n", FG_GREY, FG_WHITE);
 		exitToParentMap();
-		g_music->play();
+		g_music->playMapMusic();
 	}
 
-	/* check to see if we're entering a dungeon room */
+	// Check to see if we're entering a dungeon room
 	if (event._result & MOVE_SUCCEEDED) {
 		if (dungeon->currentToken() == DUNGEON_ROOM) {
-			int room = (int)dungeon->currentSubToken(); /* get room number */
+			int room = (int)dungeon->currentSubToken(); // Get room number
 
 			/**
 			 * recalculate room for the abyss -- there are 16 rooms for every 2 levels,
@@ -562,9 +573,10 @@ void GameController::avatarMovedInDungeon(MoveEvent &event) {
 				room = (0x10 * (g_context->_location->_coords.z / 2)) + room;
 
 			Dungeon *dng = dynamic_cast<Dungeon *>(g_context->_location->_map);
+			assert(dng);
 			dng->_currentRoom = room;
 
-			/* set the map and start combat! */
+			// Set the map and start combat!
 			CombatController *cc = new CombatController(dng->_roomMaps[room]);
 			cc->initDungeonRoom(room, dirReverse(realDir));
 			cc->begin();
@@ -670,7 +682,7 @@ void GameController::checkSpecialCreatures(Direction dir) {
 bool GameController::checkMoongates() {
 	Coords dest;
 
-	if (moongateFindActiveGateAt(g_ultima->_saveGame->_trammelPhase, g_ultima->_saveGame->_feluccaPhase, g_context->_location->_coords, dest)) {
+	if (g_moongates->findActiveGateAt(g_ultima->_saveGame->_trammelPhase, g_ultima->_saveGame->_feluccaPhase, g_context->_location->_coords, dest)) {
 
 		gameSpellEffect(-1, -1, SOUND_MOONGATE); // Default spell effect (screen inversion without 'spell' sound effects)
 
@@ -679,16 +691,17 @@ bool GameController::checkMoongates() {
 			gameSpellEffect(-1, -1, SOUND_MOONGATE); // Again, after arriving
 		}
 
-		if (moongateIsEntryToShrineOfSpirituality(g_ultima->_saveGame->_trammelPhase, g_ultima->_saveGame->_feluccaPhase)) {
+		if (g_moongates->isEntryToShrineOfSpirituality(g_ultima->_saveGame->_trammelPhase, g_ultima->_saveGame->_feluccaPhase)) {
 			Shrine *shrine_spirituality;
 
 			shrine_spirituality = dynamic_cast<Shrine *>(mapMgr->get(MAP_SHRINE_SPIRITUALITY));
+			assert(shrine_spirituality);
 
 			if (!g_context->_party->canEnterShrine(VIRT_SPIRITUALITY))
 				return true;
 
 			setMap(shrine_spirituality, 1, nullptr);
-			g_music->play();
+			g_music->playMapMusic();
 
 			shrine_spirituality->enter();
 		}
@@ -712,7 +725,9 @@ void GameController::creatureCleanup() {
 
 			/* delete the object and remove it from the map */
 			i = map->removeObject(i);
-		} else i++;
+		} else {
+			i++;
+		}
 	}
 }
 
@@ -767,6 +782,69 @@ bool GameController::createBalloon(Map *map) {
 	ASSERT(balloon, "no balloon tile found in tileset");
 	map->addObject(balloon->getId(), balloon->getId(), map->getLabel("balloon"));
 	return true;
+}
+
+void GameController::attack(Direction dir) {
+	g_screen->screenMessage("Attack: ");
+	if (g_context->_party->isFlying()) {
+		g_screen->screenMessage("\n%cDrift only!%c\n", FG_GREY, FG_WHITE);
+		return;
+	}
+
+	if (dir == DIR_NONE)
+		dir = gameGetDirection();
+
+	if (dir == DIR_NONE) {
+		g_screen->screenMessage("\n");
+		return;
+	}
+
+	Std::vector<Coords> path = gameGetDirectionalActionPath(
+		MASK_DIR(dir), MASK_DIR_ALL, g_context->_location->_coords,
+		1, 1, nullptr, true);
+	for (Std::vector<Coords>::iterator i = path.begin(); i != path.end(); i++) {
+		if (attackAt(*i))
+			return;
+	}
+
+	g_screen->screenMessage("%cNothing to Attack!%c\n", FG_GREY, FG_WHITE);
+}
+
+bool GameController::attackAt(const Coords &coords) {
+	Object *under;
+	const Tile *ground;
+	Creature *m;
+
+	m = dynamic_cast<Creature *>(g_context->_location->_map->objectAt(coords));
+	// Nothing attackable: move on to next tile
+	if (m == nullptr || !m->isAttackable())
+		return false;
+
+	// Attack successful
+	/// TODO: CHEST: Make a user option to not make chests change battlefield
+	/// map (1 of 2)
+	ground = g_context->_location->_map->tileTypeAt(g_context->_location->_coords, WITH_GROUND_OBJECTS);
+	if (!ground->isChest()) {
+		ground = g_context->_location->_map->tileTypeAt(g_context->_location->_coords, WITHOUT_OBJECTS);
+		if ((under = g_context->_location->_map->objectAt(g_context->_location->_coords)) &&
+			under->getTile().getTileType()->isShip())
+			ground = under->getTile().getTileType();
+	}
+
+	// You're attacking a townsperson!  Alert the guards!
+	if ((m->getType() == Object::PERSON) && (m->getMovementBehavior() != MOVEMENT_ATTACK_AVATAR))
+		g_context->_location->_map->alertGuards();
+
+	// Not good karma to be killing the innocent.  Bad avatar!
+	if (m->isGood() || /* attacking a good creature */
+			/* attacking a docile (although possibly evil) person in town */
+		((m->getType() == Object::PERSON) && (m->getMovementBehavior() != MOVEMENT_ATTACK_AVATAR)))
+		g_context->_party->adjustKarma(KA_ATTACKED_GOOD);
+
+	CombatController *cc = new CombatController(CombatMap::mapForTile(ground, g_context->_party->getTransport().getTileType(), m));
+	cc->init(m);
+	cc->begin();
+	return false;
 }
 
 } // End of namespace Ultima4

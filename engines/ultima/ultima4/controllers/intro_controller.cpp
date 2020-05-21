@@ -25,7 +25,7 @@
 #include "ultima/ultima4/controllers/read_string_controller.h"
 #include "ultima/ultima4/controllers/read_choice_controller.h"
 #include "ultima/ultima4/game/player.h"
-#include "ultima/ultima4/game/menu.h"
+#include "ultima/ultima4/views/menu.h"
 #include "ultima/ultima4/core/config.h"
 #include "ultima/ultima4/core/utils.h"
 #include "ultima/ultima4/core/settings.h"
@@ -34,6 +34,7 @@
 #include "ultima/ultima4/filesys/u4file.h"
 #include "ultima/ultima4/gfx/imagemgr.h"
 #include "ultima/ultima4/gfx/screen.h"
+#include "ultima/ultima4/map/mapmgr.h"
 #include "ultima/ultima4/map/shrine.h"
 #include "ultima/ultima4/map/tileset.h"
 #include "ultima/ultima4/map/tilemap.h"
@@ -45,11 +46,6 @@
 
 namespace Ultima {
 namespace Ultima4 {
-
-using namespace std;
-
-Common::String profileName;
-bool useProfile;
 
 IntroController *g_intro;
 
@@ -67,25 +63,17 @@ IntroController *g_intro;
 #define GYP_SEGUE1 13
 #define GYP_SEGUE2 14
 
+#define INTRO_SCRIPT_TABLE_SIZE 548
+#define INTRO_BASETILE_TABLE_SIZE 15
+#define BEASTIE1_FRAMES 0x80
+#define BEASTIE2_FRAMES 0x40
+
 class IntroObjectState {
 public:
 	IntroObjectState() : x(0), y(0), tile(0) {}
 	int x, y;
 	MapTile tile; /* base tile + tile frame */
 };
-
-const int IntroBinData::INTRO_TEXT_OFFSET = 17445 - 1;  // (start at zero)
-const int IntroBinData::INTRO_MAP_OFFSET = 30339;
-const int IntroBinData::INTRO_FIXUPDATA_OFFSET = 29806;
-const int IntroBinData::INTRO_SCRIPT_TABLE_SIZE = 548;
-const int IntroBinData::INTRO_SCRIPT_TABLE_OFFSET = 30434;
-const int IntroBinData::INTRO_BASETILE_TABLE_SIZE = 15;
-const int IntroBinData::INTRO_BASETILE_TABLE_OFFSET = 16584;
-const int IntroBinData::BEASTIE1_FRAMES = 0x80;
-const int IntroBinData::BEASTIE2_FRAMES = 0x40;
-const int IntroBinData::BEASTIE_FRAME_TABLE_OFFSET = 0x7380;
-const int IntroBinData::BEASTIE1_FRAMES_OFFSET = 0;
-const int IntroBinData::BEASTIE2_FRAMES_OFFSET = 0x78;
 
 void IntroController::AnimElement::shufflePlotData() {
 	for (int idx = 0; idx < ((int)_plotData.size() - 1); ++idx) {
@@ -121,64 +109,64 @@ IntroBinData::~IntroBinData() {
 	_introGypsy.clear();
 }
 
+void IntroBinData::openFile(Shared::File &f, const Common::String &name) {
+	f.open(Common::String::format("data/intro/%s.dat", name.c_str()));
+}
+
 bool IntroBinData::load() {
 	int i;
 
-	Common::File *title = u4fopen("title.exe");
-	if (!title)
-		return false;
+	_introQuestions = u4read_stringtable("intro_questions");
+	_introText = u4read_stringtable("intro_text");
+	_introGypsy = u4read_stringtable("intro_gypsy");
 
-	_introQuestions = u4read_stringtable(title, INTRO_TEXT_OFFSET, 28);
-	_introText = u4read_stringtable(title, -1, 24);
-	_introGypsy = u4read_stringtable(title, -1, 15);
-
-	/* clean up stray newlines at end of strings */
+	// Clean up stray newlines at end of strings
 	for (i = 0; i < 15; i++)
 		trim(_introGypsy[i]);
 
 	if (_sigData)
 		delete _sigData;
 	_sigData = new byte[533];
-	u4fseek(title, INTRO_FIXUPDATA_OFFSET, SEEK_SET);
-	u4fread(_sigData, 1, 533, title);
 
-	u4fseek(title, INTRO_MAP_OFFSET, SEEK_SET);
+	Shared::File f;
+	openFile(f, "intro_sig");
+	f.read(_sigData, 533);
+
+	openFile(f, "intro_map");
 	_introMap.clear();
 	_introMap.resize(INTRO_MAP_WIDTH * INTRO_MAP_HEIGHT);
 	for (i = 0; i < INTRO_MAP_HEIGHT * INTRO_MAP_WIDTH; i++)
-		_introMap[i] = g_tileMaps->get("base")->translate(u4fgetc(title));
+		_introMap[i] = g_tileMaps->get("base")->translate(f.readByte());
 
-	u4fseek(title, INTRO_SCRIPT_TABLE_OFFSET, SEEK_SET);
+	openFile(f, "intro_script");
 	_scriptTable = new byte[INTRO_SCRIPT_TABLE_SIZE];
 	for (i = 0; i < INTRO_SCRIPT_TABLE_SIZE; i++)
-		_scriptTable[i] = u4fgetc(title);
+		_scriptTable[i] = f.readByte();
 
-	u4fseek(title, INTRO_BASETILE_TABLE_OFFSET, SEEK_SET);
+	openFile(f, "intro_base_tile");
 	_baseTileTable = new Tile*[INTRO_BASETILE_TABLE_SIZE];
 	for (i = 0; i < INTRO_BASETILE_TABLE_SIZE; i++) {
-		MapTile tile = g_tileMaps->get("base")->translate(u4fgetc(title));
+		MapTile tile = g_tileMaps->get("base")->translate(f.readByte());
 		_baseTileTable[i] = g_tileSets->get("base")->get(tile._id);
 	}
 
 	/* --------------------------
 	   load beastie frame table 1
 	   -------------------------- */
+	openFile(f, "intro_beastie1");
 	_beastie1FrameTable = new byte[BEASTIE1_FRAMES];
-	u4fseek(title, BEASTIE_FRAME_TABLE_OFFSET + BEASTIE1_FRAMES_OFFSET, SEEK_SET);
 	for (i = 0; i < BEASTIE1_FRAMES; i++) {
-		_beastie1FrameTable[i] = u4fgetc(title);
+		_beastie1FrameTable[i] = f.readByte();
 	}
 
 	/* --------------------------
 	   load beastie frame table 2
 	   -------------------------- */
+	openFile(f, "intro_beastie2");
 	_beastie2FrameTable = new byte[BEASTIE2_FRAMES];
-	u4fseek(title, BEASTIE_FRAME_TABLE_OFFSET + BEASTIE2_FRAMES_OFFSET, SEEK_SET);
 	for (i = 0; i < BEASTIE2_FRAMES; i++) {
-		_beastie2FrameTable[i] = u4fgetc(title);
+		_beastie2FrameTable[i] = f.readByte();
 	}
-
-	u4fclose(title);
 
 	return true;
 }
@@ -197,8 +185,13 @@ IntroController::IntroController() : Controller(1),
 		_title(_titles.begin()),     // element iterator
 		_transparentIndex(13),       // palette index for transparency
 		_transparentColor(),         // palette color for transparency
-		_bSkipTitles(false) {
+		_bSkipTitles(false),
+		_useProfile(false) {
 	Common::fill(&_questionTree[0], &_questionTree[15], -1);
+
+	// Setup a separate image surface for rendering the animated map on
+	_mapScreen = Image::create(g_screen->w, g_screen->h, false, Image::HARDWARE);
+	_mapArea.setDest(_mapScreen);
 
 	// initialize menus
 	_confMenu.setTitle("XU4 Configuration:", 0, 0);
@@ -239,8 +232,6 @@ IntroController::IntroController() : Controller(1),
 
 
 	_soundMenu.setTitle("Sound Options:", 0, 0);
-	_soundMenu.add(MI_SOUND_01,  new IntMenuItem("Music Volume         %s", 2,  2,/*'m'*/  0, &_settingsChanged._musicVol, 0, MAX_VOLUME, 1, MENU_OUTPUT_VOLUME));
-	_soundMenu.add(MI_SOUND_02,  new IntMenuItem("Sound Effect Volume  %s", 2,  3,/*'s'*/  0, &_settingsChanged._soundVol, 0, MAX_VOLUME, 1, MENU_OUTPUT_VOLUME));
 	_soundMenu.add(MI_SOUND_03, new BoolMenuItem("Fading               %s", 2,  4,/*'f'*/  0, &_settingsChanged._volumeFades));
 	_soundMenu.add(USE_SETTINGS,                 "\010 Use These Settings", 2, 11,/*'u'*/  2);
 	_soundMenu.add(CANCEL,                       "\010 Cancel",             2, 12,/*'c'*/  2);
@@ -248,11 +239,8 @@ IntroController::IntroController() : Controller(1),
 	_soundMenu.setClosesMenu(USE_SETTINGS);
 	_soundMenu.setClosesMenu(CANCEL);
 
-	_inputMenu.setTitle("Keyboard Options:", 0, 0);
-	_inputMenu.add(MI_INPUT_01,  new IntMenuItem("Repeat Delay        %4d msec", 2,  2,/*'d'*/  7, &_settingsChanged._keyDelay, 100, MAX_KEY_DELAY, 100));
-	_inputMenu.add(MI_INPUT_02,  new IntMenuItem("Repeat Interval     %4d msec", 2,  3,/*'i'*/  7, &_settingsChanged._keyInterval, 10, MAX_KEY_INTERVAL, 10));
-	/* "Mouse Options:" is drawn in the updateInputMenu() function */
-	_inputMenu.add(MI_INPUT_03, new BoolMenuItem("Mouse                %s",      2,  7,/*'m'*/  0, &_settingsChanged._mouseOptions._enabled));
+	_inputMenu.setTitle("Mouse Options:", 0, 0);
+	_inputMenu.add(MI_INPUT_03, new BoolMenuItem("Mouse                %s",      2,  2,/*'m'*/  0, &_settingsChanged._mouseOptions._enabled));
 	_inputMenu.add(USE_SETTINGS,                 "\010 Use These Settings",      2, 11,/*'u'*/  2);
 	_inputMenu.add(CANCEL,                       "\010 Cancel",                  2, 12,/*'c'*/  2);
 	_inputMenu.addShortcutKey(CANCEL, ' ');
@@ -302,6 +290,10 @@ IntroController::IntroController() : Controller(1),
 	_interfaceMenu.setClosesMenu(CANCEL);
 }
 
+IntroController::~IntroController() {
+	delete _mapScreen;
+}
+
 bool IntroController::init() {
 	_justInitiatedNewGame = false;
 
@@ -334,7 +326,7 @@ bool IntroController::init() {
 
 	_sleepCycles = 0;
 	_scrPos = 0;
-	_objectStateTable = new IntroObjectState[IntroBinData::INTRO_BASETILE_TABLE_SIZE];
+	_objectStateTable = new IntroObjectState[INTRO_BASETILE_TABLE_SIZE];
 
 	_backgroundArea.reinit();
 	_menuArea.reinit();
@@ -372,13 +364,13 @@ bool IntroController::keyPressed(int key) {
 	bool valid = true;
 
 	switch (_mode) {
-
 	case INTRO_TITLES:
 		// the user pressed a key to abort the sequence
 		skipTitles();
 		break;
 
 	case INTRO_MAP:
+	case INTRO_ABOUT:
 		_mode = INTRO_MENU;
 		updateScreen();
 		break;
@@ -438,6 +430,32 @@ bool IntroController::keyPressed(int key) {
 	}
 
 	return valid || KeyHandler::defaultHandler(key, nullptr);
+}
+
+bool IntroController::mousePressed(const Common::Point &mousePos) {
+	switch (_mode) {
+	case INTRO_TITLES:
+		// Finish the title sequence
+		skipTitles();
+		break;
+
+	case INTRO_MAP:
+	case INTRO_ABOUT:
+		_mode = INTRO_MENU;
+		updateScreen();
+		break;
+
+	case INTRO_MENU: {
+		char key = _menuArea.getOptionAt(mousePos);
+		if (key)
+			keyPressed(key);
+	}
+
+	default:
+		break;
+	}
+
+	return true;
 }
 
 void IntroController::drawMap() {
@@ -502,6 +520,14 @@ void IntroController::drawMap() {
 				drawMapStatic();
 				drawMapAnimated();
 
+				_mapScreen->drawSubRect(
+					SCALED(8),
+					SCALED(13 * 8),
+					SCALED(8),
+					SCALED(13 * 8),
+					SCALED(38 * 8),
+					SCALED(10 * 8));
+
 				/* set sleep cycles */
 				_sleepCycles = _binData->_scriptTable[_scrPos] & 0xf;
 				_scrPos++;
@@ -537,7 +563,7 @@ void IntroController::drawMapAnimated() {
 	int i;
 
 	// draw animated objects
-	for (i = 0; i < IntroBinData::INTRO_BASETILE_TABLE_SIZE; i++)
+	for (i = 0; i < INTRO_BASETILE_TABLE_SIZE; i++)
 		if (_objectStateTable[i].tile != 0) {
 			Std::vector<MapTile> tiles;
 			tiles.push_back(_objectStateTable[i].tile);
@@ -592,6 +618,7 @@ void IntroController::drawAbacusBeads(int row, int selectedVirtue, int rejectedV
 
 void IntroController::updateScreen() {
 	g_screen->screenHideCursor();
+	_menuArea.clearOptions();
 
 	switch (_mode) {
 	case INTRO_MAP:
@@ -599,8 +626,8 @@ void IntroController::updateScreen() {
 		drawMap();
 		drawBeasties();
 		// display the profile name if a local profile is being used
-		if (useProfile)
-			g_screen->screenTextAt(40 - profileName.size(), 24, "%s", profileName.c_str());
+		if (_useProfile)
+			g_screen->screenTextAt(40 - _profileName.size(), 24, "%s", _profileName.c_str());
 		break;
 
 	case INTRO_MENU:
@@ -623,11 +650,11 @@ void IntroController::updateScreen() {
 
 		_menuArea.textAt(1,  1, "In another world, in a time to come.");
 		_menuArea.textAt(14, 3, "Options:");
-		_menuArea.textAt(10, 5, "%s", _menuArea.colorizeString("Return to the view", FG_YELLOW, 0, 1).c_str());
-		_menuArea.textAt(10, 6, "%s", _menuArea.colorizeString("Journey Onward",     FG_YELLOW, 0, 1).c_str());
-		_menuArea.textAt(10, 7, "%s", _menuArea.colorizeString("Initiate New Game",  FG_YELLOW, 0, 1).c_str());
-		_menuArea.textAt(10, 8, "%s", _menuArea.colorizeString("Configure",          FG_YELLOW, 0, 1).c_str());
-		_menuArea.textAt(10, 9, "%s", _menuArea.colorizeString("About",              FG_YELLOW, 0, 1).c_str());
+		_menuArea.optionAt(10, 5, 'r', "%s", _menuArea.colorizeString("Return to the view", FG_YELLOW, 0, 1).c_str());
+		_menuArea.optionAt(10, 6, 'j', "%s", _menuArea.colorizeString("Journey Onward",     FG_YELLOW, 0, 1).c_str());
+		_menuArea.optionAt(10, 7, 'i', "%s", _menuArea.colorizeString("Initiate New Game",  FG_YELLOW, 0, 1).c_str());
+		_menuArea.optionAt(10, 8, 'c', "%s", _menuArea.colorizeString("Configure",          FG_YELLOW, 0, 1).c_str());
+		_menuArea.optionAt(10, 9, 'a', "%s", _menuArea.colorizeString("About",              FG_YELLOW, 0, 1).c_str());
 		drawBeasties();
 
 		// draw the cursor last
@@ -646,6 +673,7 @@ void IntroController::updateScreen() {
 void IntroController::initiateNewGame() {
 	// disable the screen cursor because a text cursor will now be used
 	g_screen->screenDisableCursor();
+	_menuArea.clear();
 
 	// draw the extended background for all option screens
 	_backgroundArea.draw(BKGD_INTRO);
@@ -706,50 +734,54 @@ void IntroController::finishInitiateGame(const Common::String &nameBuffer, SexTy
 	_menuArea.disableCursor();
 
 	// show the lead up story
-	showStory();
+	if (!shouldQuit())
+		showStory();
 
 	// ask questions that determine character class
-	startQuestions();
+	if (!shouldQuit())
+		startQuestions();
 
-	// Setup savegame fields. The original wrote out multiple files and
-	// then loaded them up once the game starts. Now we're simply setting
-	// up the savegame fields and letting the game read from them later,
-	// as if a savegame had been loaded
-	SaveGame &saveGame = *g_ultima->_saveGame;
-	SaveGamePlayerRecord avatar;
-	avatar.init();
-	strcpy(avatar.name, nameBuffer.c_str());
-	avatar._sex = sex;
-	saveGame.init(&avatar);
-	g_screen->screenHideCursor();
-	initPlayers(&saveGame);
-	saveGame._food = 30000;
-	saveGame._gold = 200;
-	saveGame._reagents[REAG_GINSENG] = 3;
-	saveGame._reagents[REAG_GARLIC] = 4;
-	saveGame._torches = 2;
+	if (!shouldQuit()) {
+		// Setup savegame fields. The original wrote out multiple files and
+		// then loaded them up once the game starts. Now we're simply setting
+		// up the savegame fields and letting the game read from them later,
+		// as if a savegame had been loaded
+		SaveGame &saveGame = *g_ultima->_saveGame;
+		SaveGamePlayerRecord avatar;
+		avatar.init();
+		strncpy(avatar._name, nameBuffer.c_str(), 15);
+		avatar._name[15] = '\0';
 
-	_justInitiatedNewGame = true;
+		avatar._sex = sex;
+		saveGame.init(&avatar);
+		g_screen->screenHideCursor();
+		initPlayers(&saveGame);
+		saveGame._food = 30000;
+		saveGame._gold = 200;
+		saveGame._reagents[REAG_GINSENG] = 3;
+		saveGame._reagents[REAG_GARLIC] = 4;
+		saveGame._torches = 2;
 
-	// show the text thats segues into the main game
-	showText(_binData->_introGypsy[GYP_SEGUE1]);
+		_justInitiatedNewGame = true;
+
+		// show the text thats segues into the main game
+		showText(_binData->_introGypsy[GYP_SEGUE1]);
 #ifdef IOS_ULTIMA4
-	U4IOS::switchU4IntroControllerToContinueButton();
+		U4IOS::switchU4IntroControllerToContinueButton();
 #endif
-	ReadChoiceController pauseController("");
-	eventHandler->pushController(&pauseController);
-	pauseController.waitFor();
+		ReadChoiceController pauseController("");
+		eventHandler->pushController(&pauseController);
+		pauseController.waitFor();
 
-	showText(_binData->_introGypsy[GYP_SEGUE2]);
+		showText(_binData->_introGypsy[GYP_SEGUE2]);
 
-	eventHandler->pushController(&pauseController);
-	pauseController.waitFor();
+		eventHandler->pushController(&pauseController);
+		pauseController.waitFor();
+	}
 
 	// done: exit intro and let game begin
 	_questionArea.disableCursor();
 	EventHandler::setControllerDone();
-
-	return;
 }
 
 void IntroController::showStory() {
@@ -829,11 +861,14 @@ void IntroController::startQuestions() {
 		U4IOS::switchU4IntroControllerToABButtons();
 #endif
 		// wait for an answer
-		eventHandler->pushController(&questionController);
-		int choice = questionController.waitFor();
+		int choice;
+		do {
+			eventHandler->pushController(&questionController);
+			choice = questionController.waitFor();
+		} while (!shouldQuit() && choice == -1);
 
 		// update the question tree
-		if (doQuestion(choice == 'a' ? 0 : 1)) {
+		if (shouldQuit() || doQuestion(choice == 'a' ? 0 : 1)) {
 			return;
 		}
 	}
@@ -890,10 +925,7 @@ void IntroController::about() {
 	_menuArea.textAt(1, 3, "Based on the xu4 project");
 	drawBeasties();
 
-	ReadChoiceController::get("");
-
-	g_screen->screenShowCursor();
-	updateScreen();
+	_mode = INTRO_ABOUT;
 }
 
 void IntroController::showText(const Common::String &text) {
@@ -951,9 +983,9 @@ void IntroController::timerFired() {
 	if (_beastiesVisible)
 		drawBeasties();
 
-	if (xu4_random(2) && ++_beastie1Cycle >= IntroBinData::BEASTIE1_FRAMES)
+	if (xu4_random(2) && ++_beastie1Cycle >= BEASTIE1_FRAMES)
 		_beastie1Cycle = 0;
-	if (xu4_random(2) && ++_beastie2Cycle >= IntroBinData::BEASTIE2_FRAMES)
+	if (xu4_random(2) && ++_beastie2Cycle >= BEASTIE2_FRAMES)
 		_beastie2Cycle = 0;
 }
 
@@ -1090,13 +1122,6 @@ void IntroController::updateSoundMenu(MenuEvent &event) {
 	        event.getType() == MenuEvent::DECREMENT) {
 
 		switch (event.getMenuItem()->getId()) {
-		case MI_SOUND_01:
-			g_music->setMusicVolume(_settingsChanged._musicVol);
-			break;
-		case MI_SOUND_02:
-			g_music->setSoundVolume(_settingsChanged._soundVol);
-			soundPlay(SOUND_FLEE);
-			break;
 		case USE_SETTINGS:
 			// save settings
 			settings.setData(_settingsChanged);
@@ -1104,8 +1129,6 @@ void IntroController::updateSoundMenu(MenuEvent &event) {
 			g_music->intro();
 			break;
 		case CANCEL:
-			g_music->setMusicVolume(settings._musicVol);
-			g_music->setSoundVolume(settings._soundVol);
 			// discard settings
 			_settingsChanged = settings;
 			break;
@@ -1129,18 +1152,6 @@ void IntroController::updateInputMenu(MenuEvent &event) {
 			// save settings
 			settings.setData(_settingsChanged);
 			settings.write();
-
-			// re-initialize keyboard
-			KeyHandler::setKeyRepeat(_settingsChanged._keyDelay, _settingsChanged._keyInterval);
-
-#ifdef SLACK_ON_SDL_AGNOSTICISM
-			if (settings.mouseOptions.enabled) {
-				SDL_ShowCursor(SDL_ENABLE);
-			} else {
-				SDL_ShowCursor(SDL_DISABLE);
-			}
-#endif
-
 			break;
 		case CANCEL:
 			// discard settings
@@ -1154,9 +1165,6 @@ void IntroController::updateInputMenu(MenuEvent &event) {
 	// draw the extended background for all option screens
 	_backgroundArea.draw(BKGD_OPTIONS_TOP, 0, 0);
 	_backgroundArea.draw(BKGD_OPTIONS_BTM, 0, 120);
-
-	// after drawing the menu, extra menu text can be added here
-	_extendedMenuArea.textAt(0, 5, "Mouse Options:");
 }
 
 void IntroController::updateSpeedMenu(MenuEvent &event) {
@@ -1316,13 +1324,15 @@ void IntroController::initPlayers(SaveGame *saveGame) {
 	saveGame->_players[0]._class = static_cast<ClassType>(_questionTree[14]);
 
 	ASSERT((int)saveGame->_players[0]._class < 8, "bad class: %d", saveGame->_players[0]._class);
+	saveGame->_positions.resize(1);
+	saveGame->_positions[0] = LocationCoords(MAP_WORLD,
+		initValuesForClass[saveGame->_players[0]._class].x,
+		initValuesForClass[saveGame->_players[0]._class].y,
+		0);
 
 	saveGame->_players[0]._weapon = initValuesForClass[saveGame->_players[0]._class].weapon;
-	saveGame->_players[0].armor = initValuesForClass[saveGame->_players[0]._class].armor;
+	saveGame->_players[0]._armor = initValuesForClass[saveGame->_players[0]._class].armor;
 	saveGame->_players[0]._xp = initValuesForClass[saveGame->_players[0]._class].xp;
-	saveGame->_x = initValuesForClass[saveGame->_players[0]._class].x;
-	saveGame->_y = initValuesForClass[saveGame->_players[0]._class].y;
-
 	saveGame->_players[0]._str = 15;
 	saveGame->_players[0]._dex = 15;
 	saveGame->_players[0]._intel = 15;
@@ -1381,8 +1391,9 @@ void IntroController::initPlayers(SaveGame *saveGame) {
 			saveGame->_players[p]._dex = initValuesForNpcClass[i].dex;
 			saveGame->_players[p]._intel = initValuesForNpcClass[i].intel;
 			saveGame->_players[p]._weapon = initValuesForClass[i].weapon;
-			saveGame->_players[p].armor = initValuesForClass[i].armor;
-			strcpy(saveGame->_players[p].name, initValuesForNpcClass[i].name);
+			saveGame->_players[p]._armor = initValuesForClass[i].armor;
+			strncpy(saveGame->_players[p]._name, initValuesForNpcClass[i].name, 15);
+			saveGame->_players[p]._name[15] = '\0';
 			saveGame->_players[p]._sex = initValuesForNpcClass[i].sex;
 			saveGame->_players[p]._hp = saveGame->_players[p]._hpMax = initValuesForClass[i].level * 100;
 			saveGame->_players[p]._mp = player.getMaxMp();
@@ -1400,7 +1411,7 @@ void IntroController::preloadMap() {
 			_mapArea.loadTile(_binData->_introMap[x + (y * INTRO_MAP_WIDTH)]);
 
 	// draw animated objects
-	for (i = 0; i < IntroBinData::INTRO_BASETILE_TABLE_SIZE; i++) {
+	for (i = 0; i < INTRO_BASETILE_TABLE_SIZE; i++) {
 		if (_objectStateTable[i].tile != 0)
 			_mapArea.loadTile(_objectStateTable[i].tile);
 	}
@@ -1430,7 +1441,7 @@ void IntroController::initTitles() {
 	eventHandler->getTimer()->reset(settings._titleSpeedOther);
 }
 
-void IntroController::addTitle(int x, int y, int w, int h, AnimType method, int delay, int duration) {
+void IntroController::addTitle(int x, int y, int w, int h, AnimType method, uint32 delay, int duration) {
 	AnimElement data = {
 		x, y,               // source x and y
 		w, h,               // source width and height
@@ -1503,7 +1514,7 @@ void IntroController::getTitleSourceData() {
 		switch (_titles[i]._method) {
 		case SIGNATURE: {
 			// PLOT: "Lord British"
-			srcData = g_intro->getSigData();
+			srcData = getSigData();
 			RGBA color = info->_image->setColor(0, 255, 255);    // cyan for EGA
 			int x = 0, y = 0;
 
@@ -1605,20 +1616,6 @@ void IntroController::getTitleSourceData() {
 	info->_image = scaled;
 }
 
-
-
-#ifdef SLACK_ON_SDL_AGNOSTICISM
-int getTicks() {
-	return SDL_GetTicks();
-}
-#elif !defined(IOS_ULTIMA4)
-static int ticks = 0;
-int getTicks() {
-	ticks += 1000;
-	return ticks;
-}
-#endif
-
 bool IntroController::updateTitle() {
 #ifdef IOS_ULTIMA4
 	static bool firstTime = true;
@@ -1630,7 +1627,7 @@ bool IntroController::updateTitle() {
 
 	int animStepTarget = 0;
 
-	int timeCurrent = getTicks();
+	uint32 timeCurrent = g_system->getMillis();
 	float timePercent = 0;
 
 	if (_title->_animStep == 0 && !_bSkipTitles) {
@@ -1713,7 +1710,7 @@ bool IntroController::updateTitle() {
 			_title->_animStep = _title->_animStepMax;
 		else {
 			_title->_animStep++;
-			_title->_timeDelay = getTicks() - _title->_timeBase + 100;
+			_title->_timeDelay = g_system->getMillis() - _title->_timeBase + 100;
 		}
 
 		// blit src to the canvas one row at a time, bottom up
@@ -1733,7 +1730,7 @@ bool IntroController::updateTitle() {
 			_title->_animStep = _title->_animStepMax;
 		else {
 			_title->_animStep++;
-			_title->_timeDelay = getTicks() - _title->_timeBase + 100;
+			_title->_timeDelay = g_system->getMillis() - _title->_timeBase + 100;
 		}
 
 		// blit src to the canvas one row at a time, top down
@@ -1784,7 +1781,7 @@ bool IntroController::updateTitle() {
 			_title->_animStep = _title->_animStepMax;
 		else {
 			_title->_animStep++;
-			_title->_timeDelay = getTicks() - _title->_timeBase + 100;
+			_title->_timeDelay = g_system->getMillis() - _title->_timeBase + 100;
 		}
 
 		// blit src to the canvas one row at a time, center out
@@ -1805,7 +1802,7 @@ bool IntroController::updateTitle() {
 			_title->_animStep = _title->_animStepMax;
 		else {
 			_title->_animStep++;
-			_title->_timeDelay = getTicks() - _title->_timeBase + 100;
+			_title->_timeDelay = g_system->getMillis() - _title->_timeBase + 100;
 		}
 
 		int step = (_title->_animStep == _title->_animStepMax ? _title->_animStepMax - 1 : _title->_animStep);
@@ -1829,16 +1826,13 @@ bool IntroController::updateTitle() {
 		    SCALED(_title->_srcImage->height()));
 
 
-		// create a destimage for the map tiles
-		int newtime = getTicks();
+		// Create a destimage for the map tiles
+		int newtime = g_system->getMillis();
 		if (newtime > _title->_timeDuration + 250 / 4) {
-			// grab the map from the screen
-			Image *screen = imageMgr->get("screen")->_image;
+			// Draw the updated map display
+			drawMapStatic();
 
-			// draw the updated map display
-			g_intro->drawMapStatic();
-
-			screen->drawSubRectOn(
+			_mapScreen->drawSubRectOn(
 			    _title->_srcImage,
 			    SCALED(8),
 			    SCALED(8),

@@ -31,7 +31,7 @@ namespace Ultima4 {
 
 class Map;
 class Location;
-struct _Portal;
+struct Portal;
 
 typedef enum {
 	ACTION_NONE         = 0x0,
@@ -62,6 +62,7 @@ struct Portal {
 	Common::String _message;
 	TransportContext _portalTransportRequisites;
 	bool _exitPortal;
+	int _tile;
 };
 
 /**

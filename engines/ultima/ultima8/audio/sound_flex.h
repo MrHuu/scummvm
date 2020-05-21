@@ -31,10 +31,17 @@ namespace Ultima8 {
 
 class AudioSample;
 
+class SoundFlexEntry {
+public:
+	SoundFlexEntry(const char *name, uint32 data) : _name(name), _data(data) {}
+	SoundFlexEntry(const char *name) : _name(name), _data(0) {}
+
+	Std::string _name;
+	uint32 _data;
+};
+
 class SoundFlex : protected Archive {
 public:
-	ENABLE_RUNTIME_CLASSTYPE()
-
 	SoundFlex(Common::SeekableReadStream *rs);
 	~SoundFlex() override;
 
@@ -47,6 +54,7 @@ public:
 
 private:
 	AudioSample **_samples;
+	Std::vector<SoundFlexEntry> _index;
 };
 
 } // End of namespace Ultima8

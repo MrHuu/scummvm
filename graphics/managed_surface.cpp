@@ -244,8 +244,7 @@ void ManagedSurface::blitFromInner(const Surface &src, const Common::Rect &srcRe
 			for (int x = 0; x < srcBounds.width(); ++x,
 					srcP += src.format.bytesPerPixel,
 					destP += format.bytesPerPixel) {
-				src.format.colorToARGB(src.format.bytesPerPixel == 2 ? *(const uint16 *)srcP : *(const uint32 *)srcP,
-					aSrc, rSrc, gSrc, bSrc);
+
 				if (src.format.bytesPerPixel == 1) {
 					// Get the palette color
 					const uint32 col = palette[*srcP];
@@ -255,8 +254,9 @@ void ManagedSurface::blitFromInner(const Surface &src, const Common::Rect &srcRe
 					aSrc = (col >> 24) & 0xff;
 				} else {
 					// Use the src's pixel format to split up the source pixel
-					format.colorToRGB(format.bytesPerPixel == 2 ? *(const uint16 *)destP : *(const uint32 *)destP,
-						rDest, gDest, bDest);
+					src.format.colorToARGB(src.format.bytesPerPixel == 2
+						? *(const uint16 *)srcP : *(const uint32 *)srcP,
+						aSrc, rSrc, gSrc, bSrc);
 				}
 
 				if (aSrc == 0) {
@@ -406,6 +406,8 @@ void transBlit(const Surface &src, const Common::Rect &srcRect, Surface &dest, c
 			} else {
 				// Otherwise we have to manually decode and re-encode each pixel
 				if (srcFormat.bytesPerPixel == 1) {
+					assert(palette != nullptr);	// Catch the cases when palette is missing
+
 					// Get the palette color
 					const uint32 col = palette[srcVal];
 					rSrc = col & 0xff;

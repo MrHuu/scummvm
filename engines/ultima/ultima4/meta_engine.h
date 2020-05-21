@@ -35,23 +35,36 @@ enum KeybindingAction {
 	KEYBIND_GET, KEYBIND_HOLE_UP, KEYBIND_IGNITE, KEYBIND_JIMMY,
 	KEYBIND_LOCATE, KEYBIND_MIX, KEYBIND_NEW_ORDER,
 	KEYBIND_OPEN_DOOR, KEYBIND_PASS, KEYBIND_PEER,
-	KEYBIND_QUIT_SAVE, KEYBIND_SPEED_UP, KEYBIND_SPEED_DOWN,
-	KEYBIND_SPEED_NORMAL, KEYBIND_READY_WEAPON, KEYBIND_SEARCH,
-	KEYBIND_STATS, KEYBIND_TALK, KEYBIND_TOGGLE_MUSIC, KEYBIND_USE,
-	KEYBIND_WEAR, KEYBIND_YELL, KEYBIND_INTERACT,
+	KEYBIND_QUIT_SAVE, KEYBIND_READY_WEAPON, KEYBIND_SEARCH,
+	KEYBIND_STATS, KEYBIND_TALK, KEYBIND_USE, KEYBIND_WEAR,
+	KEYBIND_YELL, KEYBIND_INTERACT, KEYBIND_ESCAPE,
+
+	KEYBIND_SPEED_UP, KEYBIND_SPEED_DOWN, KEYBIND_SPEED_NORMAL,
+	KEYBIND_COMBATSPEED_UP, KEYBIND_COMBATSPEED_DOWN,
+	KEYBIND_COMBATSPEED_NORMAL,
 
 	KEYBIND_PARTY0, KEYBIND_PARTY1, KEYBIND_PARTY2, KEYBIND_PARTY3,
 	KEYBIND_PARTY4, KEYBIND_PARTY5, KEYBIND_PARTY6, KEYBIND_PARTY7,
 	KEYBIND_PARTY8,
 
 	KEYBIND_CHEAT_COLLISIONS, KEYBIND_CHEAT_DESTROY,
-	KEYBIND_CHEAT_EQUIPMENT, KEYBIND_CHEAT_GOTO, KEYBIND_CHEAT_HELP,
+	KEYBIND_CHEAT_DESTROY_CREATURES, KEYBIND_CHEAT_EQUIPMENT,
+	KEYBIND_CHEAT_FLEE, KEYBIND_CHEAT_GOTO, KEYBIND_CHEAT_HELP,
 	KEYBIND_CHEAT_ITEMS, KEYBIND_CHEAT_KARMA, KEYBIND_CHEAT_LEAVE,
-	KEYBIND_CHEAT_MIXTURES, KEYBIND_CHEAT_PARTY, KEYBIND_CHEAT_REAGENTS,
-	KEYBIND_CHEAT_STATS, KEYBIND_CHEAT_TRANSPORT, KEYBIND_CHEAT_UP,
-	KEYBIND_CHEAT_DOWN, KEYBIND_CHEAT_VIRTUE, KEYBIND_CHEAT_WIND,
+	KEYBIND_CHEAT_MIXTURES, KEYBIND_CHEAT_OVERHEAD, KEYBIND_CHEAT_PARTY,
+	KEYBIND_CHEAT_REAGENTS, KEYBIND_CHEAT_STATS, KEYBIND_CHEAT_TRANSPORT,
+	KEYBIND_CHEAT_UP, KEYBIND_CHEAT_DOWN, KEYBIND_CHEAT_VIRTUE,
+	KEYBIND_CHEAT_WIND,
 
 	KEYBIND_NONE
+};
+
+enum KeybindingMode {
+	KBMODE_NORMAL,		///< Keys available when normal in-game
+	KBMODE_MINIMAL,		///< Minimal list available when reading input
+	KBMODE_DIRECTION,	///< Mode for selecting direction
+	KBMODE_MENU,		///< Intro config menus
+	KBMODE_COMBAT		///< Keys when in combat mode
 };
 
 class MetaEngine {
@@ -60,11 +73,16 @@ private:
 	 * Get the method to execute
 	 */
 	static Common::String getMethod(KeybindingAction keyAction);
+
+	/**
+	 * Adds the default actions for the mouse buttons
+	 */
+	static void addMouseClickActions(Common::Keymap &keyMap);
 public:
 	/**
 	 * Initialize keymaps
 	 */
-	static Common::KeymapArray initKeymaps();
+	static Common::KeymapArray initKeymaps(KeybindingMode mode = KBMODE_NORMAL);
 
 	/**
 	 * Execute an engine keymap action
@@ -72,9 +90,9 @@ public:
 	static void executeAction(KeybindingAction keyAction);
 
 	/**
-	 * Enables/disables the keymaps when not waiting for an in-game action
+	 * Sets the current set of actions which are active
 	 */
-	static void setKeybindingsActive(bool isActive);
+	static void setKeybindingMode(KeybindingMode mode);
 };
 
 } // End of namespace Ultima4

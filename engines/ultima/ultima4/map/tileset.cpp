@@ -38,6 +38,10 @@ TileRules::TileRules() {
 }
 
 TileRules::~TileRules() {
+	// Delete the tile rules
+	for (iterator it = begin(); it != end(); ++it)
+		delete it->_value;
+
 	g_tileRules = nullptr;
 }
 
@@ -124,7 +128,8 @@ void TileSets::unloadAllImages() {
 Tileset *TileSets::get(const Common::String &name) {
 	if (find(name) != end())
 		return (*this)[name];
-	else return nullptr;
+	else
+		return nullptr;
 }
 
 Tile *TileSets::findTileByName(const Common::String &name) {
@@ -249,7 +254,8 @@ void Tileset::load(const ConfigElement &tilesetConf) {
 		_imageName = tilesetConf.getString("imageName");
 	if (tilesetConf.exists("extends"))
 		_extends = g_tileSets->get(tilesetConf.getString("extends"));
-	else _extends = nullptr;
+	else
+		_extends = nullptr;
 
 	int index = 0;
 	Std::vector<ConfigElement> children = tilesetConf.getChildren();
@@ -303,13 +309,15 @@ Tile *Tileset::getByName(const Common::String &name) {
 		return _nameMap[name];
 	else if (_extends)
 		return _extends->getByName(name);
-	else return nullptr;
+	else
+		return nullptr;
 }
 
 Common::String Tileset::getImageName() const {
 	if (_imageName.empty() && _extends)
 		return _extends->getImageName();
-	else return _imageName;
+	else
+		return _imageName;
 }
 
 uint Tileset::numTiles() const {

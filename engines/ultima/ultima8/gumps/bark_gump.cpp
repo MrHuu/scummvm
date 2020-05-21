@@ -31,18 +31,19 @@
 namespace Ultima {
 namespace Ultima8 {
 
-DEFINE_RUNTIME_CLASSTYPE_CODE(BarkGump, ItemRelativeGump)
+DEFINE_RUNTIME_CLASSTYPE_CODE(BarkGump)
 
 // TODO: Remove all the hacks
 
 BarkGump::BarkGump() : ItemRelativeGump(), _counter(0), _textWidget(0),
-		_speechShapeNum(0), _speechLength(0), _totalTextHeight(0) {
+		_speechShapeNum(0), _speechLength(0), _totalTextHeight(0),
+		_textDelay(20) {
 }
 
 BarkGump::BarkGump(uint16 owner, const Std::string &msg, uint32 speechShapeNum) :
 	ItemRelativeGump(0, 0, 100, 100, owner, FLAG_KEEP_VISIBLE, LAYER_ABOVE_NORMAL),
 	_barked(msg), _counter(100), _speechShapeNum(speechShapeNum),
-	_speechLength(0), _totalTextHeight(0), _textWidget(0) {
+	_speechLength(0), _totalTextHeight(0), _textWidget(0), _textDelay(20) {
 	SettingManager::get_instance()->get("textdelay", _textDelay);
 }
 
@@ -114,7 +115,7 @@ void BarkGump::InitGump(Gump *newparent, bool take_focus) {
 }
 
 bool BarkGump::NextText() {
-	TextWidget *widget = p_dynamic_cast<TextWidget *>(getGump(_textWidget));
+	TextWidget *widget = dynamic_cast<TextWidget *>(getGump(_textWidget));
 	assert(widget);
 	if (widget->setupNextText()) {
 		// This is just a hack
@@ -161,8 +162,8 @@ void BarkGump::run() {
 	}
 }
 
-Gump *BarkGump::OnMouseDown(int button, int32 mx, int32 my) {
-	Gump *g = ItemRelativeGump::OnMouseDown(button, mx, my);
+Gump *BarkGump::onMouseDown(int button, int32 mx, int32 my) {
+	Gump *g = ItemRelativeGump::onMouseDown(button, mx, my);
 	if (g) return g;
 
 	// Scroll to next text, if possible
@@ -208,8 +209,9 @@ bool BarkGump::loadData(Common::ReadStream *rs, uint32 version) {
 		_barked = "";
 	}
 
-
-	TextWidget *widget = p_dynamic_cast<TextWidget *>(getGump(_textWidget));
+	TextWidget *widget = dynamic_cast<TextWidget *>(getGump(_textWidget));
+	if (!widget)
+		return false;
 
 	SettingManager::get_instance()->get("textdelay", _textDelay);
 

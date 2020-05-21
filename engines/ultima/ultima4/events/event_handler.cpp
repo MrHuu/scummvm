@@ -26,7 +26,7 @@
 #include "ultima/ultima4/core/utils.h"
 #include "ultima/ultima4/filesys/savegame.h"
 #include "ultima/ultima4/game/context.h"
-#include "ultima/ultima4/game/textview.h"
+#include "ultima/ultima4/views/textview.h"
 #include "ultima/ultima4/gfx/screen.h"
 #include "ultima/ultima4/map/location.h"
 #include "common/events.h"
@@ -34,8 +34,6 @@
 
 namespace Ultima {
 namespace Ultima4 {
-
-using namespace Std;
 
 bool EventHandler::_controllerDone = false;
 bool EventHandler::_ended = false;
@@ -92,7 +90,7 @@ void EventHandler::end() {
 	_ended = true;
 }
 
-TimedEventMgr *EventHandler::getTimer()  {
+TimedEventMgr *EventHandler::getTimer() {
 	return &_timer;
 }
 
@@ -151,41 +149,41 @@ void EventHandler::run() {
 		(*_updateScreen)();
 	g_screen->update();
 
-	while (!_ended && !_controllerDone) {
+	while (!_ended && !_controllerDone && !g_ultima->shouldQuit()) {
 		Common::Event event;
-		g_system->getEventManager()->pollEvent(event);
+		if (g_system->getEventManager()->pollEvent(event)) {
+			switch (event.type) {
+			case Common::EVENT_KEYDOWN:
+				handleKeyDownEvent(event, getController(), _updateScreen);
+				break;
 
-		switch (event.type) {
-		case Common::EVENT_KEYDOWN:
-			handleKeyDownEvent(event, getController(), _updateScreen);
-			break;
+			case Common::EVENT_LBUTTONDOWN:
+			case Common::EVENT_RBUTTONDOWN:
+			case Common::EVENT_MBUTTONDOWN:
+				handleMouseButtonDownEvent(event, getController(), _updateScreen);
+				break;
 
-		case Common::EVENT_LBUTTONDOWN:
-		case Common::EVENT_RBUTTONDOWN:
-		case Common::EVENT_MBUTTONDOWN:
-			handleMouseButtonDownEvent(event, getController(), _updateScreen);
-			break;
+			case Common::EVENT_LBUTTONUP:
+			case Common::EVENT_RBUTTONUP:
+			case Common::EVENT_MBUTTONUP:
+				handleMouseButtonUpEvent(event, getController(), _updateScreen);
+				break;
 
-		case Common::EVENT_LBUTTONUP:
-		case Common::EVENT_RBUTTONUP:
-		case Common::EVENT_MBUTTONUP:
-			handleMouseButtonUpEvent(event, getController(), _updateScreen);
-			break;
+			case Common::EVENT_MOUSEMOVE:
+				handleMouseMotionEvent(event);
+				continue;
 
-		case Common::EVENT_MOUSEMOVE:
-			handleMouseMotionEvent(event);
-			continue;
+			case Common::EVENT_CUSTOM_ENGINE_ACTION_START:
+				getController()->keybinder((KeybindingAction)event.customType);
+				break;
 
-		case Common::EVENT_CUSTOM_ENGINE_ACTION_START:
-			getController()->keybinder((KeybindingAction)event.customType);
-			break;
+			case Common::EVENT_QUIT:
+				_ended = true;
+				return;
 
-		case Common::EVENT_QUIT:
-			_ended = true;
-			return;
-
-		default:
-			break;
+			default:
+				break;
+			}
 		}
 
 		// Brief delay
@@ -273,10 +271,15 @@ void EventHandler::handleMouseButtonDownEvent(const Common::Event &event, Contro
 		return;
 
 	if (event.type == Common::EVENT_LBUTTONDOWN) {
-		const MouseArea *area = eventHandler->mouseAreaForPoint(event.mouse.x, event.mouse.y);
-		if (!area)
-			return;
-		controller->keybinder(KEYBIND_INTERACT);
+		// handle the keypress
+		bool processed = controller->notifyMousePress(event.mouse);
+
+		if (processed) {
+			if (updateScreen)
+				(*updateScreen)();
+			g_screen->update();
+		}
+
 	} else if (event.type == Common::EVENT_RBUTTONDOWN) {
 		_isRightButtonDown = true;
 		handleMouseMotionEvent(event);
@@ -299,9 +302,9 @@ void EventHandler::handleKeyDownEvent(const Common::Event &event, Controller *co
 	int key;
 	bool processed;
 
-	key = event.kbd.ascii;
-	if (!key)
-		return;
+	key = (event.kbd.ascii != 0 && event.kbd.ascii < 128) ?
+		event.kbd.ascii : (int)event.kbd.keycode;
+
 	key += (event.kbd.flags & (Common::KBD_CTRL |
 		Common::KBD_ALT | Common::KBD_META)) << 16;
 

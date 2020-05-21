@@ -33,10 +33,10 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(GravityProcess, Process)
+DEFINE_RUNTIME_CLASSTYPE_CODE(GravityProcess)
 
 GravityProcess::GravityProcess()
-	: Process() {
+	: Process(), _xSpeed(0), _ySpeed(0), _zSpeed(0), _gravity(0) {
 
 }
 
@@ -54,7 +54,7 @@ void GravityProcess::init() {
 
 	item->setGravityPID(getPid());
 
-	Actor *actor = p_dynamic_cast<Actor *>(item);
+	Actor *actor = dynamic_cast<Actor *>(item);
 	if (actor) {
 		actor->setFallStart(actor->getZ());
 	}
@@ -81,7 +81,7 @@ void GravityProcess::run() {
 		return;
 	}
 
-	Actor *actor = p_dynamic_cast<Actor *>(item);
+	Actor *actor = dynamic_cast<Actor *>(item);
 	if (actor && actor->getFallStart() < actor->getZ()) {
 		actor->setFallStart(actor->getZ());
 	}
@@ -165,7 +165,9 @@ void GravityProcess::run() {
 
 		bool termFlag = true;
 		Item *hititem = getItem(hititemid);
-		if (_zSpeed < -2 && !p_dynamic_cast<Actor *>(item)) {
+		if (!hititem)
+			return; // shouldn't happen..
+		if (_zSpeed < -2 && !dynamic_cast<Actor *>(item)) {
 #ifdef BOUNCE_DIAG
 			pout << "item " << _itemNum << " bounce ["
 			     << Kernel::get_instance()->getFrameNum()

@@ -38,6 +38,7 @@
 
 #define INCLUDE_CONVERTUSECODEU8_WITHOUT_BRINGING_IN_FOLD
 #include "ultima/ultima8/convert/u8/convert_usecode_u8.h"
+#include "ultima/ultima8/convert/crusader/convert_usecode_crusader.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
 
 namespace Ultima {
@@ -88,7 +89,15 @@ UCMachine::UCMachine(Intrinsic *iset, unsigned int icount) {
 	// zero _globals
 	_globals = new BitSet(0x1000);
 
-	_convUse = new ConvertUsecodeU8; //!...
+	if (GAME_IS_U8) {
+		_convUse = new ConvertUsecodeU8();
+	} else if (GAME_IS_REMORSE) {
+		_convUse = new ConvertUsecodeCrusader();
+	} else {
+		// TODO: Need a separate convertor for Regret
+		_convUse = new ConvertUsecodeCrusader();
+	}
+
 	loadIntrinsics(iset, icount); //!...
 
 	_listIDs = new idMan(1, 65534, 128);
@@ -348,12 +357,34 @@ void UCMachine::execProcess(UCProcess *p) {
 			//! TODO
 			uint16 arg_bytes = cs.readByte();
 			uint16 func = cs.readUint16LE();
-			debug(MM_INFO, "calli\t\t%04Xh (%02Xh arg bytes) %s \n", func, arg_bytes, _convUse->intrinsics()[func]);
+			debug(10, "calli\t\t%04Xh (%02Xh arg bytes) %s ", func, arg_bytes, _convUse->intrinsics()[func]);
 
 			// !constants
 			if (func >= _intrinsicCount || _intrinsics[func] == 0) {
+				Item *testItem = nullptr;
 				p->_temp32 = 0;
-				perr << "Unhandled intrinsic \'" << _convUse->intrinsics()[func] << "\' (" << Std::hex << func << Std::dec << ") called" << Std::endl;
+
+				if (arg_bytes >= 4) {
+					// HACKHACKHACK to check what the argument is.
+					uint8 *args = new uint8[arg_bytes];
+					p->_stack.pop(args, 4);
+					p->_stack.addSP(-4); // don't really pop the args
+					ARG_UC_PTR(iptr);
+					uint16 testItemId = ptrToObject(iptr);
+					testItem = getItem(testItemId);
+				}
+				perr << "Unhandled intrinsic << " << func << " \'" << _convUse->intrinsics()[func] << "\'? (";
+				if (testItem) {
+					perr << "item " << testItem->getObjId();
+					if (arg_bytes > 4)
+						perr << " + " << arg_bytes - 4 << " bytes";
+				} else {
+					perr << arg_bytes << " bytes";
+				}
+				perr << ") called" << Std::endl;
+				if (testItem) {
+					testItem->dumpInfo();
+				}
 			} else {
 				//!! hackish
 				if (_intrinsics[func] == UCMachine::I_dummyProcess ||
@@ -504,7 +535,7 @@ void UCMachine::execProcess(UCProcess *p) {
 		}
 		break;
 
-		case 0x19:
+		case 0x19: {
 			// 19 02
 			// add two stringlists, removing duplicates
 			ui32a = cs.readByte();
@@ -515,28 +546,42 @@ void UCMachine::execProcess(UCProcess *p) {
 			}
 			ui16a = p->_stack.pop2();
 			ui16b = p->_stack.pop2();
-			getList(ui16b)->unionStringList(*getList(ui16a));
-			freeStringList(ui16a); // contents are actually freed in unionSL
+			UCList *srclist = getList(ui16a);
+			UCList *dstlist = getList(ui16b);
+			if (!srclist || !dstlist) {
+				perr << "Invalid list param to union slist" << Std::endl;
+				error = true;
+			} else {
+				dstlist->unionStringList(*srclist);
+				freeStringList(ui16a); // contents are actually freed in unionSL
+			}
 			p->_stack.push2(ui16b);
 			LOGPF(("union slist\t(%02X)\n", ui32a));
 			break;
-
-		case 0x1A:
+		}
+		case 0x1A: {
 			// 1A
-			// substract string list
+			// subtract string list
 			// NB: this one takes a length parameter in crusader. (not in U8)!!
 			// (or rather, it seems it takes one after all? -wjp,20030511)
 			ui32a = cs.readByte(); // elementsize
 			ui32a = 2;
 			ui16a = p->_stack.pop2();
 			ui16b = p->_stack.pop2();
-			getList(ui16b)->substractStringList(*getList(ui16a));
-			freeStringList(ui16a);
+			UCList *srclist = getList(ui16a);
+			UCList *dstlist = getList(ui16b);
+			if (!srclist || !dstlist) {
+				perr << "Invalid list param to subtract slist" << Std::endl;
+				error = true;
+			} else {
+				dstlist->subtractStringList(*srclist);
+				freeStringList(ui16a);
+			}
 			p->_stack.push2(ui16b);
 			LOGPF(("remove slist\t(%02X)\n", ui32a));
 			break;
-
-		case 0x1B:
+		}
+		case 0x1B: {
 			// 1B xx
 			// pop two lists from the stack and remove the 2nd from the 1st
 			// (free the originals? order?)
@@ -544,12 +589,19 @@ void UCMachine::execProcess(UCProcess *p) {
 			ui32a = cs.readByte(); // elementsize
 			ui16a = p->_stack.pop2();
 			ui16b = p->_stack.pop2();
-			getList(ui16b)->substractList(*getList(ui16a));
-			freeList(ui16a);
+			UCList *srclist = getList(ui16a);
+			UCList *dstlist = getList(ui16b);
+			if (!srclist || !dstlist) {
+				perr << "Invalid list param to remove from slist" << Std::endl;
+				error = true;
+			} else {
+				dstlist->subtractList(*srclist);
+				freeList(ui16a);
+			}
 			p->_stack.push2(ui16b);
 			LOGPF(("remove list\t(%02X)\n", ui32a));
 			break;
-
+		}
 		case 0x1C:
 			// 1C
 			// subtract two 16 bit integers
@@ -594,7 +646,7 @@ void UCMachine::execProcess(UCProcess *p) {
 			if (si16a != 0) {
 				p->_stack.push2(static_cast<uint16>(si16b / si16a));
 			} else {
-				perr.Print("division by zero.\n");
+				perr.Print("0x20 division by zero.\n");
 				p->_stack.push2(0);
 			}
 			LOGPF(("div\n"));
@@ -608,7 +660,7 @@ void UCMachine::execProcess(UCProcess *p) {
 			if (si32a != 0) {
 				p->_stack.push4(static_cast<uint32>(si32b / si32a));
 			} else {
-				perr.Print("division by zero.\n");
+				perr.Print("0x21 division by zero.\n");
 				p->_stack.push4(0);
 			}
 			LOGPF(("div\n"));
@@ -624,7 +676,7 @@ void UCMachine::execProcess(UCProcess *p) {
 			if (si16a != 0) {
 				p->_stack.push2(static_cast<uint16>(si16b % si16a));
 			} else {
-				perr.Print("division by zero.\n");
+				perr.Print("0x22 division by zero.\n");
 				p->_stack.push2(0);
 			}
 			LOGPF(("mod\n"));
@@ -639,7 +691,7 @@ void UCMachine::execProcess(UCProcess *p) {
 			if (si32a != 0) {
 				p->_stack.push4(static_cast<uint32>(si32b % si32a));
 			} else {
-				perr.Print("division by zero.\n");
+				perr.Print("0x23 division by zero.\n");
 				p->_stack.push4(0);
 			}
 			LOGPF(("mod long\n"));
@@ -896,7 +948,7 @@ void UCMachine::execProcess(UCProcess *p) {
 			break;
 
 
-		case 0x38:
+		case 0x38: {
 			// 38 xx yy
 			// is element (size xx) in list? (or slist if yy is true)
 			// free list/slist afterwards
@@ -904,19 +956,23 @@ void UCMachine::execProcess(UCProcess *p) {
 			ui16a = cs.readByte();
 			ui32a = cs.readByte();
 			ui16b = p->_stack.pop2();
-			if (ui32a) { // stringlist
+			UCList *l = getList(ui16b);
+			if (!l) {
+				perr << "Invalid list id " << ui16b << Std::endl;
+				error = true;
+			} else if (ui32a) { // stringlist
 				if (ui16a != 2) {
 					perr << "Unhandled operand " << ui16a << " to in slist"
 					     << Std::endl;
 					error = true;
 				}
-				if (getList(ui16b)->stringInList(p->_stack.pop2()))
+				if (l->stringInList(p->_stack.pop2()))
 					p->_stack.push2(1);
 				else
 					p->_stack.push2(0);
 				freeStringList(ui16b);
 			} else {
-				bool found = getList(ui16b)->inList(p->_stack.access());
+				bool found = l->inList(p->_stack.access());
 				p->_stack.addSP(ui16a);
 				if (found)
 					p->_stack.push2(1);
@@ -927,7 +983,7 @@ void UCMachine::execProcess(UCProcess *p) {
 			}
 			LOGPF(("in list\t\t%s slist==%02X\n", print_bp(ui16a), ui32a));
 			break;
-
+		}
 		case 0x39:
 			// 39
 			// 16 bit bitwise and
@@ -1544,12 +1600,26 @@ void UCMachine::execProcess(UCProcess *p) {
 				break;
 			case 2: { // slist
 				UCList *l = new UCList(2);
-				l->copyStringList(*getList(ui16a));
+				const UCList *srclist = getList(ui16a);
+				if (!srclist) {
+					perr << "Warning: invalid src list passed to slist copy"
+						 << Std::endl;
+					ui16b = 0;
+					delete l;
+					break;
+				}
+				l->copyStringList(*srclist);
 				ui16b = assignList(l);
 			}
 			break;
 			case 3: { // list
-				UCList *l = getList(ui16a);
+				const UCList *l = getList(ui16a);
+				if (!l) {
+					perr << "Warning: invalid src list passed to list copy"
+						 << Std::endl;
+					ui16b = 0;
+					break;
+				}
 				int elementsize = l->getElementSize();
 				UCList *l2 = new UCList(elementsize);
 				l2->copyList(*l);
@@ -1577,7 +1647,7 @@ void UCMachine::execProcess(UCProcess *p) {
 
 		case 0x6E:
 			// 6E xx
-			// substract xx from stack pointer
+			// subtract xx from stack pointer
 			// (effect on SP is the same as popping xx bytes)
 			si8a = static_cast<int8>(cs.readByte());
 			p->_stack.addSP(-si8a);
@@ -1940,11 +2010,21 @@ void UCMachine::execProcess(UCProcess *p) {
 			error = true;
 			break;
 
-		case 0x5B:
-		case 0x5C: // debugging
-			perr.Print("unhandled opcode %02X\n", opcode);
+		case 0x5B: {
+			ui16a = cs.readUint16LE(); // source line number
+			debug(10, "ignore debug opcode %02X: line offset %d", opcode, ui16a);
 			break;
-
+		}
+		case 0x5C: {
+			ui16a = cs.readUint16LE(); // source line number
+			char name[10] = {0};
+			for (int x = 0; x < 9; x++) {
+				// skip over class name and null terminator
+				name[x] = cs.readByte();
+			}
+			debug(10, "ignore debug opcode %02X: %s line offset %d", opcode, name, ui16a);
+			break;
+		}
 		default:
 			perr.Print("unhandled opcode %02X\n", opcode);
 
@@ -2098,14 +2178,14 @@ bool UCMachine::assignPointer(uint32 ptr, const uint8 *data, uint32 size) {
 	uint16 offset = static_cast<uint16>(ptr & 0xFFFF);
 
 	if (segment >= SEG_STACK_FIRST && segment <= SEG_STACK_LAST) {
-		UCProcess *proc = p_dynamic_cast<UCProcess *>
+		UCProcess *proc = dynamic_cast<UCProcess *>
 		                  (Kernel::get_instance()->getProcess(segment));
 
 		// reference to the stack of _pid 'segment'
 		if (!proc) {
 			// segfault :-)
 			perr << "Trying to access stack of non-existent "
-			     << "process (_pid: " << segment << ")" << Std::endl;
+			     << "process (pid: " << segment << ")" << Std::endl;
 			return false;
 		} else {
 			proc->_stack.assign(offset, data, size);
@@ -2135,14 +2215,14 @@ bool UCMachine::dereferencePointer(uint32 ptr, uint8 *data, uint32 size) {
 	uint16 offset = static_cast<uint16>(ptr & 0xFFFF);
 
 	if (segment >= SEG_STACK_FIRST && segment <= SEG_STACK_LAST) {
-		UCProcess *proc = p_dynamic_cast<UCProcess *>
+		UCProcess *proc = dynamic_cast<UCProcess *>
 		                  (Kernel::get_instance()->getProcess(segment));
 
 		// reference to the stack of _pid 'segment'
 		if (!proc) {
 			// segfault :-)
 			perr << "Trying to access stack of non-existent "
-			     << "process (_pid: " << segment << ")" << Std::endl;
+			     << "process (pid: " << segment << ")" << Std::endl;
 			return false;
 		} else {
 			Std::memcpy(data, proc->_stack.access(offset), size);
@@ -2174,14 +2254,14 @@ uint16 UCMachine::ptrToObject(uint32 ptr) {
 	uint16 segment = static_cast<uint16>(ptr >> 16);
 	uint16 offset = static_cast<uint16>(ptr);
 	if (segment >= SEG_STACK_FIRST && segment <= SEG_STACK_LAST) {
-		UCProcess *proc = p_dynamic_cast<UCProcess *>
+		UCProcess *proc = dynamic_cast<UCProcess *>
 		                  (Kernel::get_instance()->getProcess(segment));
 
 		// reference to the stack of _pid 'segment'
 		if (!proc) {
 			// segfault :-)
 			perr << "Trying to access stack of non-existent "
-			     << "process (_pid: " << segment << ")" << Std::endl;
+			     << "process (pid: " << segment << ")" << Std::endl;
 			return 0;
 		} else {
 			return proc->_stack.access2(offset);
@@ -2230,15 +2310,15 @@ void UCMachine::usecodeStats() const {
 #endif
 }
 
-void UCMachine::saveGlobals(Common::WriteStream *ws) {
+void UCMachine::saveGlobals(Common::WriteStream *ws) const {
 	_globals->save(ws);
 }
 
-void UCMachine::saveStrings(Common::WriteStream *ws) {
+void UCMachine::saveStrings(Common::WriteStream *ws) const {
 	_stringIDs->save(ws);
 	ws->writeUint32LE(static_cast<uint32>(_stringHeap.size()));
 
-	Std::map<uint16, Std::string>::iterator iter;
+	Std::map<uint16, Std::string>::const_iterator iter;
 	for (iter = _stringHeap.begin(); iter != _stringHeap.end(); ++iter) {
 		ws->writeUint16LE((*iter)._key);
 		ws->writeUint32LE((*iter)._value.size());
@@ -2246,11 +2326,11 @@ void UCMachine::saveStrings(Common::WriteStream *ws) {
 	}
 }
 
-void UCMachine::saveLists(Common::WriteStream *ws) {
+void UCMachine::saveLists(Common::WriteStream *ws) const {
 	_listIDs->save(ws);
 	ws->writeUint32LE(_listHeap.size());
 
-	Std::map<uint16, UCList *>::iterator iter;
+	Std::map<uint16, UCList *>::const_iterator iter;
 	for (iter = _listHeap.begin(); iter != _listHeap.end(); ++iter) {
 		ws->writeUint16LE((*iter)._key);
 		(*iter)._value->save(ws);

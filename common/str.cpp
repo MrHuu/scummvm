@@ -229,7 +229,12 @@ void String::decRefCount(int *oldRefCount) {
 			g_refCountPool->freeChunk(oldRefCount);
 			unlockMemoryPoolMutex();
 		}
+		// Coverity thinks that we always free memory, as it assumes
+		// (correctly) that there are cases when oldRefCount == 0
+		// Thus, DO NOT COMPILE, trick it and shut tons of false positives
+#ifndef __COVERITY__
 		delete[] _str;
+#endif
 
 		// Even though _str points to a freed memory block now,
 		// we do not change its value, because any code that calls
@@ -1312,7 +1317,7 @@ int scumm_compareDictionary(const char *s1, const char *s2) {
 //  Portable implementation of strdup.
 char *scumm_strdup(const char *in) {
 	const size_t len = strlen(in) + 1;
-	char *out = new char[len];
+	char *out = (char *)malloc(len);
 	if (out) {
 		strcpy(out, in);
 	}

@@ -30,8 +30,6 @@
 namespace Ultima {
 namespace Ultima4 {
 
-using Std::vector;
-
 Image *FMTOWNSImageLoader::load(Common::File *file, int width, int height, int bpp) {
 	if (width == -1 || height == -1 || bpp == -1) {
 		error("dimensions not set for fmtowns image");
@@ -67,9 +65,9 @@ Image *FMTOWNSImageLoader::load(Common::File *file, int width, int height, int b
 //          error("FMTOWNS 4bit images cannot handle widths not divisible by 2!");
 //      byte nibble_mask = 0x0F;
 //        for (int y = 0; y < height; y++)
-//        {
+// {
 //            for (int x = 0; x < width; x+=2)
-//            {
+// {
 //              int byte = raw[(y * width + x) / 2];
 //              image->putPixelIndex(x  ,y,(byte & nibble_mask)  << 4);
 //              image->putPixelIndex(x+1,y,(byte              )      );

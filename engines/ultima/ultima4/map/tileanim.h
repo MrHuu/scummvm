@@ -121,6 +121,8 @@ protected:
 class TileAnimPixelColorTransform : public TileAnimTransform {
 public:
 	TileAnimPixelColorTransform(int xp, int yp, int width, int height);
+	~TileAnimPixelColorTransform() override;
+
 	void draw(Image *dest, Tile *tile, MapTile &mapTile) override;
 	bool drawsTile() const override;
 
@@ -196,6 +198,7 @@ private:
 class TileAnim {
 public:
 	TileAnim(const ConfigElement &conf);
+	~TileAnim();
 
 	Common::String _name;
 	Std::vector<TileAnimTransform *> _transforms;
@@ -216,6 +219,7 @@ class TileAnimSet {
 
 public:
 	TileAnimSet(const ConfigElement &conf);
+	~TileAnimSet();
 
 	/**
 	 * Returns the tile animation with the given name from the current set

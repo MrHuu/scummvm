@@ -34,14 +34,15 @@
 #include "ultima/ultima4/game/moongate.h"
 #include "ultima/ultima4/game/player.h"
 #include "ultima/ultima4/game/portal.h"
-#include "ultima/ultima4/game/stats.h"
 #include "ultima/ultima4/game/weapon.h"
 #include "ultima/ultima4/gfx/screen.h"
 #include "ultima/ultima4/map/annotation.h"
 #include "ultima/ultima4/map/city.h"
-#include "ultima/ultima4/map/dungeonview.h"
 #include "ultima/ultima4/map/mapmgr.h"
+#include "ultima/ultima4/views/dungeonview.h"
+#include "ultima/ultima4/views/stats.h"
 #include "ultima/ultima4/ultima4.h"
+#include "common/system.h"
 
 namespace Ultima {
 namespace Ultima4 {
@@ -56,19 +57,20 @@ Debugger::Debugger() : Shared::Debugger() {
 	registerCmd("move", WRAP_METHOD(Debugger, cmdMove));
 	registerCmd("attack", WRAP_METHOD(Debugger, cmdAttack));
 	registerCmd("board", WRAP_METHOD(Debugger, cmdBoard));
+	registerCmd("camp", WRAP_METHOD(Debugger, cmdCamp));
 	registerCmd("cast", WRAP_METHOD(Debugger, cmdCastSpell));
+	registerCmd("spell", WRAP_METHOD(Debugger, cmdCastSpell));
 	registerCmd("climb", WRAP_METHOD(Debugger, cmdClimb));
+	registerCmd("descend", WRAP_METHOD(Debugger, cmdDescend));
 	registerCmd("enter", WRAP_METHOD(Debugger, cmdEnter));
 	registerCmd("exit", WRAP_METHOD(Debugger, cmdExit));
 	registerCmd("fire", WRAP_METHOD(Debugger, cmdFire));
-	registerCmd("get", WRAP_METHOD(Debugger, cmdGet));
-	registerCmd("hole", WRAP_METHOD(Debugger, cmdHoleUp));
+	registerCmd("get", WRAP_METHOD(Debugger, cmdGetChest));
 	registerCmd("ignite", WRAP_METHOD(Debugger, cmdIgnite));
 	registerCmd("interact", WRAP_METHOD(Debugger, cmdInteract));
 	registerCmd("jimmy", WRAP_METHOD(Debugger, cmdJimmy));
 	registerCmd("locate", WRAP_METHOD(Debugger, cmdLocate));
 	registerCmd("mix", WRAP_METHOD(Debugger, cmdMixReagents));
-	registerCmd("musicToggle", WRAP_METHOD(Debugger, cmdMusicToggle));
 	registerCmd("open", WRAP_METHOD(Debugger, cmdOpenDoor));
 	registerCmd("order", WRAP_METHOD(Debugger, cmdNewOrder));
 	registerCmd("party", WRAP_METHOD(Debugger, cmdParty));
@@ -83,14 +85,19 @@ Debugger::Debugger() : Shared::Debugger() {
 	registerCmd("wear", WRAP_METHOD(Debugger, cmdWearArmor));
 	registerCmd("yell", WRAP_METHOD(Debugger, cmdYell));
 
+	registerCmd("speed", WRAP_METHOD(Debugger, cmdSpeed));
+	registerCmd("combat_speed", WRAP_METHOD(Debugger, cmdCombatSpeed));
+
 	registerCmd("3d", WRAP_METHOD(Debugger, cmd3d));
 	registerCmd("abyss", WRAP_METHOD(Debugger, cmdAbyss));
 	registerCmd("collisions", WRAP_METHOD(Debugger, cmdCollisions));
 	registerCmd("companions", WRAP_METHOD(Debugger, cmdCompanions));
 	registerCmd("destroy", WRAP_METHOD(Debugger, cmdDestroy));
+	registerCmd("destroy_creatures", WRAP_METHOD(Debugger, cmdDestroyCreatures));
 	registerCmd("dungeon", WRAP_METHOD(Debugger, cmdDungeon));
 	registerCmd("equipment", WRAP_METHOD(Debugger, cmdEquipment));
 	registerCmd("exit", WRAP_METHOD(Debugger, cmdExit));
+	registerCmd("flee", WRAP_METHOD(Debugger, cmdFlee));
 	registerCmd("fullstats", WRAP_METHOD(Debugger, cmdFullStats));
 	registerCmd("gate", WRAP_METHOD(Debugger, cmdGate));
 	registerCmd("goto", WRAP_METHOD(Debugger, cmdGoto));
@@ -102,10 +109,12 @@ Debugger::Debugger() : Shared::Debugger() {
 	registerCmd("mixtures", WRAP_METHOD(Debugger, cmdMixtures));
 	registerCmd("moon", WRAP_METHOD(Debugger, cmdMoon));
 	registerCmd("opacity", WRAP_METHOD(Debugger, cmdOpacity));
+	registerCmd("overhead", WRAP_METHOD(Debugger, cmdOverhead));
 	registerCmd("reagents", WRAP_METHOD(Debugger, cmdReagents));
 	registerCmd("summon", WRAP_METHOD(Debugger, cmdSummon));
 	registerCmd("torch", WRAP_METHOD(Debugger, cmdTorch));
 	registerCmd("transport", WRAP_METHOD(Debugger, cmdTransport));
+	registerCmd("triggers", WRAP_METHOD(Debugger, cmdListTriggers));
 	registerCmd("up", WRAP_METHOD(Debugger, cmdUp));
 	registerCmd("down", WRAP_METHOD(Debugger, cmdDown));
 	registerCmd("virtue", WRAP_METHOD(Debugger, cmdVirtue));
@@ -148,21 +157,36 @@ void Debugger::printN(const char *fmt, ...) {
 	}
 }
 
+void Debugger::prompt() {
+	if (isDebuggerActive())
+		g_screen->screenPrompt();
+}
+
 bool Debugger::handleCommand(int argc, const char **argv, bool &keepRunning) {
 	static const char *DUNGEON_DISALLOWED[] = {
 		"attack", "board", "enter", "fire", "jimmy", "locate",
 		"open", "talk", "exit", "yell", nullptr
 	};
+	static const char *COMBAT_DISALLOWED[] = {
+		"board", "climb", "descend", "enter", "exit", "fire", "hole",
+		"ignite", "jimmy", "mix", "order", "open", "peer", "quitAndSave",
+		"search", "use", "wear", "yell", nullptr
+	};
 
-	if (g_context && (g_context->_location->_context & CTX_DUNGEON)) {
-		Common::String method = argv[0];
+	if (g_context && g_context->_location) {
+		int ctx = g_context->_location->_context;
+		if (ctx & (CTX_DUNGEON | CTX_COMBAT)) {
+			Common::String method = argv[0];
+			const char *const *mth = (ctx & CTX_COMBAT) ?
+				COMBAT_DISALLOWED : DUNGEON_DISALLOWED;
 
-		for (const char *const *mth = DUNGEON_DISALLOWED; *mth; ++mth) {
-			if (method.equalsIgnoreCase(*mth)) {
-				print("%cNot here!%c", FG_GREY, FG_WHITE);
-				g_game->finishTurn();
-				keepRunning = false;
-				return true;
+			for (; *mth; ++mth) {
+				if (method.equalsIgnoreCase(*mth)) {
+					print("%cNot here!%c", FG_GREY, FG_WHITE);
+					g_game->finishTurn();
+					keepRunning = false;
+					return true;
+				}
 			}
 		}
 	}
@@ -170,10 +194,25 @@ bool Debugger::handleCommand(int argc, const char **argv, bool &keepRunning) {
 	bool result = Shared::Debugger::handleCommand(argc, argv, keepRunning);
 
 	if (result) {
-		if (!isActive() && !_dontEndTurn)
-			g_game->finishTurn();
-		else if (_dontEndTurn && eventHandler->getController() == g_game)
-			g_context->_location->_turnCompleter->finishTurn();
+		Controller *ctl = eventHandler->getController();
+
+		if (g_context)
+			g_context->_lastCommandTime = g_system->getMillis();
+
+		if (!isActive() && !_dontEndTurn) {
+			GameController *gc = dynamic_cast<GameController *>(ctl);
+			CombatController *cc = dynamic_cast<CombatController *>(ctl);
+
+			if (gc)
+				gc->finishTurn();
+			else if (cc)
+				cc->finishTurn();
+		} else if (_dontEndTurn) {
+			if (ctl == g_game || ctl == g_combat) {
+				assert(g_context);
+				g_context->_location->_turnCompleter->finishTurn();
+			}
+		}
 	}
 
 	_dontEndTurn = false;
@@ -184,23 +223,8 @@ void Debugger::getChest(int player) {
 	Common::String param = Common::String::format("%d", player);
 	const char *argv[2] = { "get", param.c_str() };
 
-	cmdGet(2, argv);
+	cmdGetChest(2, argv);
 }
-
-void Debugger::castSpell(int player) {
-	Common::String param = Common::String::format("%d", player);
-	const char *argv[2] = { "cast", param.c_str() };
-
-	cmdCastSpell(2, argv);
-}
-
-void Debugger::readyWeapon(int player) {
-	Common::String param = Common::String::format("%d", player);
-	const char *argv[2] = { "ready", param.c_str() };
-
-	cmdReadyWeapon(2, argv);
-}
-
 
 bool Debugger::cmdMove(int argc, const char **argv) {
 	Direction dir;
@@ -233,40 +257,22 @@ bool Debugger::cmdMove(int argc, const char **argv) {
 }
 
 bool Debugger::cmdAttack(int argc, const char **argv) {
-	Direction dir;
-
-	if (argc != 2 && isDebuggerActive()) {
-		print("attack <direction>");
+	if (argc < 2 && isDebuggerActive()) {
+		print("attack <direction> [distance]");
 		return true;
 	}
 
-	printN("Attack: ");
-	if (g_context->_party->isFlying()) {
-		print("\n%cDrift only!%c", FG_GREY, FG_WHITE);
-		return isDebuggerActive();
-	}
+	Direction dir = (argc >= 2) ? directionFromName(argv[1]) : DIR_NONE;
+	int range = (argc >= 3) ? strToInt(argv[2]) : -1;
 
-	if (argc == 2) {
-		dir = directionFromName(argv[1]);
-	} else {
-		dir = gameGetDirection();
-	}
+	CombatController *cc = dynamic_cast<CombatController *>(eventHandler->getController());
+	GameController *gc = dynamic_cast<GameController *>(eventHandler->getController());
 
-	if (dir == DIR_NONE) {
-		if (isDebuggerActive())
-			print("");
-		return isDebuggerActive();
-	}
+	if (cc)
+		cc->attack(dir, range);
+	else if (gc)
+		gc->attack(dir);
 
-	Std::vector<Coords> path = gameGetDirectionalActionPath(
-		MASK_DIR(dir), MASK_DIR_ALL, g_context->_location->_coords,
-		1, 1, nullptr, true);
-	for (Std::vector<Coords>::iterator i = path.begin(); i != path.end(); i++) {
-		if (attackAt(*i))
-			return isDebuggerActive();
-	}
-
-	print("%cNothing to Attack!%c", FG_GREY, FG_WHITE);
 	return isDebuggerActive();
 }
 
@@ -303,11 +309,14 @@ bool Debugger::cmdBoard(int argc, const char **argv) {
 
 bool Debugger::cmdCastSpell(int argc, const char **argv) {
 	int player = -1;
-	if (argc == 2)
+	if (argc >= 2)
 		player = strToInt(argv[1]);
 
-	if (player == -1) {
-		printN("Cast Spell!\nPlayer: ");
+	print("Cast Spell!");
+	if (isCombat()) {
+		player = getCombatFocus();
+	} else if (player == -1) {
+		printN("Player: ");
 		player = gameGetPlayer(false, true);
 	}
 	if (player == -1)
@@ -316,26 +325,39 @@ bool Debugger::cmdCastSpell(int argc, const char **argv) {
 	// get the spell to cast
 	g_context->_stats->setView(STATS_MIXTURES);
 	printN("Spell: ");
-	// ### Put the iPad thing too.
 #ifdef IOS_ULTIMA4
+	// ### Put the iPad thing too.
 	U4IOS::IOSCastSpellHelper castSpellController;
 #endif
-	int spell = AlphaActionController::get('z', "Spell: ");
-	if (spell == -1)
-		return isDebuggerActive();
+	int spell;
+	if (argc == 3) {
+		printN("Spell: ");
+		if (Common::isAlpha(argv[2][0])) {
+			spell = tolower(argv[2][0]) - 'a';
+		} else {
+			spell = -1;
+		}
+	} else {
+		spell = AlphaActionController::get('z', "Spell: ");
+	}
 
-	print("%s!", spellGetName(spell)); //Prints spell name at prompt
+	if (spell == -1) {
+		print("");
+		return isDebuggerActive();
+	}
+
+	print("%s!", g_spells->spellGetName(spell)); // Prints spell name at prompt
 
 	g_context->_stats->setView(STATS_PARTY_OVERVIEW);
 
-	// if we can't really cast this spell, skip the extra parameters
-	if (spellCheckPrerequisites(spell, player) != CASTERR_NOERROR) {
+	// If we can't really cast this spell, skip the extra parameters
+	if (g_spells->spellCheckPrerequisites(spell, player) != CASTERR_NOERROR) {
 		gameCastSpell(spell, player, 0);
 		return isDebuggerActive();
 	}
 
 	// Get the final parameters for the spell
-	switch (spellGetParamType(spell)) {
+	switch (g_spells->spellGetParamType(spell)) {
 	case Spell::PARAM_NONE:
 		gameCastSpell(spell, player, 0);
 		break;
@@ -430,7 +452,8 @@ bool Debugger::cmdCastSpell(int argc, const char **argv) {
 			 * original Ultima IV (at least, in the Amiga version.)
 			 */
 			 //c->saveGame->_mixtures[castSpell]--;
-			g_context->_party->member(player)->adjustMp(-spellGetRequiredMP(spell));
+			g_context->_party->member(player)->adjustMp(
+				-g_spells->spellGetRequiredMP(spell));
 		}
 		break;
 	}
@@ -443,6 +466,26 @@ bool Debugger::cmdCastSpell(int argc, const char **argv) {
 		break;
 	}
 	}
+
+	return false;
+}
+
+bool Debugger::cmdCamp(int argc, const char **argv) {
+	print("Hole up & Camp!");
+
+	if (!(g_context->_location->_context & (CTX_WORLDMAP | CTX_DUNGEON))) {
+		print("%cNot here!%c", FG_GREY, FG_WHITE);
+		return isDebuggerActive();
+	}
+
+	if (g_context->_transportContext != TRANSPORT_FOOT) {
+		print("%cOnly on foot!%c", FG_GREY, FG_WHITE);
+		return isDebuggerActive();
+	}
+
+	CombatController *cc = new CampController();
+	cc->init(nullptr);
+	cc->begin();
 
 	return isDebuggerActive();
 }
@@ -491,7 +534,7 @@ bool Debugger::cmdDescend(int argc, const char **argv) {
 bool Debugger::cmdEnter(int argc, const char **argv) {
 	if (!usePortalAt(g_context->_location, g_context->_location->_coords, ACTION_ENTER)) {
 		if (!g_context->_location->_map->portalAt(g_context->_location->_coords, ACTION_ENTER))
-			print("%cEnter what?%c\n", FG_GREY, FG_WHITE);
+			print("%cEnter what?%c", FG_GREY, FG_WHITE);
 	} else {
 		dontEndTurn();
 	}
@@ -548,10 +591,12 @@ bool Debugger::cmdFire(int argc, const char **argv) {
 	return isDebuggerActive();
 }
 
-bool Debugger::cmdGet(int argc, const char **argv) {
-	int player = 1;
+bool Debugger::cmdGetChest(int argc, const char **argv) {
+	int player = -1;
 	if (argc == 2)
 		player = strToInt(argv[1]);
+	else if (isCombat())
+		player = getCombatFocus();
 
 	print("Get Chest!");
 
@@ -602,26 +647,6 @@ bool Debugger::cmdGet(int argc, const char **argv) {
 	} else {
 		print("%cNot Here!%c", FG_GREY, FG_WHITE);
 	}
-
-	return isDebuggerActive();
-}
-
-bool Debugger::cmdHoleUp(int argc, const char **argv) {
-	print("Hole up & Camp!");
-
-	if (!(g_context->_location->_context & (CTX_WORLDMAP | CTX_DUNGEON))) {
-		print("%cNot here!%c", FG_GREY, FG_WHITE);
-		return isDebuggerActive();
-	}
-
-	if (g_context->_transportContext != TRANSPORT_FOOT) {
-		print("%cOnly on foot!%c", FG_GREY, FG_WHITE);
-		return isDebuggerActive();
-	}
-
-	CombatController *cc = new CampController();
-	cc->init(nullptr);
-	cc->begin();
 
 	return isDebuggerActive();
 }
@@ -702,7 +727,7 @@ bool Debugger::cmdInteract(int argc, const char **argv) {
 		MapTile *tile = g_context->_location->_map->tileAt(g_context->_location->_coords, WITH_GROUND_OBJECTS);
 
 		if (tile->getTileType()->isChest())
-			return cmdGet(argc, argv);
+			return cmdGetChest(argc, argv);
 	}
 
 	// Otherwise default to search
@@ -728,8 +753,16 @@ bool Debugger::cmdJimmy(int argc, const char **argv) {
 }
 
 bool Debugger::cmdLocate(int argc, const char **argv) {
-	// can't use sextant in dungeon or in combat
-	if (g_context->_location->_context & ~(CTX_DUNGEON | CTX_COMBAT)) {
+	// Normally Locate isn't allowed in combat, but allow for a special
+	// debug display if this command is explicitly run in the debugger
+	if (isCombat() && isDebuggerActive()) {
+		CombatController *cc = static_cast<CombatController *>(eventHandler->getController());
+		Coords coords = cc->getCurrentPlayer()->getCoords();
+		print("Location: x:%d, y:%d, z:%d", coords.x, coords.y, coords.z);
+		dontEndTurn();
+	}
+	// Otherwise can't use sextant in dungeon or in combat
+	else if (g_context->_location->_context & ~(CTX_DUNGEON | CTX_COMBAT)) {
 		if (g_ultima->_saveGame->_sextants >= 1)
 			print("Locate position\nwith sextant\n Latitude: %c'%c\"\nLongitude: %c'%c\"",
 				g_context->_location->_coords.y / 16 + 'A', g_context->_location->_coords.y % 16 + 'A',
@@ -775,7 +808,7 @@ bool Debugger::cmdMixReagents(int argc, const char **argv) {
 				break;
 
 			int spell = choice - 'a';
-			print("%s", spellGetName(spell));
+			print("%s", g_spells->spellGetName(spell));
 
 			// ensure the mixtures for the spell isn't already maxed out
 			if (g_ultima->_saveGame->_mixtures[spell] == 99) {
@@ -799,16 +832,6 @@ bool Debugger::cmdMixReagents(int argc, const char **argv) {
 	g_context->_stats->setView(STATS_PARTY_OVERVIEW);
 	print("");
 
-	return isDebuggerActive();
-}
-
-bool Debugger::cmdMusicToggle(int argc, const char **argv) {
-	if (g_music->toggle())
-		print("Volume On!");
-	else
-		print("Volume Off!");
-
-	dontEndTurn();
 	return isDebuggerActive();
 }
 
@@ -890,33 +913,31 @@ bool Debugger::cmdPass(int argc, const char **argv) {
 }
 
 bool Debugger::cmdPeer(int argc, const char **argv) {
-	if ((g_context->_location->_viewMode == VIEW_NORMAL) || (g_context->_location->_viewMode == VIEW_DUNGEON))
-		g_context->_location->_viewMode = VIEW_GEM;
-	else if (g_context->_location->_context == CTX_DUNGEON)
-		g_context->_location->_viewMode = VIEW_DUNGEON;
-	else
-		g_context->_location->_viewMode = VIEW_NORMAL;
+	bool useGem = (argc != 2) ? true : strToBool(argv[1]);
+	peer(useGem);
 
-	print("Toggle view");
 	return isDebuggerActive();
 }
 
 bool Debugger::cmdQuitAndSave(int argc, const char **argv) {
 	print("Quit & Save...\n%d moves", g_ultima->_saveGame->_moves);
 	if (g_context->_location->_context & CTX_CAN_SAVE_GAME) {
-		if (g_ultima->saveGameDialog())
-			print("Press Alt-x to quit");
+		(void)g_ultima->saveGameDialog();
+		g_ultima->quitGame();
+
+		return false;
 	} else {
 		print("%cNot here!%c", FG_GREY, FG_WHITE);
+		return isDebuggerActive();
 	}
-
-	return isDebuggerActive();
 }
 
 bool Debugger::cmdReadyWeapon(int argc, const char **argv) {
 	int player = -1;
 	if (argc == 2)
 		player = strToInt(argv[1]);
+	else if (isCombat())
+		player = getCombatFocus();
 
 	// get the player if not provided
 	if (player == -1) {
@@ -929,19 +950,19 @@ bool Debugger::cmdReadyWeapon(int argc, const char **argv) {
 	// get the weapon to use
 	g_context->_stats->setView(STATS_WEAPONS);
 	printN("Weapon: ");
-	WeaponType weapon = (WeaponType)AlphaActionController::get(WEAP_MAX + 'a' - 1, "Weapon: ");
+	int weapon = AlphaActionController::get(WEAP_MAX + 'a' - 1, "Weapon: ");
 	g_context->_stats->setView(STATS_PARTY_OVERVIEW);
 	if (weapon == -1)
 		return isDebuggerActive();
 
 	PartyMember *p = g_context->_party->member(player);
-	const Weapon *w = Weapon::get(weapon);
-
-
+	const Weapon *w = g_weapons->get((WeaponType)weapon);
+ 
 	if (!w) {
 		print("");
 		return isDebuggerActive();
 	}
+
 	switch (p->setWeapon(w)) {
 	case EQUIP_SUCCEEDED:
 		print("%s", w->getName().c_str());
@@ -981,18 +1002,29 @@ bool Debugger::cmdSearch(int argc, const char **argv) {
 		dungeonSearch();
 	} else if (g_context->_party->isFlying()) {
 		print("Searching...\n%cDrift only!%c", FG_GREY, FG_WHITE);
+	} else if (g_context->_location->_map->_id == MAP_SCUMMVM &&
+			g_context->_location->_coords == Coords(52, 5, 0)) {
+		// Special hack for the ScummVM easter egg map. Searching on
+		// the given tile triggers the cheat to allow teleporting
+		print("Searching...\nFound teleport point!");
+		g_game->exitToParentMap();
+		g_music->playMapMusic();
+
+		return cmdGoto(argc, argv);
 	} else {
 		print("Searching...");
 
-		const ItemLocation *item = itemAtLocation(g_context->_location->_map, g_context->_location->_coords);
+		const ItemLocation *item = g_items->itemAtLocation(g_context->_location->_map, g_context->_location->_coords);
 		if (item) {
-			if (item->_isItemInInventory && (*item->_isItemInInventory)(item->_data)) {
+			if (item->_isItemInInventory && (g_items->*(item->_isItemInInventory))(item->_data)) {
 				print("%cNothing Here!%c", FG_GREY, FG_WHITE);
 			} else {
 				if (item->_name)
 					print("You find...\n%s!", item->_name);
-				(*item->_putItemInInventory)(item->_data);
+				(g_items->*(item->_putItemInInventory))(item->_data);
 			}
+		} else if (usePortalAt(g_context->_location, g_context->_location->_coords, ACTION_ENTER)) {
+			print("");
 		} else {
 			print("%cNothing Here!%c", FG_GREY, FG_WHITE);
 		}
@@ -1003,7 +1035,7 @@ bool Debugger::cmdSearch(int argc, const char **argv) {
 
 bool Debugger::cmdSpeed(int argc, const char **argv) {
 	Common::String action = argv[1];
-	int old_cycles = settings._gameCyclesPerSecond;
+	int oldCycles = settings._gameCyclesPerSecond;
 
 	if (action == "up") {
 		if (++settings._gameCyclesPerSecond > MAX_CYCLES_PER_SECOND)
@@ -1015,7 +1047,7 @@ bool Debugger::cmdSpeed(int argc, const char **argv) {
 		settings._gameCyclesPerSecond = DEFAULT_CYCLES_PER_SECOND;
 	}
 
-	if (old_cycles != settings._gameCyclesPerSecond) {
+	if (oldCycles != settings._gameCyclesPerSecond) {
 		settings._eventTimerGranularity = (1000 / settings._gameCyclesPerSecond);
 		eventHandler->getTimer()->reset(settings._eventTimerGranularity);
 
@@ -1033,10 +1065,39 @@ bool Debugger::cmdSpeed(int argc, const char **argv) {
 	return isDebuggerActive();
 }
 
+bool Debugger::cmdCombatSpeed(int argc, const char **argv) {
+	Common::String action = argv[1];
+	int oldSpeed = settings._battleSpeed;
+
+	if (action == "up" && ++settings._battleSpeed > MAX_BATTLE_SPEED)
+		settings._battleSpeed = MAX_BATTLE_SPEED;
+	else if (action == "down" && --settings._battleSpeed == 0)
+		settings._battleSpeed = 1;
+	else if (action == "normal")
+		settings._battleSpeed = DEFAULT_BATTLE_SPEED;
+
+	if (oldSpeed != settings._battleSpeed) {
+		if (settings._battleSpeed == DEFAULT_BATTLE_SPEED) {
+			print("Battle Speed:\nNormal");
+		} else if (action == "up") {
+			print("Battle Speed:\nUp (%d)", settings._battleSpeed);
+		} else {
+			print("Battle Speed:\nDown (%d)", settings._battleSpeed);
+		}
+	} else if (settings._battleSpeed == DEFAULT_BATTLE_SPEED) {
+		print("Battle Speed:\nNormal");
+	}
+
+	dontEndTurn();
+	return isDebuggerActive();
+}
+
 bool Debugger::cmdStats(int argc, const char **argv) {
 	int player = -1;
 	if (argc == 2)
 		player = strToInt(argv[1]);
+	else if (isCombat())
+		player = getCombatFocus();
 
 	// get the player if not provided
 	if (player == -1) {
@@ -1044,6 +1105,8 @@ bool Debugger::cmdStats(int argc, const char **argv) {
 		player = gameGetPlayer(true, false);
 		if (player == -1)
 			return isDebuggerActive();
+	} else {
+		print("Ztats");
 	}
 
 	// Reset the reagent spell mix menu by removing
@@ -1096,7 +1159,7 @@ bool Debugger::cmdUse(int argc, const char **argv) {
 #ifdef IOS_ULTIMA4
 	U4IOS::IOSConversationHelper::setIntroString("Use which item?");
 #endif
-	itemUse(gameGetInput().c_str());
+	g_items->itemUse(gameGetInput().c_str());
 	return isDebuggerActive();
 }
 
@@ -1120,13 +1183,14 @@ bool Debugger::cmdWearArmor(int argc, const char **argv) {
 	if (armor == -1)
 		return isDebuggerActive();
 
-	const Armor *a = Armor::get((ArmorType)armor);
+	const Armor *a = g_armors->get((ArmorType)armor);
 	PartyMember *p = g_context->_party->member(player);
 
 	if (!a) {
 		print("");
 		return isDebuggerActive();
 	}
+
 	switch (p->setArmor(a)) {
 	case EQUIP_SUCCEEDED:
 		print("%s", a->getName().c_str());
@@ -1162,7 +1226,7 @@ bool Debugger::cmdYell(int argc, const char **argv) {
 
 bool Debugger::cmd3d(int argc, const char **argv) {
 	if (g_context->_location->_context == CTX_DUNGEON) {
-		print("3-D view %s\n", DungeonViewer.toggle3DDungeonView() ? "on" : "off");
+		print("3-D view %s", DungeonViewer.toggle3DDungeonView() ? "on" : "off");
 	} else {
 		print("Not here");
 	}
@@ -1197,8 +1261,8 @@ bool Debugger::cmdCollisions(int argc, const char **argv) {
 
 bool Debugger::cmdCompanions(int argc, const char **argv) {
 	for (int m = g_ultima->_saveGame->_members; m < 8; m++) {
-		if (g_context->_party->canPersonJoin(g_ultima->_saveGame->_players[m].name, nullptr)) {
-			g_context->_party->join(g_ultima->_saveGame->_players[m].name);
+		if (g_context->_party->canPersonJoin(g_ultima->_saveGame->_players[m]._name, nullptr)) {
+			g_context->_party->join(g_ultima->_saveGame->_players[m]._name);
 		}
 	}
 
@@ -1231,7 +1295,14 @@ bool Debugger::cmdDestroy(int argc, const char **argv) {
 		}
 	}
 
-	print("%cNothing there!%c\n", FG_GREY, FG_WHITE);
+	print("%cNothing there!%c", FG_GREY, FG_WHITE);
+	return isDebuggerActive();
+}
+
+bool Debugger::cmdDestroyCreatures(int argc, const char **argv) {
+	gameDestroyAllCreatures();
+	dontEndTurn();
+
 	return isDebuggerActive();
 }
 
@@ -1241,7 +1312,7 @@ bool Debugger::cmdDungeon(int argc, const char **argv) {
 			int dungNum = strToInt(argv[1]);
 
 			if (dungNum >= 1 && dungNum <= 8) {
-				g_context->_location->_coords = g_context->_location->_map->_portals[dungNum - 1]->_coords;
+				g_context->_location->_coords = g_context->_location->_map->_portals[dungNum + 15]->_coords;
 				return false;
 			} else if (dungNum == 9) {
 				g_game->setMap(mapMgr->get(MAP_DECEIT), 1, nullptr);
@@ -1271,6 +1342,17 @@ bool Debugger::cmdDungeon(int argc, const char **argv) {
 	return isDebuggerActive();
 }
 
+bool Debugger::cmdFlee(int argc, const char **argv) {
+	if (eventHandler->getController() == g_combat) {
+		// End the combat without losing karma
+		g_combat->end(false);
+	} else {
+		print("Bad command");
+	}
+
+	return isDebuggerActive();
+}
+
 bool Debugger::cmdEquipment(int argc, const char **argv) {
 	int i;
 
@@ -1278,7 +1360,7 @@ bool Debugger::cmdEquipment(int argc, const char **argv) {
 		g_ultima->_saveGame->_armor[i] = 8;
 
 	for (i = WEAP_HANDS + 1; i < WEAP_MAX; ++i) {
-		const Weapon *weapon = Weapon::get(static_cast<WeaponType>(i));
+		const Weapon *weapon = g_weapons->get(static_cast<WeaponType>(i));
 		if (weapon->loseWhenUsed() || weapon->loseWhenRanged())
 			g_ultima->_saveGame->_weapons[i] = 99;
 		else
@@ -1299,7 +1381,7 @@ bool Debugger::cmdGate(int argc, const char **argv) {
 			print("Gate %d!", gateNum);
 
 		if (g_context->_location->_map->isWorldMap()) {
-			const Coords *moongate = moongateGetGateCoordsForPhase(gateNum - 1);
+			const Coords *moongate = g_moongates->getGateCoordsForPhase(gateNum - 1);
 			if (moongate) {
 				g_context->_location->_coords = *moongate;
 				return false;
@@ -1314,6 +1396,8 @@ bool Debugger::cmdGate(int argc, const char **argv) {
 
 bool Debugger::cmdGoto(int argc, const char **argv) {
 	Common::String dest;
+	PortalList &portals = g_context->_location->_map->_portals;
+	uint p;
 
 	if (argc == 2) {
 		dest = argv[1];
@@ -1327,16 +1411,25 @@ bool Debugger::cmdGoto(int argc, const char **argv) {
 	}
 
 	dest.toLowercase();
+	if (dest == "britain")
+		dest = "britannia";
 
 	bool found = false;
-	for (unsigned p = 0; p < g_context->_location->_map->_portals.size(); p++) {
-		MapId destid = g_context->_location->_map->_portals[p]->_destid;
+	p = strToInt(dest.c_str());
+
+	if (p > 0 && p <= portals.size()) {
+		g_context->_location->_coords = portals[p - 1]->_coords;
+		found = true;
+	}
+
+	for (p = 0; p < portals.size() && !found; p++) {
+		MapId destid = portals[p]->_destid;
 		Common::String destNameLower = mapMgr->get(destid)->getName();
 		destNameLower.toLowercase();
 
 		if (destNameLower.find(dest) != Common::String::npos) {
 			print("\n%s", mapMgr->get(destid)->getName().c_str());
-			g_context->_location->_coords = g_context->_location->_map->_portals[p]->_coords;
+			g_context->_location->_coords = portals[p]->_coords;
 			found = true;
 			break;
 		}
@@ -1344,7 +1437,7 @@ bool Debugger::cmdGoto(int argc, const char **argv) {
 
 	if (!found) {
 		MapCoords coords = g_context->_location->_map->getLabel(dest);
-		if (coords != MapCoords::nowhere) {
+		if (coords != MapCoords::nowhere()) {
 			print("%s", dest.c_str());
 			g_context->_location->_coords = coords;
 			found = true;
@@ -1396,7 +1489,7 @@ bool Debugger::cmdItems(int argc, const char **argv) {
 }
 
 bool Debugger::cmdKarma(int argc, const char **argv) {
-	print("Karma!\n");
+	print("Karma!");
 
 	for (int i = 0; i < 8; ++i) {
 		Common::String line = Common::String::format("%s:",
@@ -1418,7 +1511,7 @@ bool Debugger::cmdLeave(int argc, const char **argv) {
 	if (!g_game->exitToParentMap()) {
 		print("Not Here");
 	} else {
-		g_music->play();
+		g_music->playMapMusic();
 		print("Exited");
 	}
 
@@ -1428,7 +1521,29 @@ bool Debugger::cmdLeave(int argc, const char **argv) {
 bool Debugger::cmdLocation(int argc, const char **argv) {
 	const MapCoords &pos = g_context->_location->_coords;
 
-	if (isDebuggerActive()) {
+	if (argc == 3) {
+		Coords newPos;
+
+		if (strlen(argv[1]) == 2 && strlen(argv[2]) == 2
+				&& Common::isAlpha(argv[1][0]) && Common::isAlpha(argv[1][1])
+			&& Common::isAlpha(argv[2][0]) && Common::isAlpha(argv[2][1])
+		) {
+			newPos.y = (toupper(argv[1][0]) - 'A') * 16 + (toupper(argv[1][1]) - 'A');
+			newPos.x = (toupper(argv[2][0]) - 'A') * 16 + (toupper(argv[2][1]) - 'A');
+		} else {
+			newPos.x = strToInt(argv[1]);
+			newPos.y = strToInt(argv[2]);
+		}
+
+		if (newPos.x >= 0 && newPos.y >= 0
+				&& newPos.x < (int)g_context->_location->_map->_width
+				&& newPos.y < (int)g_context->_location->_map->_height) {
+			g_context->_location->_coords = newPos;
+			return false;
+		} else {
+			print("Invalid location!");
+		}
+	} else if (isDebuggerActive()) {
 		if (g_context->_location->_map->isWorldMap())
 			print("Location: %s x: %d, y: %d",
 				"World Map", pos.x, pos.y);
@@ -1437,10 +1552,10 @@ bool Debugger::cmdLocation(int argc, const char **argv) {
 				g_context->_location->_map->getName().c_str(), pos.x, pos.y, pos.z);
 	} else {
 		if (g_context->_location->_map->isWorldMap())
-			print("\nLocation:\n%s\nx: %d\ny: %d\n", "World Map",
+			print("\nLocation:\n%s\nx: %d\ny: %d", "World Map",
 				pos.x, pos.y);
 		else
-			print("\nLocation:\n%s\nx: %d\ny: %d\nz: %d\n",
+			print("\nLocation:\n%s\nx: %d\ny: %d\nz: %d",
 				g_context->_location->_map->getName().c_str(), pos.x, pos.y, pos.z);
 	}
 
@@ -1452,6 +1567,18 @@ bool Debugger::cmdMixtures(int argc, const char **argv) {
 		g_ultima->_saveGame->_mixtures[i] = 99;
 
 	print("All mixtures given");
+	return isDebuggerActive();
+}
+
+bool Debugger::cmdOverhead(int argc, const char **argv) {
+	if ((g_context->_location->_viewMode == VIEW_NORMAL) || (g_context->_location->_viewMode == VIEW_DUNGEON))
+		g_context->_location->_viewMode = VIEW_GEM;
+	else if (g_context->_location->_context == CTX_DUNGEON)
+		g_context->_location->_viewMode = VIEW_DUNGEON;
+	else
+		g_context->_location->_viewMode = VIEW_NORMAL;
+
+	print("Toggle view");
 	return isDebuggerActive();
 }
 
@@ -1502,6 +1629,7 @@ bool Debugger::cmdFullStats(int argc, const char **argv) {
 		}
 	}
 
+	g_context->_stats->update();
 	print("Full Stats given");
 	return isDebuggerActive();
 }
@@ -1525,7 +1653,7 @@ bool Debugger::cmdSummon(int argc, const char **argv) {
 }
 
 bool Debugger::cmdTorch(int argc, const char **argv) {
-	print("Torch: %d\n", g_context->_party->getTorchDuration());
+	print("Torch: %d", g_context->_party->getTorchDuration());
 	if (!isDebuggerActive())
 		g_screen->screenPrompt();
 
@@ -1593,7 +1721,7 @@ bool Debugger::cmdTransport(int argc, const char **argv) {
 	coords.move(dir, g_context->_location->_map);
 
 	if (coords != g_context->_location->_coords) {
-		bool ok = false;
+		bool ok;
 		MapTile *ground = g_context->_location->_map->tileAt(coords, WITHOUT_OBJECTS);
 
 		switch (transport) {
@@ -1607,10 +1735,11 @@ bool Debugger::cmdTransport(int argc, const char **argv) {
 			ok = ground->getTileType()->isWalkable();
 			break;
 		default:
+			ok = false;
 			break;
 		}
 
-		if (choice && ok) {
+		if (ok) {
 			g_context->_location->_map->addObject(*choice, *choice, coords);
 			print("%s created!", tile->getName().c_str());
 		} else if (!choice) {
@@ -1631,7 +1760,7 @@ bool Debugger::cmdUp(int argc, const char **argv) {
 	} else {
 		print("Leaving...");
 		g_game->exitToParentMap();
-		g_music->play();
+		g_music->playMapMusic();
 
 		return isDebuggerActive();
 	}
@@ -1705,6 +1834,38 @@ bool Debugger::cmdWind(int argc, const char **argv) {
 	}
 
 	return false;
+}
+
+bool Debugger::cmdListTriggers(int argc, const char **argv) {
+	CombatMap *map = nullptr;
+
+	if (isCombat() && (map = static_cast<CombatController *>(
+			eventHandler->getController())->getMap()) != nullptr
+			&& map->isDungeonRoom()) {
+		Dungeon *dungeon = dynamic_cast<Dungeon *>(g_context->_location->_prev->_map);
+		assert(dungeon);
+		Trigger *triggers = dungeon->_rooms[dungeon->_currentRoom]._triggers;
+		assert(triggers);
+		int i;
+
+		print("Triggers!");
+
+		for (i = 0; i < 4; i++) {
+			print("%.1d)xy tile xy xy", i + 1);
+			print("  %.1X%.1X  %.3d %.1X%.1X %.1X%.1X",
+				triggers[i].x, triggers[i].y,
+				triggers[i]._tile,
+				triggers[i]._changeX1, triggers[i]._changeY1,
+				triggers[i].changeX2, triggers[i].changeY2);
+		}
+		prompt();
+		dontEndTurn();
+
+	} else {
+		print("Not here!");
+	}
+
+	return isDebuggerActive();
 }
 
 } // End of namespace Ultima4

@@ -27,25 +27,34 @@
 namespace Director {
 
 Sprite::Sprite() {
+	_scriptId = 0;
+	_scriptCastIndex = 0;
+	_colorcode = 0;
+	_blendAmount = 0;
+	_unk3 = 0;
+
 	_enabled = false;
-	_trails = 0;
-	_width = 0;
-	_ink = kInkTypeCopy;
-	_inkData = 0;
-	_height = 0;
-	_castId = 0;
-	_constraint = 0;
-	_moveable = false;
-	_puppet = false;
-	_editable = false;
 	_castId = 0;
 	_castIndex = 0;
+	_spriteType = kInactiveSprite;
+	_castType = kCastTypeNull;
+	_inkData = 0;
+	_ink = kInkTypeCopy;
+	_trails = 0;
+
+	_cast = nullptr;
+
+	_thickness = 0;
+	_width = 0;
+	_height = 0;
+	_constraint = 0;
+	_moveable = false;
+	_editable = false;
+	_puppet = false;
 	_backColor = 255;
 	_foreColor = 0;
-	_left = 0;
-	_right = 0;
-	_top = 0;
-	_bottom = 0;
+
+	_blend = 0;
 	_visible = false;
 	_movieRate = 0;
 	_movieTime = 0;
@@ -53,19 +62,6 @@ Sprite::Sprite() {
 	_stopTime = 0;
 	_volume = 0;
 	_stretch = 0;
-	_type = kInactiveSprite;
-
-	_cast = nullptr;
-
-	_blend = 0;
-	_thickness = 0;
-
-	_scriptId = 0;
-	_scriptCastIndex = 0;
-	_colorcode = 0;
-	_blendAmount = 0;
-	_unk3 = 0;
-	_spriteType = 0;
 }
 
 Sprite::~Sprite() {
@@ -118,6 +114,58 @@ void Sprite::setPattern(uint16 pattern) {
 
 	default:
 		return;
+	}
+}
+
+void Sprite::setCast(uint16 castId) {
+	Cast *member = g_director->getCastMember(castId);
+	if (member) {
+		_cast = member;
+		_castId = castId;
+		_castType = kCastTypeNull;
+
+		if (g_director->getVersion() < 4) {
+			switch (_spriteType) {
+			case kBitmapSprite:
+				_castType = kCastBitmap;
+				break;
+			case kRectangleSprite:
+			case kRoundedRectangleSprite:
+			case kOvalSprite:
+			case kLineTopBottomSprite:
+			case kLineBottomTopSprite:
+			case kOutlinedRectangleSprite:
+			case kOutlinedRoundedRectangleSprite:
+			case kOutlinedOvalSprite:
+			case kCastMemberSprite:
+				if (_cast != nullptr) {
+					switch (_cast->_type) {
+					case kCastButton:
+						_castType = kCastButton;
+						break;
+					default:
+						_castType = kCastShape;
+						break;
+					}
+				} else {
+					_castType = kCastShape;
+				}
+				break;
+			case kTextSprite:
+				_castType = kCastText;
+				break;
+			case kButtonSprite:
+			case kCheckboxSprite:
+			case kRadioButtonSprite:
+				_castType = kCastButton;
+				break;
+			default:
+				warning("Sprite::setCast(): Unhandled sprite type %d", _spriteType);
+				break;
+			}
+		} else {
+			_castType = member->_type;
+		}
 	}
 }
 

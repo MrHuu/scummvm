@@ -30,9 +30,9 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(SplitItemProcess, Process)
+DEFINE_RUNTIME_CLASSTYPE_CODE(SplitItemProcess)
 
-SplitItemProcess::SplitItemProcess() : Process() {
+SplitItemProcess::SplitItemProcess() : Process(), _target(0) {
 
 }
 

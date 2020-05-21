@@ -30,30 +30,18 @@
 namespace Ultima {
 namespace Ultima4 {
 
-using Common::String;
-using Std::vector;
-
 Response *lordBritishGetHelp(const DynamicResponse *resp);
 Response *lordBritishGetIntro(const DynamicResponse *resp);
 
 /**
  * A special case dialogue loader for Lord British.  Loads most of the
- * keyword/responses from a hardcoded location in avatar.exe.  The
- * "help" response is a special case that changes based on the
- * current party status.
+ * keyword/responses from a string table originally extracted from the
+ * game executable.  The  "help" response is a special case that changes
+ * based on the current party status.
  */
 Dialogue *U4LBDialogueLoader::load(void *source) {
-	Common::File *avatar = u4fopen("avatar.exe");
-	if (!avatar)
-		return nullptr;
-
-	Std::vector<Common::String> lbKeywords = u4read_stringtable(avatar, 87581, 24);
-	/* There's a \0 in the 19th Common::String so we get a
-	   spurious 20th entry */
-	Std::vector<Common::String> lbText = u4read_stringtable(avatar, 87754, 25);
-	for (int i = 20; i < 24; i++)
-		lbText[i] = lbText[i + 1];
-	lbText.pop_back();
+	Std::vector<Common::String> lbKeywords = u4read_stringtable("lb_keywords");
+	Std::vector<Common::String> lbText = u4read_stringtable("lb_text");
 
 	Dialogue *dlg = new Dialogue();
 	dlg->setTurnAwayProb(0);
@@ -70,16 +58,8 @@ Dialogue *U4LBDialogueLoader::load(void *source) {
 		dlg->addKeyword(lbKeywords[i], new Response(lbText[i]));
 	}
 
-	/* since the original game files are a bit sketchy on the 'abyss' keyword,
-	   let's handle it here just to be safe :) */
-	dlg->addKeyword("abyss",
-	                new Response("\n\n\n\n\nHe says:\nThe Great Stygian Abyss is the darkest pocket of evil "
-	                             "remaining in Britannia!\n\n\n\n\nIt is said that in the deepest recesses of "
-	                             "the Abyss is the Chamber of the Codex!\n\n\n\nIt is also said that only one "
-	                             "of highest Virtue may enter this Chamber, one such as an Avatar!!!\n"));
-
 	Response *heal = new Response("\n\n\n\n\n\nHe says: I am\nwell, thank ye.");
-	heal->add(ResponsePart::HEALCONFIRM);
+	heal->add(g_responseParts->HEALCONFIRM);
 	dlg->addKeyword("heal", heal);
 
 	Response *bye;
@@ -87,8 +67,8 @@ Dialogue *U4LBDialogueLoader::load(void *source) {
 		bye = new Response("Lord British says: Fare thee well my friends!");
 	else
 		bye = new Response("Lord British says: Fare thee well my friend!");
-	bye->add(ResponsePart::STOPMUSIC);
-	bye->add(ResponsePart::END);
+	bye->add(g_responseParts->STOPMUSIC);
+	bye->add(g_responseParts->END);
 	dlg->addKeyword("bye", bye);
 	dlg->addKeyword("", bye);
 
@@ -176,7 +156,7 @@ Response *lordBritishGetHelp(const DynamicResponse *resp) {
 
 Response *lordBritishGetIntro(const DynamicResponse *resp) {
 	Response *intro = new Response("");
-	intro->add(ResponsePart::STARTMUSIC_LB);
+	intro->add(g_responseParts->STARTMUSIC_LB);
 
 	if (g_ultima->_saveGame->_lbIntro) {
 		if (g_ultima->_saveGame->_members == 1) {
@@ -197,7 +177,7 @@ Response *lordBritishGetIntro(const DynamicResponse *resp) {
 		// Lord British automatically adds "What would thou ask of me?"
 
 		// Check levels here, just like the original!
-		intro->add(ResponsePart::ADVANCELEVELS);
+		intro->add(g_responseParts->ADVANCELEVELS);
 	}
 
 	else {

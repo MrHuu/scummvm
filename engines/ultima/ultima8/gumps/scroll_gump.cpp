@@ -35,17 +35,17 @@
 namespace Ultima {
 namespace Ultima8 {
 
-DEFINE_RUNTIME_CLASSTYPE_CODE(ScrollGump, ModalGump)
+DEFINE_RUNTIME_CLASSTYPE_CODE(ScrollGump)
 
 // TODO: Remove all the hacks
 
 ScrollGump::ScrollGump()
-	: ModalGump() {
+	: ModalGump(), _textWidget(0) {
 
 }
 
 ScrollGump::ScrollGump(ObjId owner_, Std::string msg) :
-	ModalGump(0, 0, 100, 100, owner_), _text(msg) {
+	ModalGump(0, 0, 100, 100, owner_), _text(msg), _textWidget(0) {
 }
 
 ScrollGump::~ScrollGump(void) {
@@ -68,19 +68,19 @@ void ScrollGump::InitGump(Gump *newparent, bool take_focus) {
 }
 
 void ScrollGump::NextText() {
-	TextWidget *widget = p_dynamic_cast<TextWidget *>(getGump(_textWidget));
+	TextWidget *widget = dynamic_cast<TextWidget *>(getGump(_textWidget));
 	assert(widget);
 	if (!widget->setupNextText()) {
 		Close();
 	}
 }
 
-void ScrollGump::OnMouseClick(int button, int32 mx, int32 my) {
+void ScrollGump::onMouseClick(int button, int32 mx, int32 my) {
 	// Scroll to next _text, if possible
 	NextText();
 }
 
-void ScrollGump::OnMouseDouble(int button, int32 mx, int32 my) {
+void ScrollGump::onMouseDouble(int button, int32 mx, int32 my) {
 	Close();
 }
 

@@ -58,7 +58,7 @@ U8Game::U8Game() : Game() {
 	settingman->setDefault("footsteps", true);
 	settingman->setDefault("targetedjump", true);
 
-	GameInfo *info = Ultima8Engine::get_instance()->getGameInfo();
+	const GameInfo *info = Ultima8Engine::get_instance()->getGameInfo();
 	if (info->_language == GameInfo::GAMELANG_JAPANESE) {
 		settingman->setDefault("textdelay", 20);
 	} else {
@@ -74,7 +74,7 @@ bool U8Game::loadFiles() {
 	pout << "Load Palette" << Std::endl;
 	Common::SeekableReadStream *pf = FileSystem::get_instance()->ReadFile("@game/static/u8pal.pal");
 	if (!pf) {
-		perr << "Unabl-e to load static/u8pal.pal." << Std::endl;
+		perr << "Unable to load static/u8pal.pal." << Std::endl;
 		return false;
 	}
 	pf->seek(4); // seek past header
@@ -125,6 +125,7 @@ bool U8Game::startGame() {
 	Common::SeekableReadStream *npcd = u8save->getDataSource("NPCDATA.DAT");
 	if (!npcd) {
 		perr << "Unable to load savegame/u8save.000/NPCDATA.DAT." << Std::endl;
+		delete icd;
 		return false;
 	}
 
@@ -156,7 +157,7 @@ bool U8Game::startInitialUsecode(int saveSlot) {
 
 
 ProcId U8Game::playIntroMovie(bool fade) {
-	GameInfo *gameinfo = CoreApp::get_instance()->getGameInfo();
+	const GameInfo *gameinfo = CoreApp::get_instance()->getGameInfo();
 	char langletter = gameinfo->getLanguageFileLetter();
 	if (!langletter) {
 		perr << "U8Game::playIntro: Unknown language." << Std::endl;
@@ -174,8 +175,7 @@ ProcId U8Game::playIntroMovie(bool fade) {
 		return 0;
 	}
 
-	RawArchive *flex = new RawArchive(skf);
-	return MovieGump::U8MovieViewer(flex, fade, true);
+	return MovieGump::U8MovieViewer(skf, fade, true);
 }
 
 ProcId U8Game::playEndgameMovie(bool fade) {
@@ -187,12 +187,11 @@ ProcId U8Game::playEndgameMovie(bool fade) {
 		return 0;
 	}
 
-	RawArchive *flex = new RawArchive(skf);
-	return MovieGump::U8MovieViewer(flex, fade);
+	return MovieGump::U8MovieViewer(skf, fade);
 }
 
 void U8Game::playCredits() {
-	GameInfo *gameinfo = CoreApp::get_instance()->getGameInfo();
+	const GameInfo *gameinfo = CoreApp::get_instance()->getGameInfo();
 	char langletter = gameinfo->getLanguageFileLetter();
 	if (!langletter) {
 		perr << "U8Game::playCredits: Unknown language." << Std::endl;

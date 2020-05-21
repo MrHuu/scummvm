@@ -36,7 +36,7 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(CameraProcess, Process)
+DEFINE_RUNTIME_CLASSTYPE_CODE(CameraProcess)
 
 //
 // Statics
@@ -46,7 +46,9 @@ int32 CameraProcess::_earthquake = 0;
 int32 CameraProcess::_eqX = 0;
 int32 CameraProcess::_eqY = 0;
 
-CameraProcess::CameraProcess() : Process() {
+CameraProcess::CameraProcess() : Process(), _sx(0), _sy(0), _sz(0),
+	_ex(0), _ey(0), _ez(0), _time(0), _elapsed(0),
+	_itemNum(0), _lastFrameNum(0) {
 }
 
 CameraProcess::~CameraProcess() {
@@ -100,12 +102,14 @@ CameraProcess::CameraProcess(uint16 _itemnum) :
 
 	if (_itemNum) {
 		Item *item = getItem(_itemNum);
-
-		// Got it
 		if (item) {
 			item->setExtFlag(Item::EXT_CAMERA);
 			item->getLocation(_ex, _ey, _ez);
 			_ez += 20; //!!constant
+		} else {
+			_ex = 0;
+			_ey = 0;
+			_ez = 0;
 		}
 		return;
 	}
@@ -260,6 +264,7 @@ uint16 CameraProcess::FindRoof(int32 factor) {
 	GetLerped(x, y, z, factor);
 	_earthquake = earthquake_old;
 	Item *avatar = getItem(1);
+	assert(avatar);
 	int32 dx, dy, dz;
 	avatar->getFootpadWorld(dx, dy, dz);
 	uint16 roofid;
@@ -319,8 +324,8 @@ uint32 CameraProcess::I_move_to(const uint8 *args, unsigned int /*argsize*/) {
 
 //	"Camera::setCenterOn(uword)",
 uint32 CameraProcess::I_setCenterOn(const uint8 *args, unsigned int /*argsize*/) {
-	ARG_OBJID(_itemNum);
-	CameraProcess::SetCameraProcess(new CameraProcess(_itemNum));
+	ARG_OBJID(itemNum);
+	CameraProcess::SetCameraProcess(new CameraProcess(itemNum));
 	return 0;
 }
 

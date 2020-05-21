@@ -35,7 +35,7 @@
 #include "ultima/ultima4/game/player.h"
 #include "ultima/ultima4/game/weapon.h"
 #include "ultima/ultima4/game/spell.h"
-#include "ultima/ultima4/game/stats.h"
+#include "ultima/ultima4/views/stats.h"
 #include "ultima/ultima4/gfx/screen.h"
 #include "ultima/ultima4/map/tileset.h"
 #include "ultima/ultima4/sound/music.h"
@@ -43,8 +43,6 @@
 
 namespace Ultima {
 namespace Ultima4 {
-
-extern SpellEffectCallback spellEffectCallback;
 
 /*
  * Script::Variable class
@@ -94,13 +92,10 @@ bool Script::Variable::isSet() const {
 	return _set;
 }
 
-/*
- * Static member variables
- */
-Script::ActionMap Script::_actionMap;
-
-Script::Script() : _vendorScriptDoc(nullptr), _scriptNode(nullptr), _debug(false), _state(STATE_UNLOADED),
-	_nounName("item"), _idPropName("id") {
+Script::Script() : _vendorScriptDoc(nullptr), _scriptNode(nullptr),
+		_debug(false), _state(STATE_UNLOADED), _currentScript(nullptr),
+		_currentItem(nullptr), _inputType(INPUT_CHOICE), _inputMaxLen(0),
+		_nounName("item"), _idPropName("id"), _iterator(0) {
 	_actionMap["context"]           = ACTION_SET_CONTEXT;
 	_actionMap["unset_context"]     = ACTION_UNSET_CONTEXT;
 	_actionMap["end"]               = ACTION_END;
@@ -244,7 +239,8 @@ bool Script::load(const Common::String &filename, const Common::String &baseId, 
 	} else {
 		if (subNodeName.empty())
 			error("Couldn't find script '%s' in %s", baseId.c_str(), filename.c_str());
-		else error("Couldn't find subscript '%s' where id='%s' in script '%s' in %s", subNodeName.c_str(), subNodeId.c_str(), baseId.c_str(), filename.c_str());
+		else
+			error("Couldn't find subscript '%s' where id='%s' in script '%s' in %s", subNodeName.c_str(), subNodeId.c_str(), baseId.c_str(), filename.c_str());
 	}
 
 	_state = STATE_UNLOADED;
@@ -266,7 +262,8 @@ void Script::run(const Common::String &script) {
 	if (_variables.find(_idPropName) != _variables.end()) {
 		if (_variables[_idPropName]->isSet())
 			search_id = _variables[_idPropName]->getString();
-		else search_id = "null";
+		else
+			search_id = "null";
 	}
 
 	scriptNode = find(_scriptNode, script, search_id);
@@ -364,7 +361,7 @@ Script::ReturnCode Script::execute(Shared::XMLNode *script, Shared::XMLNode *cur
 					retval = forLoop(script, current);
 					break;
 				case ACTION_RANDOM:
-					retval = random(script, current);
+					retval = randomScript(script, current);
 					break;
 				case ACTION_MOVE:
 					retval = move(script, current);
@@ -441,31 +438,32 @@ void Script::_continue() {
 	/* there's no target indicated, just start where we left off! */
 	if (_target.empty())
 		execute(_currentScript, _currentItem);
-	else run(_target);
+	else
+		run(_target);
 }
 
-void Script::resetState()               {
+void Script::resetState() {
 	_state = STATE_NORMAL;
 }
 
-void Script::setState(Script::State s)  {
+void Script::setState(Script::State s) {
 	_state = s;
 }
 
-void Script::setTarget(const Common::String &val)      {
+void Script::setTarget(const Common::String &val) {
 	_target = val;
 }
 
-void Script::setChoices(const Common::String &val)     {
+void Script::setChoices(const Common::String &val) {
 	_choices = val;
 }
 
-void Script::setVar(const Common::String &name, const Common::String &val)    {
+void Script::setVar(const Common::String &name, const Common::String &val) {
 	removeCurrentVariable(name);
 	_variables[name] = new Variable(val);
 }
 
-void Script::setVar(const Common::String &name, int val)       {
+void Script::setVar(const Common::String &name, int val) {
 	removeCurrentVariable(name);
 	_variables[name] = new Variable(val);
 }
@@ -474,14 +472,15 @@ void Script::unsetVar(const Common::String &name) {
 	// Ensure that the variable at least exists, but has no value
 	if (_variables.find(name) != _variables.end())
 		_variables[name]->unset();
-	else _variables[name] = new Variable();
+	else
+		_variables[name] = new Variable();
 }
 
-Script::State Script::getState()        {
+Script::State Script::getState() {
 	return _state;
 }
 
-Common::String Script::getTarget()              {
+Common::String Script::getTarget() {
 	return _target;
 }
 
@@ -489,15 +488,15 @@ Script::InputType Script::getInputType() {
 	return _inputType;
 }
 
-Common::String Script::getChoices()             {
+Common::String Script::getChoices() {
 	return _choices;
 }
 
-Common::String Script::getInputName()           {
+Common::String Script::getInputName() {
 	return _inputName;
 }
 
-int Script::getInputMaxLen()            {
+int Script::getInputMaxLen() {
 	return _inputMaxLen;
 }
 
@@ -693,7 +692,8 @@ void Script::translate(Common::String *text) {
 				else if (funcName == "compare") {
 					if (compare(content))
 						prop = "true";
-					else prop = "false";
+					else
+						prop = "false";
 				}
 
 				/* make the Common::String upper case */
@@ -721,7 +721,8 @@ void Script::translate(Common::String *text) {
 				else if (funcName == "isempty") {
 					if (content.empty())
 						prop = "true";
-					else prop = "false";
+					else
+						prop = "false";
 				}
 			}
 		}
@@ -963,7 +964,7 @@ Script::ReturnCode Script::forLoop(Shared::XMLNode *script, Shared::XMLNode *cur
 	return retval;
 }
 
-Script::ReturnCode Script::random(Shared::XMLNode *script, Shared::XMLNode *current) {
+Script::ReturnCode Script::randomScript(Shared::XMLNode *script, Shared::XMLNode *current) {
 	int perc = getPropAsInt(current, "chance");
 	int num = xu4_random(100);
 	Script::ReturnCode retval = RET_OK;
@@ -1214,7 +1215,7 @@ Script::ReturnCode Script::heal(Shared::XMLNode *script, Shared::XMLNode *curren
 }
 
 Script::ReturnCode Script::castSpell(Shared::XMLNode *script, Shared::XMLNode *current) {
-	(*spellEffectCallback)('r', -1, SOUND_MAGIC);
+	g_spells->spellEffect('r', -1, SOUND_MAGIC);
 	if (_debug)
 		debug("<Spell effect>");
 
@@ -1278,12 +1279,12 @@ Script::ReturnCode Script::karma(Shared::XMLNode *script, Shared::XMLNode *curre
 
 Script::ReturnCode Script::music(Shared::XMLNode *script, Shared::XMLNode *current) {
 	if (current->getPropertyBool("reset"))
-		g_music->play();
+		g_music->playMapMusic();
 	else {
 		Common::String type = getPropAsStr(current, "type");
 
 		if (current->getPropertyBool("play"))
-			g_music->play();
+			g_music->playMapMusic();
 		if (current->getPropertyBool("stop"))
 			g_music->stop();
 		else if (type == "shopping")

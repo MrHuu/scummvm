@@ -32,9 +32,6 @@
 namespace Ultima {
 namespace Ultima4 {
 
-using Common::String;
-using Std::vector;
-
 TileAnimTransform *TileAnimTransform::create(const ConfigElement &conf) {
 	TileAnimTransform *transform;
 	static const char *transformTypeEnumStrings[] = { "invert", "pixel", "scroll", "frame", "pixel_color", nullptr };
@@ -52,7 +49,7 @@ TileAnimTransform *TileAnimTransform::create(const ConfigElement &conf) {
 		transform = new TileAnimPixelTransform(
 			conf.getInt("x"), conf.getInt("y"));
 
-		vector<ConfigElement> children = conf.getChildren();
+		Std::vector<ConfigElement> children = conf.getChildren();
 		for (Std::vector<ConfigElement>::iterator i = children.begin(); i != children.end(); i++) {
 			if (i->getName() == "color") {
 				RGBA *rgba = loadColorFromConf(*i);
@@ -75,7 +72,7 @@ TileAnimTransform *TileAnimTransform::create(const ConfigElement &conf) {
 			conf.getInt("x"), conf.getInt("y"),
 			conf.getInt("width"), conf.getInt("height"));
 
-		vector<ConfigElement> children = conf.getChildren();
+		Std::vector<ConfigElement> children = conf.getChildren();
 		for (Std::vector<ConfigElement>::iterator i = children.begin(); i != children.end(); i++) {
 			if (i->getName() == "color") {
 				RGBA *rgba = loadColorFromConf(*i);
@@ -104,7 +101,7 @@ TileAnimTransform *TileAnimTransform::create(const ConfigElement &conf) {
 RGBA *TileAnimTransform::loadColorFromConf(const ConfigElement &conf) {
 	RGBA *rgba;
 
-	rgba = new RGBA;
+	rgba = new RGBA();
 	rgba->r = conf.getInt("red");
 	rgba->g = conf.getInt("green");
 	rgba->b = conf.getInt("blue");
@@ -189,6 +186,11 @@ TileAnimPixelColorTransform::TileAnimPixelColorTransform(int xp, int yp, int wid
 	_start = _end = nullptr;
 }
 
+TileAnimPixelColorTransform::~TileAnimPixelColorTransform() {
+	delete _start;
+	delete _end;
+}
+
 bool TileAnimPixelColorTransform::drawsTile() const {
 	return false;
 }
@@ -237,7 +239,7 @@ TileAnimContext *TileAnimContext::create(const ConfigElement &conf) {
 
 	// Add the transforms to the context
 	if (context) {
-		vector<ConfigElement> children = conf.getChildren();
+		Std::vector<ConfigElement> children = conf.getChildren();
 
 		for (Std::vector<ConfigElement>::iterator i = children.begin(); i != children.end(); i++) {
 			if (i->getName() == "transform") {
@@ -271,13 +273,18 @@ bool TileAnimPlayerDirContext::isInContext(Tile *t, MapTile &mapTile, Direction 
 TileAnimSet::TileAnimSet(const ConfigElement &conf) {
 	_name = conf.getString("name");
 
-	vector<ConfigElement> children = conf.getChildren();
+	Std::vector<ConfigElement> children = conf.getChildren();
 	for (Std::vector<ConfigElement>::iterator i = children.begin(); i != children.end(); i++) {
 		if (i->getName() == "tileanim") {
 			TileAnim *anim = new TileAnim(*i);
 			_tileAnims[anim->_name] = anim;
 		}
 	}
+}
+
+TileAnimSet::~TileAnimSet() {
+	for (TileAnimMap::iterator it = _tileAnims.begin(); it != _tileAnims.end(); ++it)
+		delete it->_value;
 }
 
 TileAnim *TileAnimSet::getByName(const Common::String &name) {
@@ -287,12 +294,14 @@ TileAnim *TileAnimSet::getByName(const Common::String &name) {
 	return i->_value;
 }
 
+/*------------------------------------------------------------------------*/
+
 TileAnim::TileAnim(const ConfigElement &conf) : _random(0) {
 	_name = conf.getString("name");
 	if (conf.exists("random"))
 		_random = conf.getInt("random");
 
-	vector<ConfigElement> children = conf.getChildren();
+	Std::vector<ConfigElement> children = conf.getChildren();
 	for (Std::vector<ConfigElement>::iterator i = children.begin(); i != children.end(); i++) {
 		if (i->getName() == "transform") {
 			TileAnimTransform *transform = TileAnimTransform::create(*i);
@@ -304,6 +313,13 @@ TileAnim::TileAnim(const ConfigElement &conf) : _random(0) {
 			_contexts.push_back(context);
 		}
 	}
+}
+
+TileAnim::~TileAnim() {
+	for (uint idx = 0; idx < _transforms.size(); ++idx)
+		delete _transforms[idx];
+	for (uint idx = 0; idx < _contexts.size(); ++idx)
+		delete _contexts[idx];
 }
 
 void TileAnim::draw(Image *dest, Tile *tile, MapTile &mapTile, Direction dir) {

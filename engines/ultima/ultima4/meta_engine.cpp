@@ -38,8 +38,9 @@ struct KeybindingRecord {
 	const char *_joy;
 };
 
-static const KeybindingRecord KEYS[] = {
+static const KeybindingRecord NORMAL_KEYS[] = {
 	{ KEYBIND_INTERACT, "INTERACT", "Interact", "interact", "RETURN", nullptr },
+	{ KEYBIND_ESCAPE, "ESCAPE", "Abort Action", "", "ESCAPE", nullptr },
 	{ KEYBIND_UP, "UP", "Up", "move up", "UP", nullptr },
 	{ KEYBIND_DOWN, "DOWN", "Down", "move down", "DOWN", nullptr },
 	{ KEYBIND_LEFT, "LEFT", "Left", "move left", "LEFT", nullptr },
@@ -53,7 +54,7 @@ static const KeybindingRecord KEYS[] = {
 	{ KEYBIND_EXIT, "EXIT", "Exit", "exit", "x", nullptr },
 	{ KEYBIND_FIRE, "FIRE", "Fire", "fire", "f", nullptr },
 	{ KEYBIND_GET, "GET", "Get Chest", "get", "g", nullptr },
-	{ KEYBIND_HOLE_UP, "HOLE-UP", "Hole Up", "hole", "h", nullptr },
+	{ KEYBIND_HOLE_UP, "HOLE-UP", "Hole Up & Camp", "camp", "h", nullptr },
 	{ KEYBIND_JIMMY, "JIMMY", "Jimmy", "jimmy", "j", nullptr },
 	{ KEYBIND_IGNITE, "IGNITE", "Ignite", "ignite", "i", nullptr },
 	{ KEYBIND_LOCATE, "LOCATE", "Locate Position", "locate", "l", nullptr },
@@ -65,15 +66,22 @@ static const KeybindingRecord KEYS[] = {
 	{ KEYBIND_QUIT_SAVE, "QUIT-SAVE", "Quit and Save", "quitAndSave", "q", nullptr },
 	{ KEYBIND_READY_WEAPON, "READY-WEAPON", "Ready Weapon", "ready", "r", nullptr },
 	{ KEYBIND_SEARCH, "SEARCH", "Search", "search", "s", nullptr },
-	{ KEYBIND_SPEED_UP, "SPEED-UP", "Speed Up", "speed up", "PLUS", nullptr },
-	{ KEYBIND_SPEED_DOWN, "SPEED-DOWN", "Speed Down", "speed down", "MINUS", nullptr },
-	{ KEYBIND_SPEED_NORMAL, "SPEED-NORMAL", "Speed Normal", "speed normal", "KP_ENTER", nullptr },
 	{ KEYBIND_STATS, "STATS", "Stats", "stats", "z", nullptr },
 	{ KEYBIND_TALK, "TALK", "Talk", "talk", "t", nullptr },
-	{ KEYBIND_TOGGLE_MUSIC, "TOGGLE-MUSIC", "Toggle Music", "musicToggle", "v", nullptr },
 	{ KEYBIND_USE, "USE", "Use", "use", "u", nullptr },
 	{ KEYBIND_WEAR, "WEAR", "Wear Armor", "wear", "w", nullptr },
 	{ KEYBIND_YELL, "YELL", "Yell", "yell", "y", nullptr },
+
+	{ KEYBIND_NONE, nullptr, nullptr, nullptr, nullptr, nullptr }
+};
+
+static const KeybindingRecord CONFIG_KEYS[] = {
+	{ KEYBIND_SPEED_UP, "SPEED-UP", "Speed Up", "speed up", "KP_PLUS", nullptr },
+	{ KEYBIND_SPEED_DOWN, "SPEED-DOWN", "Speed Down", "speed down", "KP_MINUS", nullptr },
+	{ KEYBIND_SPEED_NORMAL, "SPEED-NORMAL", "Speed Normal", "speed normal", "KP_ENTER", nullptr },
+	{ KEYBIND_COMBATSPEED_UP, "COMBATSPEED-UP", "Combat Speed Up", "combat_speed up", "A+KP_PLUS", nullptr },
+	{ KEYBIND_COMBATSPEED_DOWN, "COMBATSPEED-DOWN", "Combat Speed Down", "combat_speed down", "A+KP_MINUS", nullptr },
+	{ KEYBIND_COMBATSPEED_NORMAL, "COMBATSPEED-NORMAL", "Combat Speed Normal", "combat_speed normal", "A+KP_ENTER", nullptr },
 
 	{ KEYBIND_NONE, nullptr, nullptr, nullptr, nullptr, nullptr }
 };
@@ -93,15 +101,18 @@ static const KeybindingRecord PARTY_KEYS[] = {
 };
 
 static const KeybindingRecord CHEAT_KEYS[] = {
+	{ KEYBIND_CHEAT_DESTROY_CREATURES, "CHEAT-DESTROY_CREATURES", "Destroy All Creatures", "destroy_creatures", "A+a", nullptr },
 	{ KEYBIND_CHEAT_COLLISIONS, "CHEAT-COLLISIONS", "Toggle Collision Handling", "collisions", "A+c", nullptr },
 	{ KEYBIND_CHEAT_DESTROY, "CHEAT-DESTROY", "Destroy Object", "destroy", "A+d", nullptr },
 	{ KEYBIND_CHEAT_EQUIPMENT, "CHEAT-EQUIPMENT", "Full Equipment", "equipment", "A+e", nullptr },
+	{ KEYBIND_CHEAT_FLEE, "CHEAT_FLEE", "Flee Combat", "flee", "A+f", nullptr },
 	{ KEYBIND_CHEAT_GOTO, "CHEAT-GOTO", "Goto location", "goto", "A+g", nullptr },
 	{ KEYBIND_CHEAT_HELP, "CHEAT-HELP", "Help - Teleport to Lord British", "goto", "A+h", nullptr },
 	{ KEYBIND_CHEAT_ITEMS, "CHEAT-ITEMS", "Give Items", "items", "A+i", nullptr },
 	{ KEYBIND_CHEAT_KARMA, "CHEAT-KARMA", "List Karma", "karma", "A+k", nullptr },
 	{ KEYBIND_CHEAT_LEAVE, "CHEAT-LEAVE", "Leave Location", "leave", "A+l", nullptr },
 	{ KEYBIND_CHEAT_MIXTURES, "CHEAT-MIXTURES", "Give Mixtures", "mixtures", "A+m", nullptr },
+	{ KEYBIND_CHEAT_OVERHEAD, "CHEAT_OVERHEAD", "Toggle Overhead View", "overhead", "A+o", nullptr },
 	{ KEYBIND_CHEAT_PARTY, "CHEAT-PARTY", "Full Party", "companions", "A+p", nullptr },
 	{ KEYBIND_CHEAT_REAGENTS, "CHEAT-REAGENTS", "Give Reagents", "reagents", "A+r", nullptr },
 	{ KEYBIND_CHEAT_STATS, "CHEAT-STATS", "Full Stats", "fullstats", "A+s", nullptr },
@@ -114,43 +125,90 @@ static const KeybindingRecord CHEAT_KEYS[] = {
 	{ KEYBIND_NONE, nullptr, nullptr, nullptr, nullptr, nullptr }
 };
 
+static const KeybindingRecord INPUT_KEYS[] = {
+	{ KEYBIND_ESCAPE, "ESCAPE", "Abort Action", "", "ESCAPE", nullptr },
+	{ KEYBIND_NONE, nullptr, nullptr, nullptr, nullptr, nullptr }
+};
+
+static const KeybindingRecord DIRECTION_KEYS[] = {
+	{ KEYBIND_ESCAPE, "ESCAPE", "Escape", nullptr, "ESCAPE", nullptr },
+	{ KEYBIND_UP, "UP", "Up", nullptr, "UP", nullptr },
+	{ KEYBIND_DOWN, "DOWN", "Down", nullptr, "DOWN", nullptr },
+	{ KEYBIND_LEFT, "LEFT", "Left", nullptr, "LEFT", nullptr },
+	{ KEYBIND_RIGHT, "RIGHT", "Right", nullptr, "RIGHT", nullptr },
+	{ KEYBIND_NONE, nullptr, nullptr, nullptr, nullptr, nullptr }
+};
+
+static const KeybindingRecord MENU_KEYS[] = {
+	{ KEYBIND_INTERACT, "INTERACT", "Interact", "interact", "RETURN", nullptr },
+	{ KEYBIND_ESCAPE, "ESCAPE", "Escape", nullptr, "ESCAPE", nullptr },
+	{ KEYBIND_UP, "UP", "Up", nullptr, "UP", nullptr },
+	{ KEYBIND_DOWN, "DOWN", "Down", nullptr, "DOWN", nullptr },
+	{ KEYBIND_LEFT, "LEFT", "Left", nullptr, "LEFT", nullptr },
+	{ KEYBIND_RIGHT, "RIGHT", "Right", nullptr, "RIGHT", nullptr },
+	{ KEYBIND_NONE, nullptr, nullptr, nullptr, nullptr, nullptr }
+};
+
+static const KeybindingRecord COMBAT_KEYS[] = {
+	{ KEYBIND_PASS, "PASS", "Pass", "pass", "SPACE", nullptr },
+	{ KEYBIND_UP, "UP", "Up", nullptr, "UP", nullptr },
+	{ KEYBIND_DOWN, "DOWN", "Down", nullptr, "DOWN", nullptr },
+	{ KEYBIND_LEFT, "LEFT", "Left", nullptr, "LEFT", nullptr },
+	{ KEYBIND_RIGHT, "RIGHT", "Right", nullptr, "RIGHT", nullptr },
+	{ KEYBIND_NONE, nullptr, nullptr, nullptr, nullptr, nullptr }
+};
+
 struct KeysRecord {
 	const char *_id;
 	const char *_desc;
 	const KeybindingRecord *_keys;
 };
-static const KeysRecord KEYS_RECORDS[3] = {
-	{ "ultima4", "Ultima IV", KEYS },
+
+static const KeysRecord NORMAL_RECORDS[] = {
+	{ "ultima4", "Ultima IV", NORMAL_KEYS },
+	{ "ultima4_config", "Ultima IV - Configuration", CONFIG_KEYS },
 	{ "ultima4_party", "Ultima IV - Party", PARTY_KEYS },
 	{ "ultima4_cheats", "Ultima IV - Cheats", CHEAT_KEYS },
+	{ nullptr, nullptr, nullptr }
 };
 
-Common::KeymapArray MetaEngine::initKeymaps() {
+static const KeysRecord INPUT_RECORDS[] = {
+	{ "ultima4", "Ultima IV", INPUT_KEYS },
+	{ nullptr, nullptr, nullptr }
+};
+
+static const KeysRecord DIRECTION_RECORDS[] = {
+	{ "ultima4", "Ultima IV", DIRECTION_KEYS },
+	{ nullptr, nullptr, nullptr }
+};
+
+static const KeysRecord MENU_RECORDS[] = {
+	{ "ultima4", "Ultima IV", MENU_KEYS },
+	{ nullptr, nullptr, nullptr }
+};
+
+static const KeysRecord *MODE_RECORDS[5] = {
+	NORMAL_RECORDS, INPUT_RECORDS, DIRECTION_RECORDS, MENU_RECORDS,
+	NORMAL_RECORDS
+};
+
+Common::KeymapArray MetaEngine::initKeymaps(KeybindingMode mode) {
 	Common::KeymapArray keymapArray;
 	Common::Keymap *keyMap;
 	Common::Action *act;
+	const KeysRecord *recPtr = MODE_RECORDS[mode];
 
-	for (int kCtr = 0; kCtr < 3; ++kCtr) {
+	for (int kCtr = 0; recPtr->_id; ++recPtr, ++kCtr) {
 		// Core keymaps
 		keyMap = new Common::Keymap(Common::Keymap::kKeymapTypeGame,
-			KEYS_RECORDS[kCtr]._id, _(KEYS_RECORDS[kCtr]._desc));
+			recPtr->_id, recPtr->_desc);
 		keymapArray.push_back(keyMap);
 
 		if (kCtr == 0) {
-			act = new Common::Action("LCLK", _("Interact via Left Click"));
-			act->setLeftClickEvent();
-			act->addDefaultInputMapping("MOUSE_LEFT");
-			act->addDefaultInputMapping("JOY_A");
-			keyMap->addAction(act);
-
-			act = new Common::Action("RCLK", _("Interact via Right Click"));
-			act->setRightClickEvent();
-			act->addDefaultInputMapping("MOUSE_RIGHT");
-			act->addDefaultInputMapping("JOY_B");
-			keyMap->addAction(act);
+			addMouseClickActions(*keyMap);
 		}
 
-		for (const KeybindingRecord *r = KEYS_RECORDS[kCtr]._keys; r->_id; ++r) {
+		for (const KeybindingRecord *r = recPtr->_keys; r->_id; ++r) {
 			act = new Common::Action(r->_id, _(r->_desc));
 			act->setCustomEngineActionEvent(r->_action);
 			act->addDefaultInputMapping(r->_key);
@@ -168,10 +226,31 @@ Common::KeymapArray MetaEngine::initKeymaps() {
 	return keymapArray;
 }
 
-void MetaEngine::setKeybindingsActive(bool isActive) {
-	g_engine->getEventManager()->getKeymapper()->setEnabled(isActive);
+void MetaEngine::addMouseClickActions(Common::Keymap &keyMap) {
+	Common::Action *act;
+
+	act = new Common::Action("LCLK", _("Interact via Left Click"));
+	act->setLeftClickEvent();
+	act->addDefaultInputMapping("MOUSE_LEFT");
+	act->addDefaultInputMapping("JOY_A");
+	keyMap.addAction(act);
+
+	act = new Common::Action("RCLK", _("Interact via Right Click"));
+	act->setRightClickEvent();
+	act->addDefaultInputMapping("MOUSE_RIGHT");
+	act->addDefaultInputMapping("JOY_B");
+	keyMap.addAction(act);
 }
 
+void MetaEngine::setKeybindingMode(KeybindingMode mode) {
+	Common::Keymapper *const mapper = g_engine->getEventManager()->getKeymapper();
+	mapper->cleanupGameKeymaps();
+
+	Common::KeymapArray arr = initKeymaps(mode);
+
+	for (uint idx = 0; idx < arr.size(); ++idx)
+		mapper->addGameKeymap(arr[idx]);
+}
 
 void MetaEngine::executeAction(KeybindingAction keyAction) {
 	Common::String methodName = getMethod(keyAction);
@@ -180,8 +259,8 @@ void MetaEngine::executeAction(KeybindingAction keyAction) {
 }
 
 Common::String MetaEngine::getMethod(KeybindingAction keyAction) {
-	for (int kCtr = 0; kCtr < 3; ++kCtr) {
-		for (const KeybindingRecord *r = KEYS_RECORDS[kCtr]._keys; r->_id; ++r) {
+	for (int kCtr = 0; kCtr < 4; ++kCtr) {
+		for (const KeybindingRecord *r = NORMAL_RECORDS[kCtr]._keys; r->_id; ++r) {
 			if (r->_action == keyAction)
 				return r->_method;
 		}

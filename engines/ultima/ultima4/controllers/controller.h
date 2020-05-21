@@ -50,6 +50,12 @@ public:
 	 */
 	bool notifyKeyPressed(int key);
 
+	/**
+	 * The event manager will call this method to notify that
+	 * the left button was clicked
+	 */
+	bool notifyMousePress(const Common::Point &mousePos);
+
 	int getTimerInterval();
 
 	/**
@@ -68,7 +74,16 @@ public:
 	/**
 	 * Key was pressed
 	 */
-	virtual bool keyPressed(int key) = 0;
+	virtual bool keyPressed(int key) {
+		return false;
+	}
+
+	/**
+	 * Mouse button was pressed
+	 */
+	virtual bool mousePressed(const Common::Point &mousePos) {
+		return false;
+	}
 
 	/**
 	 * Handles keybinder actions
@@ -102,11 +117,21 @@ void Controller_endWait();
  */
 template<class T>
 class WaitableController : public Controller {
+private:
+	bool _exitWhenDone;
+	T _defaultValue;
+protected:
+	T _value;
+	void doneWaiting() {
+		if (_exitWhenDone)
+			Controller_endWait();
+	}
 public:
-	WaitableController() : _exitWhenDone(false) {}
+	WaitableController(T defaultValue) : _defaultValue(defaultValue),
+		_value(defaultValue), _exitWhenDone(false) {}
 
 	virtual T getValue() {
-		return _value;
+		return shouldQuit() ? _defaultValue : _value;
 	}
 
 	virtual T waitFor() {
@@ -115,15 +140,15 @@ public:
 		return getValue();
 	}
 
-protected:
-	T _value;
-	void doneWaiting() {
-		if (_exitWhenDone)
-			Controller_endWait();
+	/**
+	 * Mouse button was pressed
+	 */
+	virtual bool mousePressed(const Common::Point &mousePos) {
+		// Treat mouse clicks as an abort
+		doneWaiting();
+		_value = _defaultValue;
+		return true;
 	}
-
-private:
-	bool _exitWhenDone;
 };
 
 class TurnCompleter {

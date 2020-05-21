@@ -23,8 +23,12 @@
 #ifndef ULTIMA4_FILESYS_SAVEGAME_H
 #define ULTIMA4_FILESYS_SAVEGAME_H
 
+#include "common/array.h"
+#include "common/rect.h"
 #include "common/stream.h"
 #include "common/serializer.h"
+#include "ultima/ultima4/core/coords.h"
+#include "ultima/ultima4/core/types.h"
 
 namespace Ultima {
 namespace Ultima4 {
@@ -198,8 +202,8 @@ struct SaveGamePlayerRecord {
 	unsigned short _mp;
 	unsigned short _unknown;
 	WeaponType _weapon;
-	ArmorType armor;
-	char name[16];
+	ArmorType _armor;
+	char _name[16];
 	SexType _sex;
 	ClassType _class;
 	StatusType _status;
@@ -218,7 +222,47 @@ struct SaveGameMonsterRecord {
 	byte _unused1;
 	byte _unused2;
 
+	SaveGameMonsterRecord() {
+		clear();
+	}
+
+	void clear() {
+		_tile = _x = _y = 0;
+		_prevTile = _prevX = _prevY = 0;
+		_unused1 = _unused2 = 0;
+	}
+
 	static void synchronize(SaveGameMonsterRecord *monsterTable, Common::Serializer &s);
+};
+
+class LocationCoords : public Coords {
+public:
+	MapId _map;
+
+	LocationCoords() : Coords(), _map(0xff) {}
+	LocationCoords(MapId map, int x_, int y_, int z_) :
+		Coords(x_, y_, z_), _map(map) {}
+	LocationCoords(MapId map, const Coords &pos) :
+		Coords(pos), _map(map) {}
+
+	/**
+	 * Synchronize to/from a savegame
+	 */
+	void synchronize(Common::Serializer &s);
+};
+
+class LocationCoordsArray : public Common::Array<LocationCoords> {
+public:
+
+	/**
+	 * Loads the list of map & coordinates from the game context
+	 */
+	void load();
+
+	/**
+	 * Synchronize to/from a savegame
+	 */
+	void synchronize(Common::Serializer &s);
 };
 
 /**
@@ -266,7 +310,9 @@ struct SaveGame {
 	short _reagents[REAG_MAX];
 	short _mixtures[SPELL_MAX];
 	unsigned short _items;
-	byte _x, _y;
+	LocationCoordsArray _positions;
+	unsigned short _orientation;
+
 	byte _stones;
 	byte _runes;
 	unsigned short _members;
@@ -283,10 +329,6 @@ struct SaveGame {
 	unsigned short _lastReagent;
 	unsigned short _lastMeditation;
 	unsigned short _lastVirtue;
-	byte _dngX, _dngY;
-	unsigned short _orientation;
-	unsigned short _dngLevel;
-	unsigned short _location;
 };
 
 } // End of namespace Ultima4

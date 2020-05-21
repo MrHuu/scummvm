@@ -30,7 +30,7 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(HealProcess, Process)
+DEFINE_RUNTIME_CLASSTYPE_CODE(HealProcess)
 
 HealProcess::HealProcess() : Process() {
 	_hungerCounter = 0;
@@ -100,7 +100,7 @@ uint32 HealProcess::I_feedAvatar(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_UINT16(food);
 
 	Process *p = Kernel::get_instance()->findProcess(0, 0x222); // CONSTANT!
-	HealProcess *hp = p_dynamic_cast<HealProcess *>(p);
+	HealProcess *hp = dynamic_cast<HealProcess *>(p);
 	if (!hp) {
 		perr << "I_feedAvatar: unable to find HealProcess!" << Std::endl;
 		return 0;

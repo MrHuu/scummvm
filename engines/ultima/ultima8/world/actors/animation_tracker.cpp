@@ -27,6 +27,7 @@
 #include "ultima/ultima8/world/world.h"
 #include "ultima/ultima8/world/current_map.h"
 #include "ultima/ultima8/graphics/main_shape_archive.h"
+#include "ultima/ultima8/graphics/anim_dat.h"
 #include "ultima/ultima8/world/actors/anim_action.h"
 #include "ultima/ultima8/misc/direction.h"
 #include "ultima/ultima8/graphics/shape_info.h"
@@ -44,45 +45,54 @@ namespace Ultima8 {
 static const int watchactor = WATCHACTOR;
 #endif
 
-AnimationTracker::AnimationTracker() {
+AnimationTracker::AnimationTracker() : _firstFrame(true), _done(false),
+	_blocked(false), _unsupported(false), _hitObject(0), _mode(NormalMode),
+	_actor(0), _dir(0), _animAction(nullptr), _x(0), _y(0), _z(0),
+	_prevX(0), _prevY(0), _prevZ(0), _startX(0), _startY(0), _startZ(0),
+	_targetDx(0), _targetDy(0), _targetDz(0), _targetOffGroundLeft(0),
+	_firstStep(false), _shapeFrame(0), _currentFrame(0), _startFrame(0),
+	_endFrame(0), _flipped(false) {
 }
 
 AnimationTracker::~AnimationTracker() {
 }
 
-bool AnimationTracker::init(Actor *actor_, Animation::Sequence action_,
-                            uint32 dir_, PathfindingState *state_) {
-	assert(actor_);
-	_actor = actor_->getObjId();
-	uint32 shape = actor_->getShape();
+
+bool AnimationTracker::init(const Actor *actor, Animation::Sequence action,
+                            uint32 dir, const PathfindingState *state) {
+	assert(actor);
+	_actor = actor->getObjId();
+	uint32 shape = actor->getShape();
+	uint32 actionnum = AnimDat::getActionNumberForSequence(action);
 	_animAction = GameData::get_instance()->getMainShapes()->
-	             getAnim(shape, action_);
-	if (!_animAction) return false;
+	             getAnim(shape, actionnum);
+	if (!_animAction)
+		return false;
 
-	_dir = dir_;
+	_dir = dir;
 
-	if (state_ == 0) {
-		_animAction->getAnimRange(actor_, _dir, _startFrame, _endFrame);
-		actor_->getLocation(_x, _y, _z);
-		_flipped = actor_->hasFlags(Item::FLG_FLIPPED);
-		_firstStep = actor_->hasActorFlags(Actor::ACT_FIRSTSTEP);
+	if (state == 0) {
+		_animAction->getAnimRange(actor, _dir, _startFrame, _endFrame);
+		actor->getLocation(_x, _y, _z);
+		_flipped = actor->hasFlags(Item::FLG_FLIPPED);
+		_firstStep = actor->hasActorFlags(Actor::ACT_FIRSTSTEP);
 	} else {
-		_animAction->getAnimRange(state_->_lastAnim, state_->_direction,
-		                         state_->_firstStep, _dir, _startFrame, _endFrame);
-		_flipped = state_->_flipped;
-		_firstStep = state_->_firstStep;
-		_x = state_->_x;
-		_y = state_->_y;
-		_z = state_->_z;
+		_animAction->getAnimRange(state->_lastAnim, state->_direction,
+		                         state->_firstStep, _dir, _startFrame, _endFrame);
+		_flipped = state->_flipped;
+		_firstStep = state->_firstStep;
+		_x = state->_x;
+		_y = state->_y;
+		_z = state->_z;
 	}
 	_startX = _x;
 	_startY = _y;
 	_startZ = _z;
 
 #ifdef WATCHACTOR
-	if (actor_ && actor_->getObjId() == watchactor) {
-		pout << "AnimationTracker: playing " << _startFrame << "-" << _endFrame
-		     << " (_animAction flags: " << Std::hex << _animAction->flags
+	if (actor && actor->getObjId() == watchactor) {
+		pout << "AnimationTracker: playing action " << actionnum << " " << _startFrame << "-" << _endFrame
+		     << " (_animAction flags: " << Std::hex << _animAction->_flags
 		     << Std::dec << ")" << Std::endl;
 
 	}
@@ -102,7 +112,7 @@ bool AnimationTracker::init(Actor *actor_, Animation::Sequence action_,
 unsigned int AnimationTracker::getNextFrame(unsigned int frame) const {
 	frame++;
 
-	if (frame == _endFrame)
+	if (!_animAction || frame == _endFrame)
 		return _endFrame;
 
 	// loop if necessary
@@ -158,7 +168,7 @@ void AnimationTracker::evaluateMaxAnimTravel(int32 &max_endx, int32 &max_endy, u
 bool AnimationTracker::step() {
 	if (_done) return false;
 
-	Actor *a = getActor(_actor);
+	const Actor *a = getActor(_actor);
 	assert(a);
 
 	if (_firstFrame)
@@ -189,7 +199,7 @@ bool AnimationTracker::step() {
 
 	_firstFrame = false;
 
-	AnimFrame &f = _animAction->frames[_dir][_currentFrame];
+	const AnimFrame &f = _animAction->frames[_dir][_currentFrame];
 
 	_shapeFrame = f._frame;
 	_flipped = f.is_flipped();
@@ -262,7 +272,7 @@ bool AnimationTracker::step() {
 
 		// Do the sweep test
 		Std::list<CurrentMap::SweepItem> collisions;
-		Std::list<CurrentMap::SweepItem>::iterator it;
+		Std::list<CurrentMap::SweepItem>::const_iterator it;
 		cm->sweepTest(start, end, dims, a->getShapeInfo()->_flags, a->getObjId(),
 		              false, &collisions);
 
@@ -273,7 +283,7 @@ bool AnimationTracker::step() {
 #ifdef WATCHACTOR
 				if (a->getObjId() == watchactor) {
 					pout << "AnimationTracker: did sweepTest for large step; "
-					     << "collision at time " << it->hit_time << Std::endl;
+					     << "collision at time " << it->_hitTime << Std::endl;
 				}
 #endif
 				_blocked = true;
@@ -407,7 +417,7 @@ bool AnimationTracker::step() {
 	return true;
 }
 
-AnimFrame *AnimationTracker::getAnimFrame() const {
+const AnimFrame *AnimationTracker::getAnimFrame() const {
 	return &_animAction->frames[_dir][_currentFrame];
 }
 
@@ -461,8 +471,8 @@ void AnimationTracker::checkWeaponHit() {
 #ifdef WATCHACTOR
 	if (a->getObjId() == watchactor) {
 		pout << "AnimationTracker: Checking hit, range " << range << ", box "
-		     << abox._x << "," << abox._y << "," << abox._z << "," << abox.xd
-		     << "," << abox.yd << "," << abox.zd << ": ";
+		     << abox._x << "," << abox._y << "," << abox._z << "," << abox._xd
+		     << "," << abox._yd << "," << abox._zd << ": ";
 	}
 #endif
 

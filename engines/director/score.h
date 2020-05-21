@@ -89,12 +89,12 @@ public:
 	Common::String getMacName() const { return _macName; }
 	Sprite *getSpriteById(uint16 id);
 	void setSpriteCasts();
+	void setSpriteBboxes();
 	void loadSpriteImages(bool isSharedCast);
 	void loadSpriteSounds(bool isSharedCast);
 	void copyCastStxts();
 	Graphics::ManagedSurface *getSurface() { return _surface; }
 
-	void loadCastInto(Sprite *sprite, int castId);
 	Common::Rect getCastMemberInitialRect(int castId);
 	void setCastMemberModified(int castId);
 
@@ -102,14 +102,36 @@ public:
 	int getCurrentLabelNumber();
 	int getNextLabelNumber(int referenceFrame);
 
+	uint16 getSpriteIDFromPos(Common::Point pos);
+	bool checkSpriteIntersection(uint16 spriteId, Common::Point pos);
+	Common::Rect *getSpriteRect(uint16 spriteId);
+
 	void addZoomBox(ZoomBox *box);
 	void renderZoomBox(bool redraw = false);
 	bool haveZoomBox() { return !_zoomBoxes.empty(); }
 
 	int32 getStageColor() { return _stageColor; }
 
+	Cast *getCastMember(int castId);
+	void renderFrame(uint16 frameId, bool forceUpdate = false, bool updateStageOnly = false);
+	void renderSprite(uint16 id);
+	void unrenderSprite(uint16 spriteId);
+
 private:
 	void update();
+	void renderText(uint16 spriteId, Common::Rect *textSize);
+	void renderShape(uint16 spriteId);
+	void renderButton(uint16 spriteId);
+	void renderBitmap(uint16 spriteId);
+
+	void inkBasedBlit(Graphics::ManagedSurface *maskSurface, const Graphics::Surface &spriteSurface, InkType ink, Common::Rect drawRect, uint spriteId);
+	void drawBackgndTransSprite(const Graphics::Surface &sprite, Common::Rect &drawRect, int spriteId);
+	void drawMatteSprite(const Graphics::Surface &sprite, Common::Rect &drawRect);
+	void drawGhostSprite(const Graphics::Surface &sprite, Common::Rect &drawRect);
+	void drawReverseSprite(const Graphics::Surface &sprite, Common::Rect &drawRect, uint16 spriteId);
+
+	void playSoundChannel(uint16 frameId);
+
 	void readVersion(uint32 rid);
 	void loadPalette(Common::SeekableSubReadStreamEndian &stream);
 	void loadFrames(Common::SeekableSubReadStreamEndian &stream);
@@ -126,6 +148,7 @@ private:
 
 public:
 	Common::Array<Frame *> _frames;
+	Common::Array<Sprite *> _sprites;
 	Common::HashMap<uint16, CastInfo *> _castsInfo;
 	Common::HashMap<Common::String, int, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> _castsNames;
 	Common::SortedArray<Label *> *_labels;
@@ -134,7 +157,7 @@ public:
 	Common::HashMap<uint16, Common::String> _fontMap;
 	Common::Array<uint16> _castScriptIds;
 	Graphics::ManagedSurface *_surface;
-	Graphics::ManagedSurface *_trailSurface;
+	Graphics::ManagedSurface *_maskSurface;
 	Graphics::ManagedSurface *_backSurface;
 	Graphics::ManagedSurface *_backSurface2;
 	Graphics::Font *_font;
@@ -146,6 +169,7 @@ public:
 	uint32 _lastRollTime;
 	uint32 _lastClickTime;
 	uint32 _lastKeyTime;
+	uint32 _lastTimerReset;
 
 	bool _stopPlay;
 	uint32 _nextFrameTime;

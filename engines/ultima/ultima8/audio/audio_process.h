@@ -52,7 +52,8 @@ public:
 		SampleInfo() : _sfxNum(-1) { }
 		SampleInfo(int32 s, int32 p, ObjId o, int32 l, int32 c, uint32 ps, uint16 v, int16 lv, int16 rv) :
 			_sfxNum(s), _priority(p), _objId(o), _loops(l), _channel(c),
-			_pitchShift(ps), _volume(v), _lVol(lv), _rVol(rv) { }
+			_pitchShift(ps), _volume(v), _lVol(lv), _rVol(rv),
+			_curSpeechStart(0), _curSpeechEnd(0) { }
 		SampleInfo(const Std::string &b, int32 shpnum, ObjId o, int32 c,
 				   uint32 s, uint32 e, uint32 ps, uint16 v, int16 lv, int16 rv) :
 			_sfxNum(-1), _priority(shpnum), _objId(o), _loops(0), _channel(c), _barked(b),
@@ -75,6 +76,8 @@ public:
 
 	INTRINSIC(I_playSFX);
 	INTRINSIC(I_playAmbientSFX);
+	INTRINSIC(I_playSFXCru);
+	INTRINSIC(I_playAmbientSFXCru);
 	INTRINSIC(I_isSFXPlaying);
 	INTRINSIC(I_setVolumeSFX);
 	INTRINSIC(I_stopSFX);

@@ -58,21 +58,26 @@ public:
 	Context();
 	~Context();
 
-	Party *_party;
-	class Location *_location;
-	int _line, col;
+	/**
+	 * Reset the context
+	 */
+	void reset();
+
 	StatsArea *_stats;
+	Aura *_aura;
+	Party *_party;
+	Location *_location;
+	int _line, _col;
 	int _moonPhase;
 	int _windDirection;
 	int _windCounter;
 	bool _windLock;
-	Aura *_aura;
 	int _horseSpeed;
 	int _opacity;
 	TransportContext _transportContext;
 	uint32 _lastCommandTime;
-	class Object *_lastShip;
-
+	Object *_lastShip;
+public:
 	/**
 	 * Provides scripts with information
 	 */

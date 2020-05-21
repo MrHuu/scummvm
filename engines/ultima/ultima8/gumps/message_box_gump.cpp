@@ -43,10 +43,10 @@
 namespace Ultima {
 namespace Ultima8 {
 
-DEFINE_RUNTIME_CLASSTYPE_CODE(MessageBoxGump, ModalGump)
+DEFINE_RUNTIME_CLASSTYPE_CODE(MessageBoxGump)
 
 MessageBoxGump::MessageBoxGump()
-	: ModalGump() {
+	: ModalGump(), _titleColour(0) {
 
 }
 
@@ -151,7 +151,8 @@ void MessageBoxGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool /*sc
 }
 
 void MessageBoxGump::ChildNotify(Gump *child, uint32 msg) {
-	if (child->IsOfType<ButtonWidget>() && msg == ButtonWidget::BUTTON_CLICK) {
+	ButtonWidget *buttonWidget = dynamic_cast<ButtonWidget *>(child);
+	if (buttonWidget && msg == ButtonWidget::BUTTON_CLICK) {
 		_processResult = child->GetIndex();
 		Close();
 	}

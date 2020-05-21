@@ -39,11 +39,13 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(AvatarMoverProcess, Process)
+DEFINE_RUNTIME_CLASSTYPE_CODE(AvatarMoverProcess)
 
 AvatarMoverProcess::AvatarMoverProcess() : Process(),
 		_lastFrame(0), _lastAttack(0), _idleTime(0),
-		_lastHeadShakeAnim(Animation::lookLeft), _fakeBothButtonClick(false) {
+		_lastHeadShakeAnim(Animation::lookLeft), _fakeBothButtonClick(false),
+		_tryTurnLeft(false), _tryTurnRight(false),
+		_tryMoveForward(false), _tryMoveBack(false) {
 	_type = 1; // CONSTANT! (type 1 = persistent)
 }
 
@@ -288,6 +290,33 @@ void AvatarMoverProcess::handleCombatMode() {
 		if (checkTurn(mousedir, false))
 			return;
 
+	bool moving = (lastanim == Animation::advance || lastanim == Animation::retreat);
+	bool tryMove = _tryMoveForward || _tryMoveBack;
+
+	//  if we are trying to move, allow change direction only after move occurs to avoid spinning
+	if (moving || !tryMove) {
+		if (_tryTurnLeft) {
+			direction = (direction + 7) % 8;
+		}
+
+		if (_tryTurnRight) {
+			direction = (direction + 1) % 8;
+		}
+	}
+
+	if (_tryMoveForward) {
+		waitFor(avatar->doAnim(Animation::advance, direction));
+		return;
+	}
+
+	if (_tryMoveBack) {
+		waitFor(avatar->doAnim(Animation::retreat, direction));
+		return;
+	}
+
+	if (checkTurn(direction, false))
+		return;
+
 	// not doing anything in particular? stand
 	// TODO: make sure falling works properly.
 	if (lastanim != Animation::combatStand) {
@@ -521,6 +550,36 @@ void AvatarMoverProcess::handleNormalMode() {
 		if (checkTurn(mousedir, false))
 			return;
 
+	bool moving = (lastanim == Animation::run || lastanim == Animation::walk);
+	bool tryMove = _tryMoveForward || _tryMoveBack;
+
+	//  if we are trying to move, allow change direction only after move occurs to avoid spinning
+	if (moving || !tryMove) {
+		if (_tryTurnLeft) {
+			direction = (direction + 7) % 8;
+		}
+
+		if (_tryTurnRight) {
+			direction = (direction + 1) % 8;
+		}
+	}
+
+	if (_tryMoveForward) {
+		step(Animation::walk, direction);
+		return;
+	}
+
+	if (_tryMoveBack) {
+		step(Animation::walk, (direction + 4) % 8);
+		// flip to move forward once turned
+		_tryMoveBack = false;
+		_tryMoveForward = true;
+		return;
+	}
+
+	if (checkTurn(direction, moving))
+		return;
+
 	// doing another animation?
 	if (Kernel::get_instance()->getNumProcesses(1, ActorAnimProcess::ACTOR_ANIM_PROC_TYPE))
 		return;
@@ -547,7 +606,18 @@ void AvatarMoverProcess::handleNormalMode() {
 				nextanim = Animation::lookLeft;
 			waitFor(avatar->doAnim(nextanim, direction));
 			_idleTime = 0;
+			return;
 		}
+	}
+
+	// if we were running, slow to a walk before stopping
+	if (lastanim == Animation::run) {
+		waitFor(avatar->doAnim(Animation::walk, direction));
+	}
+
+	// not doing anything in particular? stand
+	if (lastanim != Animation::stand) {
+		waitFor(avatar->doAnim(Animation::stand, direction));
 	}
 }
 
@@ -565,12 +635,14 @@ void AvatarMoverProcess::step(Animation::Sequence action, int direction,
 
 	if (res == Animation::FAILURE ||
 	        (action == Animation::step && res == Animation::END_OFF_LAND)) {
+		debug(6, "Step: end off land dir %d, try other dir", stepdir);
 		int altdir1 = (stepdir + 1) % 8;
 		int altdir2 = (stepdir + 7) % 8;
 
 		res = avatar->tryAnim(action, altdir1);
 		if (res == Animation::FAILURE ||
 		        (action == Animation::step && res == Animation::END_OFF_LAND)) {
+			debug(6, "Step: end off land dir %d, altdir1 %d failed, try altdir2 %d", stepdir, altdir1, altdir2);
 			res = avatar->tryAnim(action, altdir2);
 			if (res == Animation::FAILURE ||
 			        (action == Animation::step && res == Animation::END_OFF_LAND)) {
@@ -578,9 +650,11 @@ void AvatarMoverProcess::step(Animation::Sequence action, int direction,
 				// Try to take a smaller step
 
 				if (action == Animation::walk) {
+					debug(6, "Step: end off land both altdirs failed, smaller step (step)");
 					step(Animation::step, direction, true);
 					return;
 				} else if (action == Animation::run) {
+					debug(6, "Step: end off land both altdirs failed, smaller step (walk)");
 					step(Animation::walk, direction, true);
 					return;
 				}
@@ -599,6 +673,7 @@ void AvatarMoverProcess::step(Animation::Sequence action, int direction,
 	        lastanim != Animation::keepBalance && !adjusted) {
 		if (checkTurn(stepdir, false))
 			return;
+		debug(6, "Step: end off land both altdirs failed, keep balance.");
 		waitFor(avatar->doAnim(Animation::keepBalance, stepdir));
 		return;
 	}
@@ -613,12 +688,12 @@ void AvatarMoverProcess::step(Animation::Sequence action, int direction,
 	if (checkTurn(stepdir, moving))
 		return;
 
+	debug(6, "Step: step ok: action %d dir %d", action, stepdir);
 	action = Animation::checkWeapon(action, lastanim);
 	waitFor(avatar->doAnim(action, stepdir));
 }
 
 void AvatarMoverProcess::jump(Animation::Sequence action, int direction) {
-	Mouse *mouse = Mouse::get_instance();
 	MainActor *avatar = getMainActor();
 
 	// running jump
@@ -638,6 +713,7 @@ void AvatarMoverProcess::jump(Animation::Sequence action, int direction) {
 	SettingManager::get_instance()->get("targetedjump", targeting);
 
 	if (targeting) {
+		Mouse *mouse = Mouse::get_instance();
 		int32 coords[3];
 		int32 mx, my;
 		mouse->getMouseCoords(mx, my);
@@ -669,6 +745,28 @@ void AvatarMoverProcess::jump(Animation::Sequence action, int direction) {
 	}
 }
 
+void AvatarMoverProcess::tryTurnLeft(bool b) {
+	_tryTurnLeft = b;
+}
+
+void AvatarMoverProcess::tryTurnRight(bool b) {
+	_tryTurnRight = b;
+}
+
+void AvatarMoverProcess::tryMoveForward(bool b) {
+	_tryMoveForward = b;
+}
+
+void AvatarMoverProcess::tryMoveBack(bool b) {
+	if (b) {
+		_tryMoveBack = true;
+	}
+	else {
+		_tryMoveBack = false;
+		_tryMoveForward = false;
+	}
+}
+
 void AvatarMoverProcess::turnToDirection(int direction) {
 	MainActor *avatar = getMainActor();
 	bool combatRun = avatar->hasActorFlags(Actor::ACT_COMBATRUN);
@@ -694,6 +792,8 @@ void AvatarMoverProcess::turnToDirection(int direction) {
 
 	ProcId prevpid = 0;
 
+	// Create a sequence of turn animations from
+	// our current direction to the new one
 	for (int dir = curdir; dir != direction;) {
 		ProcId animpid = avatar->doAnim(turnanim, dir);
 
@@ -756,7 +856,7 @@ bool AvatarMoverProcess::canAttack() {
 	return (_lastFrame > _lastAttack + (25 - avatar->getDex()));
 }
 
-void AvatarMoverProcess::OnMouseDown(int button, int32 mx, int32 my) {
+void AvatarMoverProcess::onMouseDown(int button, int32 mx, int32 my) {
 	int bid = 0;
 
 	switch (button) {
@@ -779,7 +879,7 @@ void AvatarMoverProcess::OnMouseDown(int button, int32 mx, int32 my) {
 	_mouseButton[bid].clearState(MBS_HANDLED);
 }
 
-void AvatarMoverProcess::OnMouseUp(int button) {
+void AvatarMoverProcess::onMouseUp(int button) {
 	int bid = 0;
 
 	if (button == Shared::BUTTON_LEFT) {

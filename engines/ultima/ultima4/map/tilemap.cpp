@@ -61,11 +61,9 @@ void TileMaps::loadAll() {
 }
 
 void TileMaps::unloadAll() {
-	iterator map;
-
 	// Free all the memory for the tile maps
-	for (map = begin(); map != end(); map++)
-		delete map->_value;
+	for (iterator it = begin(); it != end(); it++)
+		delete it->_value;
 
 	// Clear the map so we don't attempt to delete the memory again next time
 	clear();
@@ -118,7 +116,8 @@ void TileMaps::load(const ConfigElement &tilemapConf) {
 TileMap *TileMaps::get(Common::String name) {
 	if (find(name) != end())
 		return (*this)[name];
-	else return nullptr;
+	else
+		return nullptr;
 }
 
 /*-------------------------------------------------------------------*/

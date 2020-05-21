@@ -24,12 +24,12 @@
 #include "ultima/ultima8/misc/util.h"
 #include "ultima/ultima8/games/game_data.h"
 #include "ultima/ultima8/filesys/file_system.h"
+#include "ultima/ultima8/filesys/raw_archive.h"
 #include "ultima/ultima8/filesys/idata_source.h"
 #include "ultima/ultima8/usecode/usecode_flex.h"
 #include "ultima/ultima8/graphics/main_shape_archive.h"
 #include "ultima/ultima8/graphics/fonts/font_shape_archive.h"
 #include "ultima/ultima8/graphics/gump_shape_archive.h"
-#include "ultima/ultima8/filesys/raw_archive.h"
 #include "ultima/ultima8/world/map_glob.h"
 #include "ultima/ultima8/graphics/palette_manager.h"
 #include "ultima/ultima8/graphics/shape.h"
@@ -457,7 +457,7 @@ SpeechFlex *GameData::getSpeechFlex(uint32 shapeNum) {
 	char langletter = _gameInfo->getLanguageFileLetter();
 	if (!langletter) {
 		perr << "GameData::getSpeechFlex: Unknown language." << Std::endl;
-		// FIXME: This leaks s
+		delete s;
 		return nullptr;
 	}
 
@@ -475,9 +475,9 @@ SpeechFlex *GameData::getSpeechFlex(uint32 shapeNum) {
 void GameData::loadRemorseData() {
 	FileSystem *filesystem = FileSystem::get_instance();
 
-	Common::SeekableReadStream *fd = filesystem->ReadFile("@game/static/_fixed.dat");
+	Common::SeekableReadStream *fd = filesystem->ReadFile("@game/static/fixed.dat");
 	if (!fd)
-		error("Unable to load static/_fixed.dat");
+		error("Unable to load static/fixed.dat");
 
 	_fixed = new RawArchive(fd);
 
@@ -565,60 +565,115 @@ void GameData::loadRemorseData() {
 	delete globflex;
 
 	// Load fonts
-	Common::SeekableReadStream *fds = filesystem->ReadFile("@game/static/_fonts.flx");
+	Common::SeekableReadStream *fds = filesystem->ReadFile("@game/static/fonts.flx");
 	if (!fds)
-		error("Unable to load static/_fonts.flx");
+		error("Unable to load static/fonts.flx");
 
 	_fonts = new FontShapeArchive(fds, OTHER,
 	                             PaletteManager::get_instance()->getPalette(PaletteManager::Pal_Game));
 	_fonts->setHVLeads();
 
 	// Load mouse
-	IDataSource *msds = filesystem->ReadFile("@game/static/_mouse.shp");
+	IDataSource *msds = filesystem->ReadFile("@game/static/mouse.shp");
 	if (!msds)
-		error("Unable to load static/_mouse.shp");
+		error("Unable to load static/mouse.shp");
 
 	_mouse = new Shape(msds, 0);
 	_mouse->setPalette(PaletteManager::get_instance()->getPalette(PaletteManager::Pal_Game));
 	delete msds;
 
-	Common::SeekableReadStream *gumpds = filesystem->ReadFile("@game/static/_gumps.flx");
+	Common::SeekableReadStream *gumpds = filesystem->ReadFile("@game/static/gumps.flx");
 	if (!gumpds)
-		error("Unable to load static/_gumps.flx");
+		error("Unable to load static/gumps.flx");
 
 	_gumps = new GumpShapeArchive(gumpds, GUMPS,
 		PaletteManager::get_instance()->getPalette(PaletteManager::Pal_Game));
 
-#if 0
-	Common::SeekableReadStream *gumpageds = filesystem->ReadFile("@game/static/gumpage.dat");
-	if (!gumpageds)
-		error("Unable to load static/gumpage.dat");
+	Common::SeekableReadStream *dtableds = filesystem->ReadFile("@game/static/dtable.flx");
+	if (!dtableds)
+		error("Unable to load static/dtable.flx");
 
-	_gumps->loadGumpage(gumpageds);
-	delete gumpageds;
-#endif
+	RawArchive *dtableflex = new RawArchive(dtableds);
 
-	Common::SeekableReadStream *dummyrs = filesystem->ReadFile("@data/empty.flx");
-	_music = nullptr; //new MusicFlex(dummyds);
-	delete dummyrs;
-#if 0
-	Common::SeekableReadStream *mf = filesystem->ReadFile("@game/sound/_music.flx");
-	if (!mf)
-		error("Unable to load sound/_music.flx");
+	// TODO: What's in this flex file?
+	// Object 1: 35 * 142 byte blocks of .. something
+	// Object 2: 35 * 32-byte long names of NPCs?
+	//_dtable = new DtableDat();
+	//_dtable->load(dtableflex);
 
-	_music = new MusicFlex(mf);
-#endif
+	delete dtableflex;
 
-	dummyrs = filesystem->ReadFile("@data/empty.flx");
-	_soundFlex = new SoundFlex(dummyrs);
-	delete dummyrs;
-#if 0
+	Common::SeekableReadStream *damageds = filesystem->ReadFile("@game/static/damage.flx");
+	if (!damageds)
+		error("Unable to load static/damage.flx");
+
+	RawArchive *damageflex = new RawArchive(damageds);
+
+	// TODO: What's in this flex file?
+	// 1 object of 12288 bytes, mostly 0s
+	//_damage = new DamageDat();
+	//_damage->load(damageflex);
+
+	delete damageflex;
+
+	Common::SeekableReadStream *combatds = filesystem->ReadFile("@game/static/combat.dat");
+	if (!combatds)
+		error("Unable to load static/combat.dat");
+
+	RawArchive *combatflex = new RawArchive(combatds);
+
+	// TODO: What's in this flex file?  Descriptions of combat tactics?
+	// 14 objects with contents:
+	// [ 16 Byte Name ]
+	// [ 4 * 16 bit numbers, alway 44, xx, 77, 78 ]
+	// [ 20 bytes of 0s ]
+	// [ variable number of bytes of data ]
+	//_combat = new CombatDat();
+	//_combat->load(combatflex);
+
+	delete combatflex;
+
+	Common::SeekableReadStream *stuffds = filesystem->ReadFile("@game/static/stuff.dat");
+	if (!stuffds)
+		error("Unable to load static/stuff.dat");
+
+	// TODO: What's in this dat file?
+	// 14 blocks of 323 bytes, references like W01 and I07
+	// (presumably weapon and inventory)
+	// shop data?
+
+	delete stuffds;
+
+	Common::SeekableReadStream *trigds = filesystem->ReadFile("@game/static/trig.dat");
+	if (!trigds)
+		error("Unable to load static/trig.dat");
+
+	// TODO: What's in this dat file?
+	// 12 x 256 bytes. Each block has consistently either 0000 or FFFF in the
+	//vsecond word of each DWORD
+
+	delete trigds;
+
+	Common::SeekableReadStream *xformpalds = filesystem->ReadFile("@game/static/xformpal.dat");
+	if (!xformpalds)
+		error("Unable to load static/xformpal.dat");
+	RawArchive *xformpalflex = new RawArchive(xformpalds);
+
+	// TODO: What's in this flex?
+	// Object 1: 32 bytes
+	// Object 2: 2304 bytes - presumably data for 3 palettes == 768 * 3
+	//           almost no low numbers (so not raw palette data, would be missing black..)
+
+	delete xformpalflex;
+
+	// Note: No MusicFlex for Remorse, as the music is all in different AMF files.
+	// The remorse_music_process will load them.
+
 	Common::SeekableReadStream *sndflx = filesystem->ReadFile("@game/sound/sound.flx");
 	if (!sndflx)
 		error("Unable to load sound/sound.flx");
 
 	_soundFlex = new SoundFlex(sndflx);
-#endif
 
 	loadTranslation();
 }

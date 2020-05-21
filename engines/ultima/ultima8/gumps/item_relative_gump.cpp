@@ -31,7 +31,7 @@
 namespace Ultima {
 namespace Ultima8 {
 
-DEFINE_RUNTIME_CLASSTYPE_CODE(ItemRelativeGump, Gump)
+DEFINE_RUNTIME_CLASSTYPE_CODE(ItemRelativeGump)
 
 ItemRelativeGump::ItemRelativeGump() : Gump(), _ix(0), _iy(0) {
 }
@@ -132,7 +132,7 @@ void ItemRelativeGump::GetItemLocation(int32 lerp_factor) {
 	int32 gx, gy;
 
 	if (!gump) {
-		gump = GetRootGump()->FindGump(GameMapGump::ClassType);
+		gump = GetRootGump()->FindGump<GameMapGump>();
 
 		if (!gump) {
 			perr << "ItemRelativeGump::GetItemLocation(): "

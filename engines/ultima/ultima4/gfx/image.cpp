@@ -34,7 +34,8 @@
 namespace Ultima {
 namespace Ultima4 {
 
-Image::Image() : _surface(nullptr), _disposeAfterUse(DisposeAfterUse::NO) {
+Image::Image() : _surface(nullptr), _disposeAfterUse(DisposeAfterUse::NO),
+		_paletted(false) {
 }
 
 Image *Image::create(int w, int h, bool paletted, Image::Type type) {
@@ -47,7 +48,8 @@ Image *Image::create(int w, int h, bool paletted, Image::Type type) {
 void Image::create(int w, int h, bool paletted) {
 	_paletted = paletted;
 	_surface = new Graphics::ManagedSurface(w, h, paletted ?
-		Graphics::PixelFormat::createFormatCLUT8() : g_screen->format);
+		Graphics::PixelFormat::createFormatCLUT8() :
+		Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0));
 	_disposeAfterUse = DisposeAfterUse::YES;
 }
 
@@ -227,9 +229,10 @@ bool Image::getTransparentIndex(uint &index) const {
 
 void Image::initializeToBackgroundColor(RGBA backgroundColor) {
 	if (_paletted)
-		error("Not supported"); //TODO, this better
-	this->_backgroundColor = backgroundColor;
-	this->fillRect(0, 0, _surface->w, _surface->h, backgroundColor.r,
+		error("initializeToBackgroundColor: Not supported");
+
+	_backgroundColor = backgroundColor;
+	fillRect(0, 0, _surface->w, _surface->h, backgroundColor.r,
 		backgroundColor.g, backgroundColor.b, backgroundColor.a);
 }
 
@@ -278,7 +281,6 @@ void Image::makeBackgroundColorTransparent(int haloSize, int shadowOpacity) {
 	performTransparencyHack(bgColor, 1, 0, haloSize, shadowOpacity);
 }
 
-//TODO Separate functionalities found in here
 void Image::performTransparencyHack(uint colorValue, uint numFrames,
                                     uint currentFrameIndex, uint haloWidth,
                                     uint haloOpacityIncrementByPixelDistance) {
@@ -430,7 +432,24 @@ void Image::drawOn(Image *d, int x, int y) const {
 
 void Image::drawSubRectOn(Image *d, int x, int y, int rx, int ry, int rw, int rh) const {
 	Graphics::ManagedSurface *destSurface = getSurface(d);
-	destSurface->blitFrom(*_surface, Common::Rect(rx, ry, rx + rw, ry + rh), Common::Point(x, y));
+
+	Common::Rect srcRect(rx, ry, MIN(rx + rw, (int)_surface->w), MIN(ry + rh, (int)_surface->h));
+	Common::Point destPos(x, y);
+
+	// Handle when the source rect is off the surface
+	if (srcRect.left < 0) {
+		destPos.x += -srcRect.left;
+		srcRect.left = 0;
+	}
+
+	if (srcRect.top < 0) {
+		destPos.y += -srcRect.top;
+		srcRect.top = 0;
+	}
+
+	if (srcRect.isValidRect())
+		// Blit the surface
+		destSurface->blitFrom(*_surface, srcRect, destPos);
 }
 
 void Image::drawSubRectInvertedOn(Image *d, int x, int y, int rx, int ry, int rw, int rh) const {

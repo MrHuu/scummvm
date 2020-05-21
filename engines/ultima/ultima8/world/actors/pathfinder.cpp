@@ -89,7 +89,8 @@ bool PathfindingState::checkItem(const Item *item, int xyRange, int zRange) cons
 	return (range <= xyRange);
 }
 
-bool PathfindingState::checkHit(Actor *_actor, const Actor *target) {
+bool PathfindingState::checkHit(const Actor *_actor, const Actor *target) const {
+	assert(target);
 #if 0
 	pout << "Trying hit in _direction " << _actor->getDirToItemCentre(*target) << Std::endl;
 #endif
@@ -113,7 +114,9 @@ bool PathNodeCmp::operator()(const PathNode *n1, const PathNode *n2) const {
 	return (n1->heuristicTotalCost < n2->heuristicTotalCost);
 }
 
-Pathfinder::Pathfinder() {
+Pathfinder::Pathfinder() : _actor(nullptr), _targetItem(nullptr),
+		_hitMode(false), _expandTime(0), _targetX(0), _targetY(0),
+		_targetZ(0), _actorXd(0), _actorYd(0), _actorZd(0) {
 	expandednodes = 0;
 }
 
@@ -160,7 +163,7 @@ void Pathfinder::setTarget(Item *item, bool hit) {
 
 	if (hit) {
 		assert(_start._combat);
-		assert(p_dynamic_cast<Actor *>(_targetItem));
+		assert(dynamic_cast<Actor *>(_targetItem));
 		_hitMode = true;
 	} else {
 		_hitMode = false;
@@ -184,13 +187,13 @@ bool Pathfinder::alreadyVisited(int32 x, int32 y, int32 z) const {
 	return false;
 }
 
-bool Pathfinder::checkTarget(PathNode *node) {
+bool Pathfinder::checkTarget(PathNode *node) const {
 	// TODO: these ranges are probably a bit too high,
 	// but otherwise it won't work properly yet -wjp
 	if (_targetItem) {
 		if (_hitMode) {
 			return node->state.checkHit(_actor,
-			                            p_dynamic_cast<Actor *>(_targetItem));
+			                            dynamic_cast<Actor *>(_targetItem));
 		} else {
 			return node->state.checkItem(_targetItem, 32, 8);
 		}

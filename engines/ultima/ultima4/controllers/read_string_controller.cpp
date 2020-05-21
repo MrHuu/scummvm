@@ -27,7 +27,8 @@
 namespace Ultima {
 namespace Ultima4 {
 
-ReadStringController::ReadStringController(int maxlen, int screenX, int screenY, const Common::String &accepted_chars) {
+ReadStringController::ReadStringController(int maxlen, int screenX, int screenY,
+		const Common::String &accepted_chars) : WaitableController<Common::String>("") {
 	_maxLen = maxlen;
 	_screenX = screenX;
 	_screenY = screenY;
@@ -35,7 +36,8 @@ ReadStringController::ReadStringController(int maxlen, int screenX, int screenY,
 	_accepted = accepted_chars;
 }
 
-ReadStringController::ReadStringController(int maxlen, TextView *view, const Common::String &accepted_chars) {
+ReadStringController::ReadStringController(int maxlen, TextView *view,
+		const Common::String &accepted_chars) : WaitableController<Common::String>("") {
 	_maxLen = maxlen;
 	_screenX = view->getCursorX();
 	_screenY = view->getCursorY();
@@ -78,11 +80,13 @@ bool ReadStringController::keyPressed(int key) {
 				g_screen->screenHideCursor();
 				g_screen->screenTextAt(_screenX + len, _screenY, "%c", key);
 				g_screen->screenSetCursorPos(_screenX + len + 1, _screenY);
-				g_context->col = len + 1;
+				g_context->_col = len + 1;
 				g_screen->screenShowCursor();
 			}
 		}
-	} else valid = false;
+	} else {
+		valid = false;
+	}
 
 	return valid || KeyHandler::defaultHandler(key, nullptr);
 }

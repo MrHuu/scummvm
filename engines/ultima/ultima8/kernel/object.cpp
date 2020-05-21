@@ -25,7 +25,6 @@
 #include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/kernel/object_manager.h"
 #include "ultima/ultima8/world/world.h"
-#include "ultima/ultima8/kernel/memory_manager.h"
 #include "ultima/ultima8/usecode/uc_process.h"
 #include "ultima/ultima8/usecode/uc_machine.h"
 
@@ -33,9 +32,7 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE_BASE_CLASS(Object)
-
-DEFINE_CUSTOM_MEMORY_ALLOCATION(Object)
+DEFINE_RUNTIME_CLASSTYPE_CODE(Object)
 
 Object::~Object() {
 	if (_objId != 0xFFFF)

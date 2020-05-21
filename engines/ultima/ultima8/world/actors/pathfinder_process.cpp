@@ -34,17 +34,19 @@ static const unsigned int PATH_OK = 1;
 static const unsigned int PATH_FAILED = 0;
 
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(PathfinderProcess, Process)
+DEFINE_RUNTIME_CLASSTYPE_CODE(PathfinderProcess)
 
-PathfinderProcess::PathfinderProcess() : Process() {
-
+PathfinderProcess::PathfinderProcess() : Process(),
+		_currentStep(0), _targetItem(0), _hitMode(false),
+		_targetX(0), _targetY(0), _targetZ(0) {
 }
 
-PathfinderProcess::PathfinderProcess(Actor *actor_, ObjId item_, bool hit) {
-	assert(actor_);
-	_itemNum = actor_->getObjId();
+PathfinderProcess::PathfinderProcess(Actor *actor, ObjId item_, bool hit) :
+		_currentStep(0), _targetItem(item_), _hitMode(hit),
+		_targetX(0), _targetY(0), _targetZ(0) {
+	assert(actor);
+	_itemNum = actor->getObjId();
 	_type = 0x0204; // CONSTANT !
-
 
 	Item *item = getItem(item_);
 	if (!item) {
@@ -55,15 +57,12 @@ PathfinderProcess::PathfinderProcess(Actor *actor_, ObjId item_, bool hit) {
 		return;
 	}
 
-	_currentStep = 0;
-	_targetItem = item_;
-	_hitMode = hit;
 	assert(_targetItem);
 
 	item->getLocation(_targetX, _targetY, _targetZ);
 
 	Pathfinder pf;
-	pf.init(actor_);
+	pf.init(actor);
 	pf.setTarget(item, hit);
 
 	bool ok = pf.pathfind(_path);
@@ -77,20 +76,14 @@ PathfinderProcess::PathfinderProcess(Actor *actor_, ObjId item_, bool hit) {
 	}
 
 	// TODO: check if flag already set? kill other pathfinders?
-	actor_->setActorFlag(Actor::ACT_PATHFINDING);
+	actor->setActorFlag(Actor::ACT_PATHFINDING);
 }
 
-PathfinderProcess::PathfinderProcess(Actor *actor_,
-                                     int32 x, int32 y, int32 z) {
+PathfinderProcess::PathfinderProcess(Actor *actor_, int32 x, int32 y, int32 z) :
+		_targetX(x), _targetY(y), _targetZ(z), _targetItem(0), _currentStep(0),
+		_hitMode(false) {
 	assert(actor_);
 	_itemNum = actor_->getObjId();
-
-	_targetX = x;
-	_targetY = y;
-	_targetZ = z;
-	_targetItem = 0;
-
-	_currentStep = 0;
 
 	Pathfinder pf;
 	pf.init(actor_);

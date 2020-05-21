@@ -34,17 +34,18 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_class stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(ButtonWidget, Gump)
+DEFINE_RUNTIME_CLASSTYPE_CODE(ButtonWidget)
 
 ButtonWidget::ButtonWidget() : Gump(), _shapeUp(nullptr), _shapeDown(nullptr),
-		_mouseOver(false), _origW(0), _origH(0) {
+		_mouseOver(false), _origW(0), _origH(0), _frameNumUp(0),
+		_frameNumDown(0), _mouseOverBlendCol(0), _textWidget(0) {
 }
 
 ButtonWidget::ButtonWidget(int x, int y, Std::string txt, bool gamefont,
                            int font, uint32 mouseOverBlendCol,
                            int w, int h, int32 layer) :
 	Gump(x, y, w, h, 0, 0, layer), _shapeUp(nullptr), _shapeDown(nullptr),
-	_mouseOver(false), _origW(w), _origH(h) {
+	_mouseOver(false), _origW(w), _origH(h), _frameNumUp(0), _frameNumDown(0) {
 	TextWidget *widget = new TextWidget(0, 0, txt, gamefont, font, w, h);
 	_textWidget = widget->getObjId();
 	_mouseOverBlendCol = mouseOverBlendCol;
@@ -53,7 +54,8 @@ ButtonWidget::ButtonWidget(int x, int y, Std::string txt, bool gamefont,
 
 ButtonWidget::ButtonWidget(int x, int y, FrameID frame_up, FrameID frame_down,
                            bool mouseOver, int32 layer)
-	: Gump(x, y, 5, 5, 0, 0, layer), _textWidget(0), _mouseOver(mouseOver) {
+	: Gump(x, y, 5, 5, 0, 0, layer), _textWidget(0), _mouseOver(mouseOver),
+		_origW(0), _origH(0), _mouseOverBlendCol(0) {
 	_shapeUp = GameData::get_instance()->getShape(frame_up);
 	_shapeDown = GameData::get_instance()->getShape(frame_down);
 	_frameNumUp = frame_up._frameNum;
@@ -85,7 +87,7 @@ void ButtonWidget::InitGump(Gump *newparent, bool take_focus) {
 int ButtonWidget::getVlead() {
 	if (_textWidget != 0) {
 		Gump *widget = getGump(_textWidget);
-		TextWidget *txtWidget = p_dynamic_cast<TextWidget *>(widget);
+		TextWidget *txtWidget = dynamic_cast<TextWidget *>(widget);
 		assert(txtWidget);
 		return txtWidget->getVlead();
 	} else {
@@ -106,8 +108,8 @@ bool ButtonWidget::PointOnGump(int mx, int my) {
 	return _dims.InRect(gx, gy);
 }
 
-Gump *ButtonWidget::OnMouseDown(int button, int32 mx, int32 my) {
-	Gump *ret = Gump::OnMouseDown(button, mx, my);
+Gump *ButtonWidget::onMouseDown(int button, int32 mx, int32 my) {
+	Gump *ret = Gump::onMouseDown(button, mx, my);
 	if (ret)
 		return ret;
 	if (button == Shared::BUTTON_LEFT) {
@@ -129,7 +131,7 @@ uint16 ButtonWidget::TraceObjId(int32 mx, int32 my) {
 }
 
 
-void ButtonWidget::OnMouseUp(int button, int32 mx, int32 my) {
+void ButtonWidget::onMouseUp(int button, int32 mx, int32 my) {
 	if (button == Shared::BUTTON_LEFT) {
 		if (!_mouseOver) {
 			_shape = _shapeUp;
@@ -139,21 +141,21 @@ void ButtonWidget::OnMouseUp(int button, int32 mx, int32 my) {
 	}
 }
 
-void ButtonWidget::OnMouseClick(int button, int32 mx, int32 my) {
+void ButtonWidget::onMouseClick(int button, int32 mx, int32 my) {
 	int gx = mx, gy = my;
 	if (PointOnGump(gx, gy))
 		_parent->ChildNotify(this, BUTTON_CLICK);
 }
 
-void ButtonWidget::OnMouseDouble(int button, int32 mx, int32 my) {
+void ButtonWidget::onMouseDouble(int button, int32 mx, int32 my) {
 	_parent->ChildNotify(this, BUTTON_DOUBLE);
 }
 
-void ButtonWidget::OnMouseOver() {
+void ButtonWidget::onMouseOver() {
 	if (_mouseOver) {
 		if (_textWidget) {
 			Gump *widget = getGump(_textWidget);
-			TextWidget *txtWidget = p_dynamic_cast<TextWidget *>(widget);
+			TextWidget *txtWidget = dynamic_cast<TextWidget *>(widget);
 			assert(txtWidget);
 			txtWidget->setBlendColour(_mouseOverBlendCol);
 		} else {
@@ -163,11 +165,11 @@ void ButtonWidget::OnMouseOver() {
 	}
 }
 
-void ButtonWidget::OnMouseLeft() {
+void ButtonWidget::onMouseLeft() {
 	if (_mouseOver) {
 		if (_textWidget) {
 			Gump *widget = getGump(_textWidget);
-			TextWidget *txtWidget = p_dynamic_cast<TextWidget *>(widget);
+			TextWidget *txtWidget = dynamic_cast<TextWidget *>(widget);
 			assert(txtWidget);
 			txtWidget->setBlendColour(0);
 		} else {

@@ -31,7 +31,7 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_class stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(AskGump, ItemRelativeGump)
+DEFINE_RUNTIME_CLASSTYPE_CODE(AskGump)
 
 AskGump::AskGump() : ItemRelativeGump(), _answers(0) {
 }
@@ -141,7 +141,7 @@ bool AskGump::loadData(Common::ReadStream *rs, uint32 version) {
 		Std::list<Gump *>::iterator it;
 		for (it = _children.begin(); it != _children.end(); ++it) {
 			if ((*it)->GetIndex() != (int)i) continue;
-			child = p_dynamic_cast<ButtonWidget *>(*it);
+			child = dynamic_cast<ButtonWidget *>(*it);
 			if (!child) continue;
 		}
 

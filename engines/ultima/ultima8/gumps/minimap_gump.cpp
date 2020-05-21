@@ -36,7 +36,7 @@
 namespace Ultima {
 namespace Ultima8 {
 
-DEFINE_RUNTIME_CLASSTYPE_CODE(MiniMapGump, Gump)
+DEFINE_RUNTIME_CLASSTYPE_CODE(MiniMapGump)
 
 MiniMapGump::MiniMapGump(int x, int y) :
 	Gump(x, y, MAP_NUM_CHUNKS * 2 + 2, MAP_NUM_CHUNKS * 2 + 2, 0,
@@ -46,7 +46,7 @@ MiniMapGump::MiniMapGump(int x, int y) :
 		TEX_FMT_NATIVE);
 }
 
-MiniMapGump::MiniMapGump() : Gump() {
+MiniMapGump::MiniMapGump() : Gump() , _lastMapNum(0){
 }
 
 MiniMapGump::~MiniMapGump(void) {

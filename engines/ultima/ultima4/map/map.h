@@ -34,8 +34,6 @@
 namespace Ultima {
 namespace Ultima4 {
 
-using Common::String;
-
 #define MAP_IS_OOB(mapptr, c) (((c).x) < 0 || ((c).x) >= (static_cast<int>((mapptr)->_width)) || ((c).y) < 0 || ((c).y) >= (static_cast<int>((mapptr)->_height)) || ((c).z) < 0 || ((c).z) >= (static_cast<int>((mapptr)->_levels)))
 
 class AnnotationMgr;
@@ -124,7 +122,12 @@ public:
 	 */
 	int distance(const MapCoords &c, const class Map *map = nullptr) const;
 
-	static MapCoords nowhere;
+	/**
+	 * Returns true if the co-ordinates point to nowhere
+	 */
+	static MapCoords nowhere() {
+		return MapCoords(-1, -1, -1);
+	}
 };
 
 /**
@@ -137,7 +140,8 @@ public:
 		CITY,
 		SHRINE,
 		COMBAT,
-		DUNGEON
+		DUNGEON,
+		XML
 	};
 
 	enum BorderBehavior {
@@ -149,7 +153,7 @@ public:
 
 	class Source {
 	public:
-		Source() {}
+		Source() : _type(WORLD) {}
 		Source(const Common::String &f, Type t) : _fname(f), _type(t) {}
 
 		Common::String _fname;
@@ -252,7 +256,7 @@ public:
 	 * Alerts the guards that the avatar is doing something bad
 	 */
 	void alertGuards();
-	const MapCoords &getLabel(const Common::String &name) const;
+	MapCoords getLabel(const Common::String &name) const;
 
 	// u4dos compatibility
 	bool fillMonsterTable();
@@ -260,31 +264,30 @@ public:
 	uint translateToRawTileIndex(MapTile &tile) const;
 
 public:
-	MapId           _id;
-	Common::String  _fname;
-	Type            _type;
-	uint    _width,
-	         _height,
-	         _levels;
-	uint    _chunkWidth,
-	         _chunkHeight;
-	uint    _offset;
+	MapId _id;
+	Common::String _fname;
+	Type _type;
+	uint _width, _height, _levels;
+	uint _chunkWidth, _chunkHeight;
+	uint _offset;
 
-	Source          _baseSource;
+	Source _baseSource;
 	Common::List<Source> _extraSources;
 
-	CompressedChunkList     _compressedChunks;
-	BorderBehavior          _borderBehavior;
+	CompressedChunkList _compressedChunks;
+	BorderBehavior _borderBehavior;
 
-	PortalList      _portals;
-	AnnotationMgr  *_annotations;
-	int             _flags;
-	Music::Type     _music;
-	MapData         _data;
-	ObjectDeque     _objects;
+	PortalList _portals;
+	AnnotationMgr *_annotations;
+	int _flags;
+	Music::Type _music;
+	MapData _data;
+	ObjectDeque _objects;
 	Std::map<Common::String, MapCoords> _labels;
-	Tileset        *_tileSet;
-	TileMap        *_tileMap;
+	Tileset *_tileSet;
+	TileMap *_tileMap;
+	MapTile _blank;
+
 
 	// u4dos compatibility
 	SaveGameMonsterRecord _monsterTable[MONSTERTABLE_SIZE];

@@ -37,10 +37,10 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(FireballProcess, Process)
+DEFINE_RUNTIME_CLASSTYPE_CODE(FireballProcess)
 
 FireballProcess::FireballProcess()
-	: Process() {
+	: Process(), _xSpeed(0), _ySpeed(0), _age(0), _target(0) {
 
 }
 

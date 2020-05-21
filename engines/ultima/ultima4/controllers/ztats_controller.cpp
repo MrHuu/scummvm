@@ -23,7 +23,7 @@
 #include "ultima/ultima4/controllers/ztats_controller.h"
 #include "ultima/ultima4/events/event_handler.h"
 #include "ultima/ultima4/game/context.h"
-#include "ultima/ultima4/game/stats.h"
+#include "ultima/ultima4/views/stats.h"
 #include "ultima/ultima4/ultima4.h"
 
 namespace Ultima {
@@ -53,14 +53,15 @@ bool ZtatsController::keyPressed(int key) {
 	case '0':
 		g_context->_stats->setView(StatsView(STATS_WEAPONS));
 		return true;
-	case Common::KEYCODE_ESCAPE:
-	case Common::KEYCODE_SPACE:
-	case Common::KEYCODE_RETURN:
-		g_context->_stats->setView(StatsView(STATS_PARTY_OVERVIEW));
-		doneWaiting();
-		return true;
 	default:
 		return KeyHandler::defaultHandler(key, nullptr);
+	}
+}
+
+void ZtatsController::keybinder(KeybindingAction action) {
+	if (action == KEYBIND_ESCAPE) {
+		g_context->_stats->setView(StatsView(STATS_PARTY_OVERVIEW));
+		doneWaiting();
 	}
 }
 

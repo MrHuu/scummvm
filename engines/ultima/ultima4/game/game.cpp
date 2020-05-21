@@ -41,7 +41,7 @@
 #include "ultima/ultima4/game/context.h"
 #include "ultima/ultima4/game/death.h"
 #include "ultima/ultima4/game/item.h"
-#include "ultima/ultima4/game/menu.h"
+#include "ultima/ultima4/views/menu.h"
 #include "ultima/ultima4/game/creature.h"
 #include "ultima/ultima4/game/moongate.h"
 #include "ultima/ultima4/game/names.h"
@@ -49,7 +49,7 @@
 #include "ultima/ultima4/game/player.h"
 #include "ultima/ultima4/game/portal.h"
 #include "ultima/ultima4/game/spell.h"
-#include "ultima/ultima4/game/stats.h"
+#include "ultima/ultima4/views/stats.h"
 #include "ultima/ultima4/game/script.h"
 #include "ultima/ultima4/game/weapon.h"
 #include "ultima/ultima4/gfx/imagemgr.h"
@@ -64,17 +64,15 @@
 #include "ultima/ultima4/map/shrine.h"
 #include "ultima/ultima4/map/tilemap.h"
 #include "ultima/ultima4/map/tileset.h"
-#include "ultima/ultima4/map/dungeonview.h"
 #include "ultima/ultima4/sound/music.h"
 #include "ultima/ultima4/sound/sound.h"
+#include "ultima/ultima4/views/dungeonview.h"
 #include "ultima/ultima4/meta_engine.h"
 #include "common/savefile.h"
 #include "common/system.h"
 
 namespace Ultima {
 namespace Ultima4 {
-
-using namespace std;
 
 /*-----------------*/
 /* Functions BEGIN */
@@ -93,9 +91,6 @@ void wearArmor(int player = -1);
 /* Functions END */
 /*---------------*/
 
-/**
- * Sets the view mode.
- */
 void gameSetViewMode(ViewMode newMode) {
 	g_context->_location->_viewMode = newMode;
 }
@@ -127,7 +122,6 @@ void gameUpdateScreen() {
 }
 
 void gameSpellEffect(int spell, int player, Sound sound) {
-
 	int time;
 	Spell::SpecialEffects effect = Spell::SFX_INVERT;
 
@@ -151,8 +145,6 @@ void gameSpellEffect(int spell, int player, Sound sound) {
 	}
 
 	switch (effect) {
-	case Spell::SFX_NONE:
-		break;
 	case Spell::SFX_TREMOR:
 	case Spell::SFX_INVERT:
 		gameUpdateScreen();
@@ -165,9 +157,10 @@ void gameSpellEffect(int spell, int player, Sound sound) {
 			gameUpdateScreen();
 			soundPlay(SOUND_RUMBLE, false);
 			g_screen->screenShake(8);
-
 		}
 
+		break;
+	default:
 		break;
 	}
 }
@@ -180,7 +173,7 @@ Common::String gameGetInput(int maxlen) {
 	helper.beginConversation(U4IOS::UIKeyboardTypeDefault);
 #endif
 
-	return ReadStringController::get(maxlen, TEXT_AREA_X + g_context->col, TEXT_AREA_Y + g_context->_line);
+	return ReadStringController::get(maxlen, TEXT_AREA_X + g_context->_col, TEXT_AREA_Y + g_context->_line);
 }
 
 int gameGetPlayer(bool canBeDisabled, bool canBeActivePlayer) {
@@ -202,9 +195,9 @@ int gameGetPlayer(bool canBeDisabled, bool canBeActivePlayer) {
 		}
 	}
 
-	g_context->col--;// display the selected character name, in place of the number
+	g_context->_col--;// display the selected character name, in place of the number
 	if ((player >= 0) && (player < 8)) {
-		g_screen->screenMessage("%s\n", g_ultima->_saveGame->_players[player].name); //Write player's name after prompt
+		g_screen->screenMessage("%s\n", g_ultima->_saveGame->_players[player]._name); //Write player's name after prompt
 	}
 
 	if (!canBeDisabled && g_context->_party->member(player)->isDisabled()) {
@@ -251,6 +244,7 @@ bool fireAt(const Coords &coords, bool originAvatar) {
 
 	obj = g_context->_location->_map->objectAt(coords);
 	Creature *m = dynamic_cast<Creature *>(obj);
+	assert(m);
 
 	if (obj && obj->getType() == Object::CREATURE && m->isAttackable())
 		validObject = true;
@@ -296,9 +290,6 @@ bool fireAt(const Coords &coords, bool originAvatar) {
 	return objectHit;
 }
 
-/**
- * Peers at a city from A-P (Lycaeum telescope) and functions like a gem
- */
 bool gamePeerCity(int city, void *data) {
 	Map *peerMap;
 
@@ -327,11 +318,7 @@ bool gamePeerCity(int city, void *data) {
 	return false;
 }
 
-/**
- * Peers at a gem
- */
 void peer(bool useGem) {
-
 	if (useGem) {
 		if (g_ultima->_saveGame->_gems <= 0) {
 			g_screen->screenMessage("%cPeer at What?%c\n", FG_GREY, FG_WHITE);
@@ -359,10 +346,6 @@ void peer(bool useGem) {
 	g_game->_paused = false;
 }
 
-/**
- * Checks the hull integrity of the ship and handles
- * the ship sinking, if necessary
- */
 void gameCheckHullIntegrity() {
 	int i;
 
@@ -389,14 +372,10 @@ void gameCheckHullIntegrity() {
 		}
 
 		g_screen->update();
-		deathStart(5);
+		g_death->start(5);
 	}
 }
 
-/**
- * Fixes objects initially loaded by saveGameMonstersRead,
- * and alters movement behavior accordingly to match the creature
- */
 void gameFixupObjects(Map *map) {
 	int i;
 	Object *obj;
@@ -434,9 +413,6 @@ uint32 gameTimeSinceLastCommand() {
 	return (g_system->getMillis() - g_context->_lastCommandTime) / 1000;
 }
 
-/**
- * Handles what happens when a creature attacks you
- */
 void gameCreatureAttack(Creature *m) {
 	Object *under;
 	const Tile *ground;
@@ -458,9 +434,6 @@ void gameCreatureAttack(Creature *m) {
 	cc->begin();
 }
 
-/**
- * Performs a ranged attack for the creature at x,y on the world map
- */
 bool creatureRangeAttack(const Coords &coords, Creature *m) {
 //    int attackdelay = MAX_BATTLE_SPEED - settings.battleSpeed;
 
@@ -483,13 +456,14 @@ bool creatureRangeAttack(const Coords &coords, Creature *m) {
 		/* FIXME: check actual damage from u4dos -- values here are guessed */
 		if (g_context->_transportContext == TRANSPORT_SHIP)
 			gameDamageShip(-1, 10);
-		else gameDamageParty(10, 25);
+		else
+			gameDamageParty(10, 25);
 
 		return true;
 	}
 	// Destroy objects that were hit
 	else if (obj) {
-		if ((obj->getType() == Object::CREATURE && m->isAttackable()) ||
+		if ((obj->getType() == Object::CREATURE && m && m->isAttackable()) ||
 		        obj->getType() == Object::UNKNOWN) {
 
 			GameController::flashTile(coords, tile, 3);
@@ -501,13 +475,6 @@ bool creatureRangeAttack(const Coords &coords, Creature *m) {
 	return false;
 }
 
-/**
- * Gets the path of coordinates for an action.  Each tile in the
- * direction specified by dirmask, between the minimum and maximum
- * distances given, is included in the path, until blockedPredicate
- * fails.  If a tile is blocked, that tile is included in the path
- * only if includeBlocked is true.
- */
 Std::vector<Coords> gameGetDirectionalActionPath(int dirmask, int validDirections, const Coords &origin, int minDistance, int maxDistance, bool (*blockedPredicate)(const Tile *tile), bool includeBlocked) {
 	Std::vector<Coords> path;
 	Direction dirx = DIR_NONE,
@@ -559,12 +526,6 @@ Std::vector<Coords> gameGetDirectionalActionPath(int dirmask, int validDirection
 	return path;
 }
 
-/**
- * Deals an amount of damage between 'minDamage' and 'maxDamage'
- * to each party member, with a 50% chance for each member to
- * avoid the damage.  If (minDamage == -1) or (minDamage >= maxDamage),
- * deals 'maxDamage' damage to each member.
- */
 void gameDamageParty(int minDamage, int maxDamage) {
 	int i;
 	int damage;
@@ -588,11 +549,6 @@ void gameDamageParty(int minDamage, int maxDamage) {
 	if (lastdmged != -1) g_context->_stats->highlightPlayer(lastdmged);
 }
 
-/**
- * Deals an amount of damage between 'minDamage' and 'maxDamage'
- * to the ship.  If (minDamage == -1) or (minDamage >= maxDamage),
- * deals 'maxDamage' damage to the ship.
- */
 void gameDamageShip(int minDamage, int maxDamage) {
 	int damage;
 
@@ -608,9 +564,6 @@ void gameDamageShip(int minDamage, int maxDamage) {
 	}
 }
 
-/**
- * Sets (or unsets) the active player
- */
 void gameSetActivePlayer(int player) {
 	if (player == -1) {
 		g_context->_party->setActivePlayer(-1);
@@ -624,10 +577,6 @@ void gameSetActivePlayer(int player) {
 	}
 }
 
-/**
- * Spawns a creature (m) just offscreen of the avatar.
- * If (m==nullptr) then it finds its own creature to spawn and spawns it.
- */
 bool gameSpawnCreature(const Creature *m) {
 	int t, i;
 	const Creature *creature;
@@ -684,8 +633,11 @@ bool gameSpawnCreature(const Creature *m) {
 				        (m->walks() && tile->isCreatureWalkable()) ||
 				        (m->flies() && tile->isFlyable()))
 					ok = true;
-				else tries++;
-			} else ok = true;
+				else
+					tries++;
+			} else {
+				ok = true;
+			}
 		}
 
 		if (ok)
@@ -709,16 +661,13 @@ bool gameSpawnCreature(const Creature *m) {
 	return true;
 }
 
-/**
- * Destroys all creatures on the current map.
- */
 void gameDestroyAllCreatures(void) {
 	int i;
 
 	gameSpellEffect('t', -1, SOUND_MAGIC); /* same effect as tremor */
 
 	if (g_context->_location->_context & CTX_COMBAT) {
-		/* destroy all creatures in combat */
+		// Destroy all creatures in combat
 		for (i = 0; i < AREA_CREATURES; i++) {
 			CombatMap *cm = getCombatMap();
 			CreatureVector creatures = cm->getCreatures();
@@ -730,7 +679,7 @@ void gameDestroyAllCreatures(void) {
 			}
 		}
 	} else {
-		/* destroy all creatures on the map */
+		// Destroy all creatures on the map
 		ObjectDeque::iterator current;
 		Map *map = g_context->_location->_map;
 
@@ -738,15 +687,18 @@ void gameDestroyAllCreatures(void) {
 			Creature *m = dynamic_cast<Creature *>(*current);
 
 			if (m) {
-				/* the skull does not destroy Lord British */
+				// The skull does not destroy Lord British
 				if (m->getId() != LORDBRITISH_ID)
 					current = map->removeObject(current);
-				else current++;
-			} else current++;
+				else
+					current++;
+			} else {
+				current++;
+			}
 		}
 	}
 
-	/* alert the guards! Really, the only one left should be LB himself :) */
+	// Alert the guards! Really, the only one left should be LB himself :)
 	g_context->_location->_map->alertGuards();
 }
 
@@ -762,7 +714,7 @@ void showMixturesSuper(int page = 0) {
 	for (int i = 0; i < 13; i++) {
 		char buf[4];
 
-		const Spell *s = getSpell(i + 13 * page);
+		const Spell *s = g_spells->getSpell(i + 13 * page);
 		int line = i + 8;
 		g_screen->screenTextAt(2, line, "%s", s->_name);
 
@@ -794,7 +746,7 @@ void mixReagentsSuper() {
 	ReagentShop shops[] = {
 		{ "BuccDen", {6, 7, 9, 9, 9, 1} },
 		{ "Moonglo", {2, 5, 6, 3, 6, 9} },
-		{ "Paws",    {3, 4, 2, 8, 6, 7} },
+		{ "Paws", {3, 4, 2, 8, 6, 7} },
 		{ "SkaraBr", {2, 4, 9, 6, 4, 8} },
 	};
 	const int shopcount = sizeof(shops) / sizeof(shops[0]);
@@ -836,7 +788,7 @@ void mixReagentsSuper() {
 			done = true;
 		} else {
 			spell -= 'a';
-			const Spell *s = getSpell(spell);
+			const Spell *s = g_spells->getSpell(spell);
 			g_screen->screenMessage("%s\n", s->_name);
 			page = (spell >= 13);
 			showMixturesSuper(page);
@@ -855,7 +807,7 @@ void mixReagentsSuper() {
 			g_screen->screenMessage("You can make %d.\n", (mixQty > ingQty) ? ingQty : mixQty);
 			g_screen->screenMessage("How many? ");
 
-			int howmany = ReadIntController::get(2, TEXT_AREA_X + g_context->col, TEXT_AREA_Y + g_context->_line);
+			int howmany = ReadIntController::get(2, TEXT_AREA_X + g_context->_col, TEXT_AREA_Y + g_context->_line);
 
 			if (howmany == 0) {
 				g_screen->screenMessage("\nNone mixed!\n");

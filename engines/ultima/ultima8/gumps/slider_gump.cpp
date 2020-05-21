@@ -38,16 +38,17 @@
 namespace Ultima {
 namespace Ultima8 {
 
-DEFINE_RUNTIME_CLASSTYPE_CODE(SliderGump, ModalGump)
+DEFINE_RUNTIME_CLASSTYPE_CODE(SliderGump)
 
-SliderGump::SliderGump() : ModalGump(), _renderedText(nullptr) {
+SliderGump::SliderGump() : ModalGump(), _renderedText(nullptr), _min(0), _max(0),
+		_delta(0), _value(0), _usecodeNotifyPID(0), _renderedValue(-1) {
 }
 
 
 SliderGump::SliderGump(int x, int y, int16 min, int16 max,
                        int16 value_, int16 delta)
 	: ModalGump(x, y, 5, 5), _min(min), _max(max), _delta(delta), _value(value_),
-	  _usecodeNotifyPID(0), _renderedText(nullptr) {
+	  _usecodeNotifyPID(0), _renderedText(nullptr), _renderedValue(-1) {
 }
 
 SliderGump::~SliderGump() {
@@ -91,7 +92,7 @@ void SliderGump::setValueFromSlider(int sliderx) {
 }
 
 void SliderGump::setSliderPos() {
-	Gump *slider = Gump::FindGump(SlidingWidget::ClassType);
+	Gump *slider = Gump::FindGump<SlidingWidget>();
 	assert(slider);
 	slider->Move(getSliderPos(), slidery);
 }
@@ -182,7 +183,7 @@ void SliderGump::Close(bool no_del) {
 	_processResult = _value;
 
 	if (_usecodeNotifyPID) {
-		UCProcess *ucp = p_dynamic_cast<UCProcess *>(Kernel::get_instance()->getProcess(_usecodeNotifyPID));
+		UCProcess *ucp = dynamic_cast<UCProcess *>(Kernel::get_instance()->getProcess(_usecodeNotifyPID));
 		assert(ucp);
 		ucp->setReturnValue(_value);
 		ucp->wakeUp(_value);

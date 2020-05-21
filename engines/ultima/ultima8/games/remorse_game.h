@@ -46,11 +46,10 @@ public:
 	void writeSaveInfo(Common::WriteStream *ws) override;
 
 	ProcId playIntroMovie(bool fade) override;
+	ProcId playIntroMovie2(bool fade);
 	ProcId playEndgameMovie(bool fade) override;
 	void playCredits() override;
 	void playQuotes() override { };
-
-	static Game *createGame(GameInfo *info);
 
 protected:
 	static Game *_game;

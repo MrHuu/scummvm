@@ -34,7 +34,7 @@
 namespace Ultima {
 namespace Ultima8 {
 
-DEFINE_RUNTIME_CLASSTYPE_CODE(TextWidget, Gump)
+DEFINE_RUNTIME_CLASSTYPE_CODE(TextWidget)
 
 TextWidget::TextWidget() : Gump(), _gameFont(false), _fontNum(0), _blendColour(0),
 		_tx(0), _ty(0), _currentStart(0), _currentEnd(0), _targetWidth(0), _targetHeight(0),
@@ -44,7 +44,7 @@ TextWidget::TextWidget() : Gump(), _gameFont(false), _fontNum(0), _blendColour(0
 TextWidget::TextWidget(int x, int y, const Std::string &txt, bool gamefont_, int font,
                        int w, int h, Font::TextAlign align) :
 	Gump(x, y, w, h), _text(txt), _gameFont(gamefont_), _fontNum(font),
-	_blendColour(0), _currentStart(0), _currentEnd(0),
+	_blendColour(0), _currentStart(0), _currentEnd(0), _tx(0), _ty(0),
 	_targetWidth(w), _targetHeight(h), _cachedText(nullptr), _textAlign(align) {
 }
 
@@ -193,10 +193,10 @@ void TextWidget::PaintComposited(RenderSurface *surf, int32 lerp_factor, int32 s
 	else
 		_cachedText->drawBlended(surf, x, y, _blendColour, true);
 
-	if (_parent->IsOfType<BarkGump>())
+	if (dynamic_cast<BarkGump *>(_parent))
 		return;
 
-	if (_parent->IsOfType<ButtonWidget>() && _parent->GetParent()->IsOfType<AskGump>())
+	if (dynamic_cast<ButtonWidget *>(_parent) && dynamic_cast<AskGump *>(_parent->GetParent()))
 		return;
 
 	x = _dims.x;
@@ -207,7 +207,7 @@ void TextWidget::PaintComposited(RenderSurface *surf, int32 lerp_factor, int32 s
 }
 
 // don't handle any mouse motion events, so let parent handle them for us.
-Gump *TextWidget::OnMouseMotion(int32 mx, int32 my) {
+Gump *TextWidget::onMouseMotion(int32 mx, int32 my) {
 	return nullptr;
 }
 

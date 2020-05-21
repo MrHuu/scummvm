@@ -34,6 +34,7 @@
 #include "backends/platform/3ds/sprite.h"
 #include "common/rect.h"
 #include "common/queue.h"
+#include "engines/engine.h"
 
 #define TICKS_PER_MSEC 268123
 
@@ -289,6 +290,10 @@ private:
 	u16 _magX, _magY;
 	u16 _magWidth, _magHeight;
 	u16 _magCenterX, _magCenterY;
+
+public:
+	// Pause
+	PauseToken _sleepPauseToken;
 };
 
 } // namespace _3DS

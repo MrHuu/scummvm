@@ -35,9 +35,6 @@ namespace Ultima8 {
 
 using Std::string;
 
-// p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE_BASE_CLASS(CoreApp)
-
 CoreApp *CoreApp::_application = nullptr;
 
 CoreApp::CoreApp(const Ultima::UltimaGameDescription *gameDesc)
@@ -194,7 +191,7 @@ void CoreApp::killGame() {
 }
 
 
-bool CoreApp::getGameInfo(istring &game, GameInfo *ginfo) {
+bool CoreApp::getGameInfo(const istring &game, GameInfo *ginfo) {
 	// first try getting the information from the config file
 	// if that fails, try to autodetect it
 

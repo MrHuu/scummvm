@@ -39,20 +39,6 @@ class Script;
  */
 class ResponsePart {
 public:
-	// the valid command response parts
-	static const ResponsePart NONE;
-	static const ResponsePart ASK;
-	static const ResponsePart END;
-	static const ResponsePart ATTACK;
-	static const ResponsePart BRAGGED;
-	static const ResponsePart HUMBLE;
-	static const ResponsePart ADVANCELEVELS;
-	static const ResponsePart HEALCONFIRM;
-	static const ResponsePart STARTMUSIC_LB;
-	static const ResponsePart STARTMUSIC_HW;
-	static const ResponsePart STOPMUSIC;
-	static const ResponsePart HAWKWIND;
-
 	ResponsePart(const Common::String &value, const Common::String &arg = "", bool command = false);
 
 	operator Common::String() const;
@@ -63,6 +49,30 @@ private:
 	Common::String _value, _arg;
 	bool _command;
 };
+
+/**
+ * A list of valid command response parts
+ */
+class ResponseParts {
+public:
+	const ResponsePart NONE;
+	const ResponsePart ASK;
+	const ResponsePart END;
+	const ResponsePart ATTACK;
+	const ResponsePart BRAGGED;
+	const ResponsePart HUMBLE;
+	const ResponsePart ADVANCELEVELS;
+	const ResponsePart HEALCONFIRM;
+	const ResponsePart STARTMUSIC_LB;
+	const ResponsePart STARTMUSIC_HW;
+	const ResponsePart STOPMUSIC;
+	const ResponsePart HAWKWIND;
+
+	ResponseParts();
+	~ResponseParts();
+};
+
+extern ResponseParts *g_responseParts;
 
 /**
  * A static response.  Each response can be made up of any number of
@@ -148,10 +158,10 @@ public:
 		/*
 		 * Accessor methods
 		 */
-		const Common::String &getKeyword()  {
+		const Common::String &getKeyword() {
 			return _keyword;
 		}
-		Response *getResponse()     {
+		Response *getResponse() {
 			return _response;
 		}
 
@@ -174,53 +184,53 @@ public:
 	/*
 	 * Accessor methods
 	 */
-	const Common::String &getName() const                   {
+	const Common::String &getName() const {
 		return _name;
 	}
-	const Common::String &getPronoun() const                {
+	const Common::String &getPronoun() const {
 		return _pronoun;
 	}
-	const Common::String &getPrompt() const                 {
+	const Common::String &getPrompt() const {
 		return _prompt;
 	}
-	Response *getIntro(bool familiar = false)       {
+	Response *getIntro(bool familiar = false) {
 		return _intro;
 	}
-	Response *getLongIntro(bool familiar = false)   {
+	Response *getLongIntro(bool familiar = false) {
 		return _longIntro;
 	}
-	Response *getDefaultAnswer()                    {
+	Response *getDefaultAnswer() {
 		return _defaultAnswer;
 	}
-	Dialogue::Question *getQuestion()               {
+	Dialogue::Question *getQuestion() {
 		return _question;
 	}
 
 	/*
 	 * Getters
 	 */
-	void setName(const Common::String &n)       {
+	void setName(const Common::String &n) {
 		_name           = n;
 	}
-	void setPronoun(const Common::String &pn)   {
+	void setPronoun(const Common::String &pn) {
 		_pronoun        = pn;
 	}
 	void setPrompt(const Common::String &prompt) {
 		this->_prompt   = prompt;
 	}
-	void setIntro(Response *i)          {
+	void setIntro(Response *i) {
 		_intro          = i;
 	}
-	void setLongIntro(Response *i)      {
+	void setLongIntro(Response *i) {
 		_longIntro      = i;
 	}
-	void setDefaultAnswer(Response *a)  {
+	void setDefaultAnswer(Response *a) {
 		_defaultAnswer  = a;
 	}
-	void setTurnAwayProb(int prob)      {
+	void setTurnAwayProb(int prob) {
 		_turnAwayProb   = prob;
 	}
-	void setQuestion(Question *q)       {
+	void setQuestion(Question *q) {
 		_question       = q;
 	}
 	void addKeyword(const Common::String &kw, Response *response);

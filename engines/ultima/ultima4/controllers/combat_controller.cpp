@@ -44,7 +44,7 @@
 #include "ultima/ultima4/game/player.h"
 #include "ultima/ultima4/game/portal.h"
 #include "ultima/ultima4/game/spell.h"
-#include "ultima/ultima4/game/stats.h"
+#include "ultima/ultima4/views/stats.h"
 #include "ultima/ultima4/game/weapon.h"
 #include "ultima/ultima4/gfx/screen.h"
 #include "ultima/shared/std/containers.h"
@@ -54,7 +54,7 @@
 namespace Ultima {
 namespace Ultima4 {
 
-extern void gameDestroyAllCreatures();
+CombatController *g_combat;
 
 /**
  * Returns true if 'map' points to a Combat Map
@@ -79,22 +79,29 @@ CombatMap *getCombatMap(Map *punknown) {
 	Map *m = punknown ? punknown : g_context->_location->_map;
 	if (!isCombatMap(m))
 		return nullptr;
-	else return dynamic_cast<CombatMap *>(m);
+	else
+		return dynamic_cast<CombatMap *>(m);
 }
 
 /**
  * CombatController class implementation
  */
 CombatController::CombatController() : _map(nullptr) {
+	init();
+
 	g_context->_party->addObserver(this);
 }
 
 CombatController::CombatController(CombatMap *m) : _map(m) {
+	init();
+
 	g_game->setMap(_map, true, nullptr, this);
 	g_context->_party->addObserver(this);
 }
 
-CombatController::CombatController(MapId id) {
+CombatController::CombatController(MapId id) : _map(nullptr) {
+	init();
+
 	_map = getCombatMap(mapMgr->get(id));
 	g_game->setMap(_map, true, nullptr, this);
 	g_context->_party->addObserver(this);
@@ -103,44 +110,66 @@ CombatController::CombatController(MapId id) {
 
 CombatController::~CombatController() {
 	g_context->_party->deleteObserver(this);
+	g_combat = nullptr;
+}
+
+void CombatController::init() {
+	g_combat = this;
+
+	_focus = 0;
+	Common::fill(&_creatureTable[0], &_creatureTable[AREA_CREATURES],
+		(const Creature *)nullptr);
+	_creature = nullptr;
+
+	_camping = false;
+	_forceStandardEncounterSize = false;
+	_placePartyOnMap = false;
+	_placeCreaturesOnMap = false;
+	_winOrLose = false;
+	_showMessage = false;
+	_exitDir = DIR_NONE;
+}
+
+void CombatController::setActive() {
+	MetaEngine::setKeybindingMode(KBMODE_COMBAT);
 }
 
 // Accessor Methods
-bool CombatController::isCamping() const                    {
+bool CombatController::isCamping() const {
 	return _camping;
 }
-bool CombatController::isWinOrLose() const                  {
+bool CombatController::isWinOrLose() const {
 	return _winOrLose;
 }
-Direction CombatController::getExitDir() const              {
+Direction CombatController::getExitDir() const {
 	return _exitDir;
 }
-byte CombatController::getFocus() const            {
+byte CombatController::getFocus() const {
 	return _focus;
 }
-CombatMap *CombatController::getMap() const                 {
+CombatMap *CombatController::getMap() const {
 	return _map;
 }
-Creature *CombatController::getCreature() const               {
+Creature *CombatController::getCreature() const {
 	return _creature;
 }
-PartyMemberVector *CombatController::getParty()             {
+PartyMemberVector *CombatController::getParty() {
 	return &_party;
 }
-PartyMember *CombatController::getCurrentPlayer()           {
+PartyMember *CombatController::getCurrentPlayer() {
 	return _party[_focus];
 }
 
-void CombatController::setExitDir(Direction d)              {
+void CombatController::setExitDir(Direction d) {
 	_exitDir = d;
 }
-void CombatController::setCreature(Creature *m)               {
+void CombatController::setCreature(Creature *m) {
 	_creature = m;
 }
-void CombatController::setWinOrLose(bool worl)              {
+void CombatController::setWinOrLose(bool worl) {
 	_winOrLose = worl;
 }
-void CombatController::showCombatMessage(bool show)         {
+void CombatController::showCombatMessage(bool show) {
 	_showMessage = show;
 }
 
@@ -158,7 +187,7 @@ void CombatController::init(class Creature *m) {
 
 	/* initialize creature info */
 	for (i = 0; i < AREA_CREATURES; i++) {
-		creatureTable[i] = nullptr;
+		_creatureTable[i] = nullptr;
 	}
 
 	for (i = 0; i < AREA_PLAYERS; i++) {
@@ -173,14 +202,15 @@ void CombatController::init(class Creature *m) {
 }
 
 void CombatController::initDungeonRoom(int room, Direction from) {
-	int offset, i;
+	int i;
 	init(nullptr);
 
 	ASSERT(g_context->_location->_prev->_context & CTX_DUNGEON, "Error: called initDungeonRoom from non-dungeon context");
 	{
 		Dungeon *dng = dynamic_cast<Dungeon *>(g_context->_location->_prev->_map);
-		byte *party_x = &dng->_rooms[room]._partyNorthStartX[0],
-			*party_y = &dng->_rooms[room]._partyNorthStartY[0];
+		assert(dng);  
+
+		DngRoom &dngRoom = dng->_rooms[room];
 
 		/* load the dungeon room properties */
 		_winOrLose = false;
@@ -194,32 +224,26 @@ void CombatController::initDungeonRoom(int room, Direction from) {
 				_map->setAltarRoom(VIRT_LOVE);
 			else if (g_context->_location->_prev->_coords.x <= 2)
 				_map->setAltarRoom(VIRT_TRUTH);
-			else _map->setAltarRoom(VIRT_COURAGE);
+			else
+				_map->setAltarRoom(VIRT_COURAGE);
 		}
 
 		/* load in creatures and creature start coordinates */
 		for (i = 0; i < AREA_CREATURES; i++) {
 			if (dng->_rooms[room]._creatureTiles[i] > 0) {
 				_placeCreaturesOnMap = true;
-				creatureTable[i] = creatureMgr->getByTile(dng->_rooms[room]._creatureTiles[i]);
+				_creatureTable[i] = creatureMgr->getByTile(dng->_rooms[room]._creatureTiles[i]);
 			}
-			_map->creature_start[i].x = dng->_rooms[room]._creatureStartX[i];
-			_map->creature_start[i].y = dng->_rooms[room]._creatureStartY[i];
+			_map->creature_start[i].x = dng->_rooms[room]._creatureStart[i].x;
+			_map->creature_start[i].y = dng->_rooms[room]._creatureStart[i].y;
 		}
 
-		/* figure out party start coordinates */
+		// Validate direction
 		switch (from) {
 		case DIR_WEST:
-			offset = 3;
-			break;
 		case DIR_NORTH:
-			offset = 0;
-			break;
 		case DIR_EAST:
-			offset = 1;
-			break;
 		case DIR_SOUTH:
-			offset = 2;
 			break;
 		case DIR_ADVANCE:
 		case DIR_RETREAT:
@@ -227,10 +251,9 @@ void CombatController::initDungeonRoom(int room, Direction from) {
 			error("Invalid 'from' direction passed to initDungeonRoom()");
 		}
 
-		// TODO: Check for possible memory overrun below
 		for (i = 0; i < AREA_PLAYERS; i++) {
-			_map->player_start[i].x = *(party_x + (offset * AREA_PLAYERS * 2) + i);
-			_map->player_start[i].y = *(party_y + (offset * AREA_PLAYERS * 2) + i);
+			_map->player_start[i].x = dngRoom._partyStart[i][from].x;
+			_map->player_start[i].y = dngRoom._partyStart[i][from].y;
 		}
 	}
 }
@@ -269,7 +292,7 @@ void CombatController::begin() {
 
 	/* FIXME: there should be a better way to accomplish this */
 	if (!_camping) {
-		g_music->play();
+		g_music->playMapMusic();
 	}
 
 	/* Set focus to the first active party member, if there is one */
@@ -295,7 +318,7 @@ void CombatController::end(bool adjustKarma) {
 		if (_creature)
 			g_context->_location->_map->removeObject(_creature);
 
-		deathStart(5);
+		g_death->start(5);
 	}
 
 	else {
@@ -304,7 +327,7 @@ void CombatController::end(bool adjustKarma) {
 		bool won = isWon();
 
 		g_game->exitToParentMap();
-		g_music->play();
+		g_music->playMapMusic();
 
 		if (_winOrLose) {
 			if (won) {
@@ -356,7 +379,9 @@ void CombatController::end(bool adjustKarma) {
 
 				if (action != ACTION_NONE)
 					usePortalAt(g_context->_location, g_context->_location->_coords, action);
-			} else g_screen->screenMessage("\n");
+			} else {
+				g_screen->screenMessage("\n");
+			}
 
 			if (_exitDir != DIR_NONE) {
 				g_ultima->_saveGame->_orientation = _exitDir;  /* face the direction exiting the room */
@@ -393,7 +418,7 @@ void CombatController::fillCreatureTable(const Creature *creature) {
 			/* find a free spot in the creature table */
 			do {
 				j = xu4_random(AREA_CREATURES) ;
-			} while (creatureTable[j] != nullptr);
+			} while (_creatureTable[j] != nullptr);
 
 			/* see if creature is a leader or leader's leader */
 			if (creatureMgr->getById(baseCreature->getLeader()) != baseCreature && /* leader is a different creature */
@@ -406,7 +431,7 @@ void CombatController::fillCreatureTable(const Creature *creature) {
 			}
 
 			/* place this creature in the creature table */
-			creatureTable[j] = current;
+			_creatureTable[j] = current;
 		}
 	}
 }
@@ -456,18 +481,18 @@ bool CombatController::isLost() const {
 
 void CombatController::moveCreatures() {
 	Creature *m;
+	CreatureVector creatures = _map->getCreatures();
 
-	// XXX: this iterator is rather complex; but the vector::iterator can
-	// break and crash if we delete elements while iterating it, which we do
-	// if a jinxed monster kills another
-	for (uint i = 0; i < _map->getCreatures().size(); i++) {
-		m = _map->getCreatures().at(i);
-		//GameController::doScreenAnimationsWhilePausing(1);
+	// IMPORTANT: We need to keep regenerating the creatures list,
+	// because monsters may be removed if a jinxed monster kills another
+	for (int i = 0; i < (int)creatures.size(); ++i) {
+		m = creatures[i];
 		m->act(this);
 
-		if (i < _map->getCreatures().size() && _map->getCreatures().at(i) != m) {
-			// don't skip a later creature when an earlier one flees
-			i--;
+		creatures = _map->getCreatures();
+		if (i < (int)creatures.size() && creatures[i] != m) {
+			// Don't skip a later creature when an earlier one flees
+			--i;
 		}
 	}
 }
@@ -476,7 +501,7 @@ void CombatController::placeCreatures() {
 	int i;
 
 	for (i = 0; i < AREA_CREATURES; i++) {
-		const Creature *m = creatureTable[i];
+		const Creature *m = _creatureTable[i];
 		if (m)
 			_map->addCreature(m, _map->creature_start[i]);
 	}
@@ -619,7 +644,6 @@ bool CombatController::rangedAttack(const Coords &coords, Creature *attacker) {
 
 	/* These effects happen whether or not the opponent was hit */
 	switch (effect) {
-
 	case EFFECT_ELECTRICITY:
 		/* FIXME: are there any special effects here? */
 		soundPlay(SOUND_PC_STRUCK, false);
@@ -664,7 +688,8 @@ bool CombatController::rangedAttack(const Coords &coords, Creature *attacker) {
 		// soundPlay(SOUND_PC_STRUCK, false);
 		if (hittile == g_tileSets->findTileByName("magic_flash")->getId())
 			g_screen->screenMessage("\n%s %cMagical Hit%c!\n", target->getName().c_str(), FG_BLUE, FG_WHITE);
-		else g_screen->screenMessage("\n%s Hit!\n", target->getName().c_str());
+		else
+			g_screen->screenMessage("\n%s Hit!\n", target->getName().c_str());
 		attacker->dealDamage(target, attacker->getDamage());
 		break;
 	}
@@ -788,7 +813,9 @@ void CombatController::finishTurn() {
 		          (_party[g_context->_party->getActivePlayer()]) && /* and the active player is still in combat */
 		          !_party[g_context->_party->getActivePlayer()]->isDisabled() && /* and the active player is not disabled */
 		          (g_context->_party->getActivePlayer() != _focus)));
-	} else g_context->_location->_map->_annotations->passTurn();
+	} else {
+		g_context->_location->_map->_annotations->passTurn();
+	}
 
 #if 0
 	if (focus != 0) {
@@ -831,234 +858,23 @@ void CombatController::movePartyMember(MoveEvent &event) {
 	}
 }
 
-// Key handlers
-bool CombatController::keyPressed(int key) {
-	bool valid = true;
-	bool endTurn = true;
-
-	switch (key) {
-	case Common::KEYCODE_UP:
-	case Common::KEYCODE_DOWN:
-	case Common::KEYCODE_LEFT:
-	case Common::KEYCODE_RIGHT:
-		g_context->_location->move(keyToDirection(key), true);
-		break;
-
-	case Common::KEYCODE_ESCAPE:
-		if (settings._debug)
-			end(false);         /* don't adjust karma */
-		else g_screen->screenMessage("Bad command\n");
-
-		break;
-
-	case ' ':
-		g_screen->screenMessage("Pass\n");
-		break;
-
-	case Common::KEYCODE_F1: {
-		if (settings._debug)
-			gameDestroyAllCreatures();
-		else valid = false;
-		break;
-	}
-
-	// Change the speed of battle
-	case '+':
-	case '-':
-	case Common::KEYCODE_KP_ENTER: {
-		int old_speed = settings._battleSpeed;
-		if (key == '+' && ++settings._battleSpeed > MAX_BATTLE_SPEED)
-			settings._battleSpeed = MAX_BATTLE_SPEED;
-		else if (key == '-' && --settings._battleSpeed == 0)
-			settings._battleSpeed = 1;
-		else if (key == Common::KEYCODE_KP_ENTER)
-			settings._battleSpeed = DEFAULT_BATTLE_SPEED;
-
-		if (old_speed != settings._battleSpeed) {
-			if (settings._battleSpeed == DEFAULT_BATTLE_SPEED)
-				g_screen->screenMessage("Battle Speed:\nNormal\n");
-			else if (key == '+')
-				g_screen->screenMessage("Battle Speed:\nUp (%d)\n", settings._battleSpeed);
-			else g_screen->screenMessage("Battle Speed:\nDown (%d)\n", settings._battleSpeed);
-		} else if (settings._battleSpeed == DEFAULT_BATTLE_SPEED)
-			g_screen->screenMessage("Battle Speed:\nNormal\n");
-	}
-
-	valid = false;
-	break;
-
-	/* handle music volume adjustments */
-	case ',':
-		// decrease the volume if possible
-		g_screen->screenMessage("Music: %d%s\n", g_music->decreaseMusicVolume(), "%");
-		endTurn = false;
-		break;
-	case '.':
-		// increase the volume if possible
-		g_screen->screenMessage("Music: %d%s\n", g_music->increaseMusicVolume(), "%");
-		endTurn = false;
-		break;
-
-	/* handle sound volume adjustments */
-	case '<':
-		// decrease the volume if possible
-		g_screen->screenMessage("Sound: %d%s\n", g_music->decreaseSoundVolume(), "%");
-		soundPlay(SOUND_FLEE);
-		endTurn = false;
-		break;
-	case '>':
-		// increase the volume if possible
-		g_screen->screenMessage("Sound: %d%s\n", g_music->increaseSoundVolume(), "%");
-		soundPlay(SOUND_FLEE);
-		endTurn = false;
-		break;
-
-	case 'a':
-		attack();
-		break;
-
-	case 'c':
-		g_screen->screenMessage("Cast Spell!\n");
-		g_debugger->castSpell(_focus);
-		break;
-
-#ifdef IOS_ULTIMA4
-	case Common::KEYCODE_RETURN: // Fall through and get the chest.
-#endif
-	case 'g':
-		g_screen->screenMessage("Get Chest!\n");
-		g_debugger->getChest(_focus);
-		break;
-
-	case 'l':
-		if (settings._debug) {
-			Coords coords = getCurrentPlayer()->getCoords();
-			g_screen->screenMessage("\nLocation:\nx:%d\ny:%d\nz:%d\n", coords.x, coords.y, coords.z);
-			g_screen->screenPrompt();
-			valid = false;
-		} else
-			g_screen->screenMessage("Not here!\n");
-		break;
-
-	case 'r':
-		g_debugger->readyWeapon(getFocus());
-		break;
-
-	case 't':
-		if (settings._debug && _map->isDungeonRoom()) {
-			Dungeon *dungeon = dynamic_cast<Dungeon *>(g_context->_location->_prev->_map);
-			Trigger *triggers = dungeon->_rooms[dungeon->_currentRoom]._triggers;
-			int i;
-
-			g_screen->screenMessage("Triggers!\n");
-
-			for (i = 0; i < 4; i++) {
-				g_screen->screenMessage("%.1d)xy tile xy xy\n", i + 1);
-				g_screen->screenMessage("  %.1X%.1X  %.3d %.1X%.1X %.1X%.1X\n",
-				              triggers[i].x, triggers[i].y,
-				              triggers[i]._tile,
-				              triggers[i]._changeX1, triggers[i]._changeY1,
-				              triggers[i].changeX2, triggers[i].changeY2);
-			}
-			g_screen->screenPrompt();
-			valid = false;
-
-		} else
-			g_screen->screenMessage("Not here!\n");
-		break;
-
-	case 'u':
-		g_screen->screenMessage("Use which item:\n");
-		g_context->_stats->setView(STATS_ITEMS);
-#ifdef IOS_ULTIMA4
-		U4IOS::IOSConversationHelper::setIntroString("Use which item?");
-#endif
-		itemUse(gameGetInput().c_str());
-		break;
-
-	case 'v':
-		if (g_music->toggle())
-			g_screen->screenMessage("Volume On!\n");
-		else
-			g_screen->screenMessage("Volume Off!\n");
-		endTurn = false;
-		break;
-
-	case 'z': {
-		g_context->_stats->setView(StatsView(STATS_CHAR1 + getFocus()));
-
-		/* reset the spell mix menu and un-highlight the current item,
-		   and hide reagents that you don't have */
-		g_context->_stats->resetReagentsMenu();
-
-		g_screen->screenMessage("Ztats\n");
-		ZtatsController ctrl;
-		eventHandler->pushController(&ctrl);
-		ctrl.waitFor();
-	}
-	break;
-
-	case 'b':
-	case 'e':
-	case 'd':
-	case 'f':
-	case 'h':
-	case 'i':
-	case 'j':
-	case 'k':
-	case 'm':
-	case 'n':
-	case 'o':
-	case 'p':
-	case 'q':
-	case 's':
-	case 'w':
-	case 'x':
-	case 'y':
-		g_screen->screenMessage("Not here!\n");
-		break;
-
-	case '0':
-	case '1':
-	case '2':
-	case '3':
-	case '4':
-	case '5':
-	case '6':
-	case '7':
-	case '8':
-	case '9':
-		if (settings._enhancements && settings._enhancementsOptions._activePlayer)
-			gameSetActivePlayer(key - '1');
-		else g_screen->screenMessage("Bad command\n");
-
-		break;
-
-	default:
-		valid = false;
-		break;
-	}
-
-	if (valid) {
-		g_context->_lastCommandTime = g_system->getMillis();
-		if (endTurn && (eventHandler->getController() == this))
-			g_context->_location->_turnCompleter->finishTurn();
-	}
-
-	return valid;
+void CombatController::keybinder(KeybindingAction action) {
+	MetaEngine::executeAction(action);
 }
 
-void CombatController::attack() {
+void CombatController::attack(Direction dir, int distance) {
 	g_screen->screenMessage("Dir: ");
 
 	ReadDirController dirController;
 #ifdef IOS_ULTIMA4
 	U4IOS::IOSDirectionHelper directionPopup;
 #endif
-	eventHandler->pushController(&dirController);
-	Direction dir = dirController.waitFor();
-	if (dir == DIR_NONE)
-		return;
+	if (dir == DIR_NONE) {
+		eventHandler->pushController(&dirController);
+		dir = dirController.waitFor();
+		if (dir == DIR_NONE)
+			return;
+	}
 	g_screen->screenMessage("%s\n", getDirectionName(dir));
 
 	PartyMember *attacker = getCurrentPlayer();
@@ -1067,9 +883,14 @@ void CombatController::attack() {
 	int range = weapon->getRange();
 	if (weapon->canChooseDistance()) {
 		g_screen->screenMessage("Range: ");
-		int choice = ReadChoiceController::get("123456789");
-		if ((choice - '0') >= 1 && (choice - '0') <= weapon->getRange()) {
-			range = choice - '0';
+
+		if (distance == -1) {
+			int choice = ReadChoiceController::get("123456789");
+			distance = choice - '0';
+		}
+
+		if (distance >= 1 && distance <= weapon->getRange()) {
+			range = distance;
 			g_screen->screenMessage("%d\n", range);
 		} else {
 			return;
@@ -1092,7 +913,7 @@ void CombatController::attack() {
 	if (path.size() > 0)
 		targetCoords = path.back();
 
-	int distance = 1;
+	distance = 1;
 	for (Std::vector<Coords>::iterator i = path.begin(); i != path.end(); i++) {
 		if (attackAt(*i, attacker, MASK_DIR(dir), range, distance)) {
 			foundTarget = true;

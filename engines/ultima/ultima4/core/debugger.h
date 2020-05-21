@@ -66,6 +66,11 @@ protected:
 	void printN(const char *fmt, ...) override;
 
 	/**
+	 * Prompts for input, but only if debugger isn't running
+	 */
+	void prompt() override;
+
+	/**
 	 * Gets the direction for an action
 	 */
 	Direction getDirection(int argc, const char **argv);
@@ -126,12 +131,12 @@ private:
 	/**
 	 * Get chest
 	 */
-	bool cmdGet(int argc, const char **argv);
+	bool cmdGetChest(int argc, const char **argv);
 
 	/**
-	 * Hole Up
+	 * Hole Up & Camp
 	 */
-	bool cmdHoleUp(int argc, const char **argv);
+	bool cmdCamp(int argc, const char **argv);
 
 	/**
 	 * Ignite Torch
@@ -157,11 +162,6 @@ private:
 	 * Mix reagents
 	 */
 	bool cmdMixReagents(int argc, const char **argv);
-
-	/**
-	 * Toggles music
-	 */
-	bool cmdMusicToggle(int argc, const char **argv);
 
 	/**
 	 * Exchanges the position of two players in the party.  Prompts the
@@ -209,6 +209,12 @@ private:
 	 * Speed up, down, or normal
 	 */
 	bool cmdSpeed(int argc, const char **argv);
+
+	/**
+	 * Combat speed up, down, or normal
+	 */
+	bool cmdCombatSpeed(int argc, const char **argv);
+
 
 	/**
 	 * Show character stats
@@ -261,9 +267,19 @@ private:
 	bool cmdDestroy(int argc, const char **argv);
 
 	/**
+	 * Destroy all creatures
+	 */
+	bool cmdDestroyCreatures(int argc, const char **argv);
+
+	/**
 	 * Jumps to a given dungeon
 	 */
 	bool cmdDungeon(int argc, const char **argv);
+
+	/**
+	 * Flee from combat
+	 */
+	bool cmdFlee(int argc, const char **argv);
 
 	/**
 	 * All equipement
@@ -326,6 +342,11 @@ private:
 	bool cmdOpacity(int argc, const char **argv);
 
 	/**
+	 * Toggle overhead view
+	 */
+	bool cmdOverhead(int argc, const char **argv);
+
+	/**
 	 * Give all the reagents
 	 */
 	bool cmdReagents(int argc, const char **argv);
@@ -365,6 +386,10 @@ private:
 	 */
 	bool cmdWind(int argc, const char **argv);
 
+	/**
+	 * Lists the triggers in a dungeon room
+	 */
+	bool cmdListTriggers(int argc, const char **argv);
 public:
 	bool _collisionOverride;
 public:
@@ -377,16 +402,6 @@ public:
 	 * user. Otherwise, a non-negative player number is expected
 	 */
 	void getChest(int player = -2);
-
-	/**
-	 * Cast a spell
-	 */
-	void castSpell(int player);
-
-	/**
-	 * Ready a weapon
-	 */
-	void readyWeapon(int player);
 };
 
 extern Debugger *g_debugger;

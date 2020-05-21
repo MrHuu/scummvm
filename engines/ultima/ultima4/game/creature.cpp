@@ -48,8 +48,11 @@ bool isCreature(Object *punknown) {
 		return false;
 }
 
-Creature::Creature(MapTile tile) :
-	Object(Object::CREATURE) {
+Creature::Creature(MapTile tile) : Object(Object::CREATURE),
+		_id(0), _leader(0), _baseHp(0), _hp(0), _xp(0), _ranged(0),
+		_leavesTile(false), _mAttr(MATTR_STEALFOOD),
+		_movementAttr(MATTR_STATIONARY), _slowedType(SLOWED_BY_NOTHING),
+		_encounterSize(0), _resists(0), _spawn(0) {
 	const Creature *m = creatureMgr->getByTile(tile);
 	if (m)
 		*this = *m;
@@ -237,7 +240,7 @@ void Creature::load(const ConfigElement &conf) {
 		_slowedType = SLOWED_BY_NOTHING;
 }
 
-bool Creature::isAttackable() const  {
+bool Creature::isAttackable() const {
 	if (_mAttr & MATTR_NONATTACKABLE)
 		return false;
 	/* can't attack horse transport */
@@ -321,7 +324,6 @@ bool Creature::specialAction() {
 	int broadsidesDirs = 0;
 
 	switch (_id) {
-
 	case LAVA_LIZARD_ID:
 	case SEA_SERPENT_ID:
 	case HYDRA_ID:
@@ -376,7 +378,6 @@ bool Creature::specialEffect() {
 	bool retval = false;
 
 	switch (_id) {
-
 	case STORM_ID: {
 		ObjectDeque::iterator i;
 
@@ -805,7 +806,8 @@ void Creature::removeStatus(StatusType s) {
 	for (i = _status.begin(); i != _status.end();) {
 		if (*i == s)
 			i = _status.erase(i);
-		else i++;
+		else
+			i++;
 	}
 
 	// Just to be sure, if a player is poisoned from a savegame, then they won't have
@@ -830,7 +832,6 @@ bool Creature::applyDamage(int damage, bool byplayer) {
 		AdjustValueMin(_hp, -damage, 0);
 
 	switch (getState()) {
-
 	case MSTAT_DEAD:
 		if (byplayer)
 			g_screen->screenMessage("%c%s Killed!%c\nExp. %d\n", FG_RED, _name.c_str(), FG_WHITE, _xp);
@@ -925,7 +926,8 @@ Creature *CreatureMgr::getById(CreatureId id) {
 	CreatureMap::const_iterator i = _creatures.find(id);
 	if (i != _creatures.end())
 		return i->_value;
-	else return nullptr;
+	else
+		return nullptr;
 }
 
 Creature *CreatureMgr::getByName(Common::String name) {
@@ -1005,7 +1007,8 @@ Creature *CreatureMgr::randomAmbushing() {
 				if (numAmbushingCreatures == randCreature)
 					return i->_value;
 				/* move on to the next creature */
-				else numAmbushingCreatures++;
+				else
+					numAmbushingCreatures++;
 			}
 		}
 	}

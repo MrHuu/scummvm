@@ -28,10 +28,10 @@
 namespace Ultima {
 namespace Ultima8 {
 
-DEFINE_RUNTIME_CLASSTYPE_CODE(GumpNotifyProcess, Process)
+DEFINE_RUNTIME_CLASSTYPE_CODE(GumpNotifyProcess)
 
 GumpNotifyProcess::GumpNotifyProcess()
-	: Process() {
+	: Process(), _gump(0) {
 
 }
 

@@ -23,7 +23,7 @@
 #include "ultima/ultima4/game/person.h"
 #include "ultima/ultima4/game/names.h"
 #include "ultima/ultima4/game/player.h"
-#include "ultima/ultima4/game/stats.h"
+#include "ultima/ultima4/views/stats.h"
 #include "ultima/ultima4/game/context.h"
 #include "ultima/ultima4/game/script.h"
 #include "ultima/ultima4/controllers/read_choice_controller.h"
@@ -44,8 +44,6 @@
 
 namespace Ultima {
 namespace Ultima4 {
-
-using namespace Std;
 
 int chars_needed(const char *s, int columnmax, int linesdesired, int *real_lines);
 
@@ -208,7 +206,7 @@ Common::List<Common::String> Person::getConversationText(Conversation *cnv, cons
 						U4IOS::IOSConversationHelper ipadNumberInput;
 						ipadNumberInput.beginConversation(U4IOS::UIKeyboardTypeNumberPad, "Amount?");
 #endif
-						int val = ReadIntController::get(script->getInputMaxLen(), TEXT_AREA_X + g_context->col, TEXT_AREA_Y + g_context->_line);
+						int val = ReadIntController::get(script->getInputMaxLen(), TEXT_AREA_X + g_context->_col, TEXT_AREA_Y + g_context->_line);
 						script->setVar(script->getInputName(), val);
 					}
 					break;
@@ -218,7 +216,7 @@ Common::List<Common::String> Person::getConversationText(Conversation *cnv, cons
 						U4IOS::IOSConversationHelper ipadNumberInput;
 						ipadNumberInput.beginConversation(U4IOS::UIKeyboardTypeDefault);
 #endif
-						Common::String str = ReadStringController::get(script->getInputMaxLen(), TEXT_AREA_X + g_context->col, TEXT_AREA_Y + g_context->_line);
+						Common::String str = ReadStringController::get(script->getInputMaxLen(), TEXT_AREA_X + g_context->_col, TEXT_AREA_Y + g_context->_line);
 						if (str.size()) {
 							lowercase(str);
 							script->setVar(script->getInputName(), str);
@@ -355,8 +353,8 @@ Common::String Person::getIntro(Conversation *cnv) {
 
 Common::String Person::processResponse(Conversation *cnv, Response *response) {
 	Common::String text;
-	const vector<ResponsePart> &parts = response->getParts();
-	for (vector<ResponsePart>::const_iterator i = parts.begin(); i != parts.end(); i++) {
+	const Std::vector<ResponsePart> &parts = response->getParts();
+	for (Std::vector<ResponsePart>::const_iterator i = parts.begin(); i != parts.end(); i++) {
 
 		// check for command triggers
 		if (i->isCommand())
@@ -370,28 +368,28 @@ Common::String Person::processResponse(Conversation *cnv, Response *response) {
 }
 
 void Person::runCommand(Conversation *cnv, const ResponsePart &command) {
-	if (command == ResponsePart::ASK) {
+	if (command == g_responseParts->ASK) {
 		cnv->_question = _dialogue->getQuestion();
 		cnv->_state = Conversation::ASK;
-	} else if (command == ResponsePart::END) {
+	} else if (command == g_responseParts->END) {
 		cnv->_state = Conversation::DONE;
-	} else if (command == ResponsePart::ATTACK) {
+	} else if (command == g_responseParts->ATTACK) {
 		cnv->_state = Conversation::ATTACK;
-	} else if (command == ResponsePart::BRAGGED) {
+	} else if (command == g_responseParts->BRAGGED) {
 		g_context->_party->adjustKarma(KA_BRAGGED);
-	} else if (command == ResponsePart::HUMBLE) {
+	} else if (command == g_responseParts->HUMBLE) {
 		g_context->_party->adjustKarma(KA_HUMBLE);
-	} else if (command == ResponsePart::ADVANCELEVELS) {
+	} else if (command == g_responseParts->ADVANCELEVELS) {
 		cnv->_state = Conversation::ADVANCELEVELS;
-	} else if (command == ResponsePart::HEALCONFIRM) {
+	} else if (command == g_responseParts->HEALCONFIRM) {
 		cnv->_state = Conversation::CONFIRMATION;
-	} else if (command == ResponsePart::STARTMUSIC_LB) {
+	} else if (command == g_responseParts->STARTMUSIC_LB) {
 		g_music->lordBritish();
-	} else if (command == ResponsePart::STARTMUSIC_HW) {
+	} else if (command == g_responseParts->STARTMUSIC_HW) {
 		g_music->hawkwind();
-	} else if (command == ResponsePart::STOPMUSIC) {
-		g_music->play();
-	} else if (command == ResponsePart::HAWKWIND) {
+	} else if (command == g_responseParts->STOPMUSIC) {
+		g_music->playMapMusic();
+	} else if (command == g_responseParts->HAWKWIND) {
 		g_context->_party->adjustKarma(KA_HAWKWIND);
 	} else {
 		error("unknown command trigger in dialogue response: %s\n", Common::String(command).c_str());
@@ -406,10 +404,10 @@ Common::String Person::getResponse(Conversation *cnv, const char *inquiry) {
 	reply = "\n";
 
 	/* Does the person take action during the conversation? */
-	if (action == ResponsePart::END) {
+	if (action == g_responseParts->END) {
 		runCommand(cnv, action);
 		return _dialogue->getPronoun() + " turns away!\n";
-	} else if (action == ResponsePart::ATTACK) {
+	} else if (action == g_responseParts->ATTACK) {
 		runCommand(cnv, action);
 		return Common::String("\n") + getName() + " says: On guard! Fool!";
 	}
@@ -441,7 +439,7 @@ Common::String Person::getResponse(Conversation *cnv, const char *inquiry) {
 	}
 
 	else if (settings._debug && scumm_strnicmp(inquiry, "dump", 4) == 0) {
-		vector<Common::String> words = split(inquiry, " \t");
+		Std::vector<Common::String> words = split(inquiry, " \t");
 		if (words.size() <= 1)
 			reply = _dialogue->dump("");
 		else
@@ -579,7 +577,8 @@ int chars_needed(const char *s, int columnmax, int linesdesired, int *real_lines
 		lines += linecount(p.c_str(), columnmax);
 		if (lines <= linesdesired)
 			paragraphs += p + "\n";
-		else break;
+		else
+			break;
 		text = text.substr(pos + 1);
 	}
 	// Seems to be some sort of clang compilation bug in this code, that causes this addition

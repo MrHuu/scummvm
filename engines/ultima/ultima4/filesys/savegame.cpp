@@ -28,7 +28,7 @@
 #include "ultima/ultima4/game/object.h"
 #include "ultima/ultima4/game/player.h"
 #include "ultima/ultima4/game/spell.h"
-#include "ultima/ultima4/game/stats.h"
+#include "ultima/ultima4/views/stats.h"
 #include "ultima/ultima4/map/location.h"
 #include "ultima/ultima4/map/mapmgr.h"
 
@@ -37,93 +37,26 @@ namespace Ultima4 {
 
 void SaveGame::save(Common::WriteStream *stream) {
 	Common::Serializer ser(nullptr, stream);
+	assert(g_context && g_context->_location);
 
-	if (g_context->_location) {
-		if (g_context->_location->_prev) {
-			_x = g_context->_location->_coords.x;
-			_y = g_context->_location->_coords.y;
-			_dngLevel = g_context->_location->_coords.z;
-			_dngX = g_context->_location->_prev->_coords.x;
-			_dngY = g_context->_location->_prev->_coords.y;
-		} else {
-			_x = g_context->_location->_coords.x;
-			_y = g_context->_location->_coords.y;
-			_dngLevel = g_context->_location->_coords.z;
-		}
-
-		_location = g_context->_location->_map->_id;
-	}
-
+	_positions.load();
 	synchronize(ser);
 
 	/*
 	 * Save monsters
 	 */
 
-	if (g_context->_location) {
-		// fix creature animations. This was done for compatibility with u4dos,
-		// so may be redundant now
-		g_context->_location->_map->resetObjectAnimations();
-		g_context->_location->_map->fillMonsterTable();
+	// fix creature animations. This was done for compatibility with u4dos,
+	// so may be redundant now
+	g_context->_location->_map->resetObjectAnimations();
+	g_context->_location->_map->fillMonsterTable();
 
-		SaveGameMonsterRecord::synchronize(g_context->_location->_map->_monsterTable, ser);
-	} else {
-		SaveGameMonsterRecord::synchronize(nullptr, ser);
-	}
+	SaveGameMonsterRecord::synchronize(g_context->_location->_map->_monsterTable, ser);
 
 	/**
 	 * Write dungeon info
 	 */
-	if (g_context->_location && g_context->_location->_context & CTX_DUNGEON) {
-		uint x, y, z;
-
-		typedef Std::map<const Creature *, int, Std::PointerHash> DngCreatureIdMap;
-		static DngCreatureIdMap id_map;
-
-		/**
-		 * Map creatures to u4dos dungeon creature Ids
-		 */
-		if (id_map.size() == 0) {
-			id_map[creatureMgr->getById(RAT_ID)] = 1;
-			id_map[creatureMgr->getById(BAT_ID)] = 2;
-			id_map[creatureMgr->getById(GIANT_SPIDER_ID)] = 3;
-			id_map[creatureMgr->getById(GHOST_ID)] = 4;
-			id_map[creatureMgr->getById(SLIME_ID)] = 5;
-			id_map[creatureMgr->getById(TROLL_ID)] = 6;
-			id_map[creatureMgr->getById(GREMLIN_ID)] = 7;
-			id_map[creatureMgr->getById(MIMIC_ID)] = 8;
-			id_map[creatureMgr->getById(REAPER_ID)] = 9;
-			id_map[creatureMgr->getById(INSECT_SWARM_ID)] = 10;
-			id_map[creatureMgr->getById(GAZER_ID)] = 11;
-			id_map[creatureMgr->getById(PHANTOM_ID)] = 12;
-			id_map[creatureMgr->getById(ORC_ID)] = 13;
-			id_map[creatureMgr->getById(SKELETON_ID)] = 14;
-			id_map[creatureMgr->getById(ROGUE_ID)] = 15;
-		}
-
-		for (z = 0; z < g_context->_location->_map->_levels; z++) {
-			for (y = 0; y < g_context->_location->_map->_height; y++) {
-				for (x = 0; x < g_context->_location->_map->_width; x++) {
-					byte tile = g_context->_location->_map->translateToRawTileIndex(*g_context->_location->_map->getTileFromData(MapCoords(x, y, z)));
-					Object *obj = g_context->_location->_map->objectAt(MapCoords(x, y, z));
-
-					/**
-					 * Add the creature to the tile
-					 */
-					if (obj && obj->getType() == Object::CREATURE) {
-						const Creature *m = dynamic_cast<Creature *>(obj);
-						DngCreatureIdMap::iterator m_id = id_map.find(m);
-						if (m_id != id_map.end())
-							tile |= m_id->_value;
-					}
-
-					// Write the tile
-					stream->writeByte(tile);
-				}
-			}
-		}
-
-
+	if (g_context->_location && g_context->_location->_prev) {
 		/**
 		 * Write out monsters
 		 */
@@ -139,6 +72,8 @@ void SaveGame::save(Common::WriteStream *stream) {
 
 void SaveGame::load(Common::SeekableReadStream *stream) {
 	Common::Serializer *ser = nullptr;
+	assert(g_context);
+
 	if (stream) {
 		ser = new Common::Serializer(stream, nullptr);
 		synchronize(*ser);
@@ -147,45 +82,31 @@ void SaveGame::load(Common::SeekableReadStream *stream) {
 	// initialize our party
 	if (g_context->_party) {
 		g_context->_party->deleteObserver(g_game);
+		delete g_context->_party;
 	}
 	g_context->_party = new Party(this);
 	g_context->_party->addObserver(g_game);
 
 	// Delete any prior map
-	if (g_context->_location && g_context->_location->_prev) {
-		g_context->_location->_prev->deleteObserver(g_game);
-		delete g_context->_location->_prev;
-		g_context->_location->_prev = nullptr;
-	}
-	if (g_context->_location) {
-		g_context->_location->deleteObserver(g_game);
-		delete g_context->_location;
-		g_context->_location = nullptr;
-	}
+	while (g_context->_location)
+		locationFree(&g_context->_location);
 
 	// set the map to the world map
-	g_game->setMap(mapMgr->get(MAP_WORLD), 0, nullptr);
+	Map *map = mapMgr->get(MAP_WORLD);
+	g_game->setMap(map, 0, nullptr);
+	assert(g_context->_location && g_context->_location->_map);
 	g_context->_location->_map->clearObjects();
 
-	// initialize our start location
-	Map *map = mapMgr->get(MapId(_location));
+	// initialize the moons (must be done from the world map)
+	g_game->initMoons();
 
-	// if our map is not the world map, then load our map
-	if (map->_type != Map::WORLD)
+	// initialize overworld position and any secondary map we're in
+	g_context->_location->_coords = _positions[0];
+
+	for (uint idx = 1; idx < _positions.size(); ++idx) {
+		map = mapMgr->get(_positions[idx]._map);
 		g_game->setMap(map, 1, nullptr);
-	else
-		// initialize the moons (must be done from the world map)
-		g_game->initMoons();
-
-
-	/**
-	 * Translate info from the savegame to something we can use
-	 */
-	if (g_context->_location->_prev) {
-		g_context->_location->_coords = MapCoords(_x, _y, _dngLevel);
-		g_context->_location->_prev->_coords = MapCoords(_dngX, _dngY);
-	} else {
-		g_context->_location->_coords = MapCoords(_x, _y, (int)_dngLevel);
+		g_context->_location->_coords = _positions[idx];
 	}
 
 	/**
@@ -209,8 +130,8 @@ void SaveGame::load(Common::SeekableReadStream *stream) {
 		gameFixupObjects(g_context->_location->_prev->_map);
 	}
 
-	spellSetEffectCallback(&gameSpellEffect);
-	itemSetDestroyAllCreaturesCallback(&gameDestroyAllCreatures);
+	g_spells->spellSetEffectCallback(&gameSpellEffect);
+	g_items->setDestroyAllCreaturesCallback(&gameDestroyAllCreatures);
 
 	g_context->_stats->resetReagentsMenu();
 
@@ -261,9 +182,10 @@ void SaveGame::synchronize(Common::Serializer &s) {
 	for (i = 0; i < SPELL_MAX; ++i)
 		s.syncAsUint16LE(_mixtures[i]);
 
+	_positions.synchronize(s);
+	s.syncAsUint16LE(_orientation);
+
 	s.syncAsUint16LE(_items);
-	s.syncAsByte(_x);
-	s.syncAsByte(_y);
 	s.syncAsByte(_stones);
 	s.syncAsByte(_runes);
 	s.syncAsUint16LE(_members);
@@ -277,11 +199,6 @@ void SaveGame::synchronize(Common::Serializer &s) {
 	s.syncAsUint16LE(_lastReagent);
 	s.syncAsUint16LE(_lastMeditation);
 	s.syncAsUint16LE(_lastVirtue);
-	s.syncAsByte(_dngX);
-	s.syncAsByte(_dngY);
-	s.syncAsUint16LE(_orientation);
-	s.syncAsUint16LE(_dngLevel);
-	s.syncAsUint16LE(_location);
 }
 
 void SaveGame::init(const SaveGamePlayerRecord *avatarInfo) {
@@ -318,8 +235,6 @@ void SaveGame::init(const SaveGamePlayerRecord *avatarInfo) {
 		_mixtures[i] = 0;
 
 	_items = 0;
-	_x = 0;
-	_y = 0;
 	_stones = 0;
 	_runes = 0;
 	_members = 1;
@@ -333,11 +248,7 @@ void SaveGame::init(const SaveGamePlayerRecord *avatarInfo) {
 	_lastReagent = 0;
 	_lastMeditation = 0;
 	_lastVirtue = 0;
-	_dngX = 0;
-	_dngY = 0;
 	_orientation = 0;
-	_dngLevel = 0xFFFF;
-	_location = 0;
 }
 
 /*-------------------------------------------------------------------*/
@@ -352,8 +263,8 @@ void SaveGamePlayerRecord::synchronize(Common::Serializer &s) {
 	s.syncAsUint16LE(_mp);
 	s.syncAsUint16LE(_unknown);
 	s.syncAsUint16LE(_weapon);
-	s.syncAsUint16LE(armor);
-	s.syncBytes((byte *)name, 16);
+	s.syncAsUint16LE(_armor);
+	s.syncBytes((byte *)_name, 16);
 	s.syncAsByte(_sex);
 	s.syncAsByte(_class);
 	s.syncAsByte(_status);
@@ -371,10 +282,10 @@ void SaveGamePlayerRecord::init() {
 	_mp = 0;
 	_unknown = 0;
 	_weapon = WEAP_HANDS;
-	armor = ARMR_NONE;
+	_armor = ARMR_NONE;
 
 	for (i = 0; i < 16; ++i)
-		name[i] = '\0';
+		_name[i] = '\0';
 
 	_sex = SEX_MALE;
 	_class = CLASS_MAGE;
@@ -415,6 +326,37 @@ void SaveGameMonsterRecord::synchronize(SaveGameMonsterRecord *monsterTable, Com
 		s.syncAsByte(monsterTable[i]._unused1);
 	for (i = 0; i < MONSTERTABLE_SIZE; ++i)
 		s.syncAsByte(monsterTable[i]._unused2);
+}
+
+/*-------------------------------------------------------------------*/
+
+void LocationCoordsArray::load() {
+	clear();
+
+	for (Location *l = g_context->_location; l; l = l->_prev)
+		insert_at(0, LocationCoords(l->_map->_id, l->_coords));
+}
+
+void LocationCoords::synchronize(Common::Serializer &s) {
+	s.syncAsByte(x);
+	s.syncAsByte(y);
+	s.syncAsByte(z);
+	s.syncAsByte(_map);
+}
+
+/*-------------------------------------------------------------------*/
+
+void LocationCoordsArray::synchronize(Common::Serializer &s) {
+	byte count = size();
+	s.syncAsByte(count);
+
+	if (s.isLoading())
+		resize(count);
+
+	for (uint idx = 0; idx < count; ++idx)
+		(*this)[idx].synchronize(s);
+
+	assert(!empty() && (*this)[0]._map == MAP_WORLD);
 }
 
 } // End of namespace Ultima4

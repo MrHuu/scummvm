@@ -1508,12 +1508,60 @@ static const uint16 ecoquest2PatchEcorderLily[] = {
 	PATCH_END
 };
 
+// Objects that you can hide behind in rooms 530 and 560 all have messages that
+//  are supposed to display when clicking Do after Gonzales leaves camp, but
+//  their doVerb methods are missing a call to super:doVerb. We fix this by
+//  patching the doVerb methods to call super:doVerb instead of doing nothing.
+//
+// Applies to: All versions
+// Responsible methods: crates:doVerb, barrel1-4:doVerb, refuse:doVerb in 530,
+//  bullldozer:doVerb, barrel1-5:doVerb, crates:doVerb in 560
+static const uint16 ecoquest2SignatureCampMessages1[] = {
+	0x30, SIG_UINT16(0x0033),           // bnt 0033 [ end of method ]
+	SIG_ADDTOOFFSET(+10),
+	0x30, SIG_UINT16(0x0026),           // bnt 0026 [ end of method ]
+	SIG_ADDTOOFFSET(+8),
+	0x30, SIG_UINT16(0x001b),           // bnt 001b [ end of method ]
+	0x38, SIG_SELECTOR16(setScript),    // pushi setScript
+	0x39, SIG_MAGICDWORD, 0x03,         // pushi 03
+	0x72, SIG_UINT16(0x00cc),           // lofsa sRunHide
+	SIG_ADDTOOFFSET(+10),
+	0x38, SIG_SELECTOR16(doVerb),       // pushi doVerb
+	SIG_END
+};
+
+static const uint16 ecoquest2PatchCampMessages1[] = {
+	0x30, PATCH_UINT16(0x002a),         // bnt 002a [ super doVerb: verb ]
+	PATCH_ADDTOOFFSET(+10),
+	0x30, PATCH_UINT16(0x001d),         // bnt 001d [ super doVerb: verb ]
+	PATCH_ADDTOOFFSET(+8),
+	0x30, PATCH_UINT16(0x0012),         // bnt 0012 [ super doVerb: verb ]
+	PATCH_END
+};
+
+static const uint16 ecoquest2SignatureCampMessages2[] = {
+	0x30, SIG_UINT16(0x001b),           // bnt 001b [ end of method ]
+	0x38, SIG_SELECTOR16(setScript),    // pushi setScript
+	0x39, SIG_MAGICDWORD, 0x03,         // pushi 03
+	0x72, SIG_UINT16(0x0154),           // lofsa sRunHide
+	SIG_ADDTOOFFSET(+10),
+	0x38, SIG_SELECTOR16(doVerb),       // pushi doVerb
+	SIG_END
+};
+
+static const uint16 ecoquest2PatchCampMessages2[] = {
+	0x30, PATCH_UINT16(0x0012),         // bnt 0012 [ super doVerb: verb ]
+	PATCH_END
+};
+
 //          script, description,                                        signature                          patch
 static const SciScriptPatcherEntry ecoquest2Signatures[] = {
 	{  true,     0, "icon bar tutorial",                            10, ecoquest2SignatureIconBarTutorial, ecoquest2PatchIconBarTutorial },
 	{  true,    50, "initial text not removed on ecorder",           1, ecoquest2SignatureEcorder,         ecoquest2PatchEcorder },
 	{  true,   333, "initial text not removed on ecorder tutorial",  1, ecoquest2SignatureEcorderTutorial, ecoquest2PatchEcorderTutorial },
 	{  true,   500, "room 500 items reappear",                       1, ecoquest2SignatureRoom500Items,    ecoquest2PatchRoom500Items },
+	{  true,   530, "missing camp messages",                         6, ecoquest2SignatureCampMessages1,   ecoquest2PatchCampMessages1 },
+	{  true,   560, "missing camp messages",                         7, ecoquest2SignatureCampMessages2,   ecoquest2PatchCampMessages2 },
 	{  true,   702, "ecorder not highlighting lilies",               3, ecoquest2SignatureEcorderLily,     ecoquest2PatchEcorderLily },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };
@@ -1755,6 +1803,13 @@ static const uint16 freddypharkasPatchMacInventory[] = {
 //
 // We work around this by setting macSound:loop correctly on the heap so that it
 //  only plays once and macThing proceeds.
+//
+// This buggy script didn't break in the original because the Mac interpreter
+//  didn't support looping sounds. It always played sounds just once and then 
+//  signaled when they were complete and ignored the value of the loop property.
+//  This was most apparent in the KQ6 Mac port. All the room music, which was
+//  designed to loop, stopped abruptly after a minute in a room and then
+//  jarringly returned when changing rooms.
 //
 // Applies to: Mac Floppy
 // Responsible method: Heap in script 270
@@ -4504,6 +4559,71 @@ static const uint16 kq6CDPatchWallFlowerDanceFix[] = {
 	PATCH_END
 };
 
+// In room 300 at the bottom of the logic cliffs, clicking Walk while Alexander
+//  randomly wobbles on lower steps causes him to float around the room. Scripts
+//  attempt to prevent this by ignoring Walk when ego:view is 301 and ego:loop
+//  is 3, which is wobbling animation, but this is incomplete because egoWobbles
+//  also animates with view 3011. The rest of the cliff rooms directly test if
+//  egoWobbles is running and so they don't have this bug. egoWobbles isn't
+//  exported so room 300 is left testing ego's state.
+//
+// We fix this by adding the missing test for view 3011 so that the Walk verb is
+//  successfully ignored whenever egoWobbles is running.
+//
+// Applies to: All versions
+// Responsible methods: beach:doVerb, WalkFeature:doVerb
+static const uint16 kq6SignatureCliffStepFloatFix[] = {
+	0x36,                               // push
+	0x34, SIG_UINT16(0x012d),           // ldi 012d
+	0x1a,                               // eq?      [ ego:view == 301 ]
+	0x31, 0x12,                         // bnt 12   [ not wobbling ]
+	0x39, 0x03,                         // pushi 03 [ loop ]
+	0x76,                               // push0
+	0x81, 0x00,                         // lag 00
+	0x4a, 0x04,                         // send 04  [ ego loop? ]
+	0x36,                               // push
+	0x35, SIG_MAGICDWORD, 0x03,         // ldi 03
+	0x1a,                               // eq?      [ ego:loop == 3 ]
+	0x31, 0x05,                         // bnt 05   [ not wobbling ]
+	0x35, 0x00,                         // ldi 00
+	0x32, SIG_ADDTOOFFSET(+2),          // jmp      [ end of method ]
+	0x76,                               // push0    [ y ]
+	0x76,                               // push0
+	0x81, 0x00,                         // lag 00
+	0x4a, 0x04,                         // send 04  [ ego y? ]
+	0x36,                               // push
+	0x35, 0x26,                         // ldi 26
+	0x22,                               // lt?      [ ego:y < 38 ]
+	SIG_ADDTOOFFSET(+17),
+	0x32,                               // jmp      [ end of method ]
+	SIG_END
+};
+
+static const uint16 kq6PatchCliffStepFloatFix[] = {
+	0x38, PATCH_UINT16(0x0bc3),         // pushi 0bc3
+	0x1a,                               // eq?      [ ego:view == 3011 ]
+	0x2f, 0x12,                         // bt 12    [ wobbling ]
+	0x60,                               // pprev
+	0x34, PATCH_UINT16(0x012d),         // ldi 012d
+	0x1a,                               // eq?      [ ego:view == 301 ]
+	0x31, 0x0d,                         // bnt 0d   [ not wobbling ]
+	0x39, 0x03,                         // pushi 03
+	0x3c,                               // dup      [ loop ]
+	0x76,                               // push0
+	0x81, 0x00,                         // lag 00
+	0x4a, 0x04,                         // send 04  [ ego loop? ]
+	0x1a,                               // eq?      [ ego:loop == 3 ]
+	0x31, 0x02,                         // bnt 02   [ not wobbling ]
+	0x33, 0x1a,                         // jmp 1a   [ end of method ]
+	0x76,                               // push0    [ y ]
+	0x76,                               // push0
+	0x81, 0x00,                         // lag 00
+	0x4a, 0x04,                         // send 04  [ ego y? ]
+	0x39, 0x26,                         // pushi 26
+	0x20,                               // ge?      [ 38 >= ego:y ]
+	PATCH_END
+};
+
 // KQ6 truncates messages longer than 400 characters in the CD and Mac versions.
 //  This is most prominent when reading Cassima's letter to Alexander. When the
 //  Messager class was upgraded to support audio, a 400 character buffer was
@@ -4561,7 +4681,6 @@ static const uint16 kq6PatchTruncatedMessagesFix[] = {
 	0x32, PATCH_UINT16(0x0009),         // jmp 0009
 	PATCH_END
 };
-
 
 // Audio + subtitles support - SHARED! - used for King's Quest 6 and Laura Bow 2.
 //  This patch gets enabled when the user selects "both" in the ScummVM
@@ -4980,6 +5099,7 @@ static const uint16 kq6CDPatchAudioTextMenuSupport[] = {
 static const SciScriptPatcherEntry kq6Signatures[] = {
 	{  true,    87, "fix Drink Me bottle",                            1, kq6SignatureDrinkMeFix,                   kq6PatchDrinkMeFix },
 	{ false,    87, "Mac: Drink Me pic",                              1, kq6SignatureMacDrinkMePic,                kq6PatchMacDrinkMePic },
+	{  true,   300, "fix floating off steps",                         2, kq6SignatureCliffStepFloatFix,            kq6PatchCliffStepFloatFix },
 	{  true,   480, "CD: fix wallflower dance",                       1, kq6CDSignatureWallFlowerDanceFix,         kq6CDPatchWallFlowerDanceFix },
 	{  true,   481, "fix duplicate baby cry",                         1, kq6SignatureDuplicateBabyCry,             kq6PatchDuplicateBabyCry },
 	{  true,   640, "fix 'Tickets, only' message",                    1, kq6SignatureTicketsOnly,                  kq6PatchTicketsOnly },
@@ -6838,6 +6958,35 @@ static const uint16 laurabow1PatchCopyProtectionRandomFix[] = {
 	PATCH_END
 };
 
+// At the end of the game a dialog asks if you'd like to review your notes.
+//  Pressing the escape key dismisses the dialog and locks up the game with the
+//  menu and input disabled. The script is missing a handler for this result.
+//  We fix this by repeating the dialog when escape is pressed, just like the
+//  other dialogs do in room 786. Sierra fixed this in later versions.
+//
+// Applies to: DOS
+// Responsible method: Notes:changeState(1)
+static const uint16 laurabow1SignatureReviewNotesDialog[] = {
+	0x39, 0x0f,                         // pushi 0f
+	SIG_ADDTOOFFSET(+0x20),
+	SIG_MAGICDWORD,
+	0x7a,                               // push2
+	0x47, 0xff, 0x00, 0x1e,             // calle proc255_0 [ print dialog ]
+	0x36,                               // push
+	0x3c,                               // dup
+	0x35, 0x01,                         // ldi 01
+	0x1a,                               // eq?
+	SIG_END
+};
+
+static const uint16 laurabow1PatchReviewNotesDialog[] = {
+	PATCH_ADDTOOFFSET(+0x27),
+	0x31, 0xd7,                         // bnt -29 [ repeat dialog if escape pressed ]
+	0x36,                               // push
+	0x78,                               // push1
+	PATCH_END
+};
+
 //          script, description,                                signature                                             patch
 static const SciScriptPatcherEntry laurabow1Signatures[] = {
 	{  true,     4, "easter egg view fix",                      1, laurabow1SignatureEasterEggViewFix,                laurabow1PatchEasterEggViewFix },
@@ -6851,6 +7000,7 @@ static const SciScriptPatcherEntry laurabow1Signatures[] = {
 	{  true,   236, "tell Lilly about Gertie blocking fix 1/2", 1, laurabow1SignatureTellLillyAboutGerieBlockingFix1, laurabow1PatchTellLillyAboutGertieBlockingFix1 },
 	{  true,   236, "tell Lilly about Gertie blocking fix 2/2", 1, laurabow1SignatureTellLillyAboutGerieBlockingFix2, laurabow1PatchTellLillyAboutGertieBlockingFix2 },
 	{  true,   414, "copy protection random fix",               1, laurabow1SignatureCopyProtectionRandomFix,         laurabow1PatchCopyProtectionRandomFix },
+	{  true,   786, "review notes dialog fix",                  1, laurabow1SignatureReviewNotesDialog,               laurabow1PatchReviewNotesDialog },
 	{  true,   998, "obstacle collision lockups fix",           1, laurabow1SignatureObstacleCollisionLockupsFix,     laurabow1PatchObstacleCollisionLockupsFix },
 	SCI_SIGNATUREENTRY_TERMINATOR
 };

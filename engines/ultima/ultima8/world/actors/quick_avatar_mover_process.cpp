@@ -35,7 +35,7 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(QuickAvatarMoverProcess, Process)
+DEFINE_RUNTIME_CLASSTYPE_CODE(QuickAvatarMoverProcess)
 
 ProcId QuickAvatarMoverProcess::_amp[6] = { 0, 0, 0, 0, 0, 0 };
 bool QuickAvatarMoverProcess::_clipping = false;
@@ -140,7 +140,7 @@ void QuickAvatarMoverProcess::terminateMover(int dir) {
 	Kernel *kernel = Kernel::get_instance();
 
 	QuickAvatarMoverProcess *p =
-	    p_dynamic_cast<QuickAvatarMoverProcess *>(kernel->getProcess(_amp[dir]));
+	    dynamic_cast<QuickAvatarMoverProcess *>(kernel->getProcess(_amp[dir]));
 
 	if (p && !p->is_terminated())
 		p->terminate();
@@ -152,7 +152,7 @@ void QuickAvatarMoverProcess::startMover(int x, int y, int z, int dir) {
 		Process *p = new QuickAvatarMoverProcess(x, y, z, dir);
 		Kernel::get_instance()->addProcess(p);
 	} else {
-		pout << "Can't: avatarInStasis" << Std::endl;
+		pout << "Can't quickmove: avatarInStasis" << Std::endl;
 	}
 }
 

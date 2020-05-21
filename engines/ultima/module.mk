@@ -178,8 +178,6 @@ MODULE_OBJS := \
 	ultima4/game/death.o \
 	ultima4/game/game.o \
 	ultima4/game/item.o \
-	ultima4/game/menu.o \
-	ultima4/game/menuitem.o \
 	ultima4/game/moongate.o \
 	ultima4/game/names.o \
 	ultima4/game/object.o \
@@ -188,9 +186,6 @@ MODULE_OBJS := \
 	ultima4/game/portal.o \
 	ultima4/game/script.o \
 	ultima4/game/spell.o \
-	ultima4/game/stats.o \
-	ultima4/game/textview.o \
-	ultima4/game/view.o \
 	ultima4/game/weapon.o \
 	ultima4/gfx/image.o \
 	ultima4/gfx/imageloader.o \
@@ -198,14 +193,12 @@ MODULE_OBJS := \
 	ultima4/gfx/imageloader_png.o \
 	ultima4/gfx/imageloader_u4.o \
 	ultima4/gfx/imagemgr.o \
-	ultima4/gfx/imageview.o \
 	ultima4/gfx/scale.o \
 	ultima4/gfx/screen.o \
 	ultima4/map/annotation.o \
 	ultima4/map/city.o \
 	ultima4/map/direction.o \
 	ultima4/map/dungeon.o \
-	ultima4/map/dungeonview.o \
 	ultima4/map/map_tile.o \
 	ultima4/map/movement.o \
 	ultima4/map/shrine.o \
@@ -217,10 +210,16 @@ MODULE_OBJS := \
 	ultima4/map/tileanim.o \
 	ultima4/map/tilemap.o \
 	ultima4/map/tileset.o \
-	ultima4/map/tileview.o \
 	ultima4/sound/music.o \
 	ultima4/sound/sound.o \
-	ultima4/sound/sound_scummvm.o \
+	ultima4/views/dungeonview.o \
+	ultima4/views/imageview.o \
+	ultima4/views/menu.o \
+	ultima4/views/menuitem.o \
+	ultima4/views/stats.o \
+	ultima4/views/textview.o \
+	ultima4/views/tileview.o \
+	ultima4/views/view.o \
 	ultima4/meta_engine.o \
 	ultima4/ultima4.o \
 	nuvie/meta_engine.o \
@@ -390,9 +389,11 @@ MODULE_OBJS := \
 	ultima8/audio/music_flex.o \
 	ultima8/audio/music_process.o \
 	ultima8/audio/raw_audio_sample.o \
+	ultima8/audio/remorse_music_process.o \
 	ultima8/audio/sonarc_audio_sample.o \
 	ultima8/audio/sound_flex.o \
 	ultima8/audio/speech_flex.o \
+	ultima8/audio/u8_music_process.o \
 	ultima8/conf/config_file_manager.o \
 	ultima8/conf/ini_file.o \
 	ultima8/conf/setting_manager.o \
@@ -411,10 +412,12 @@ MODULE_OBJS := \
 	ultima8/games/game_data.o \
 	ultima8/games/game_info.o \
 	ultima8/games/remorse_game.o \
+	ultima8/games/start_crusader_process.o \
 	ultima8/games/start_u8_process.o \
 	ultima8/games/treasure_loader.o \
 	ultima8/games/u8_game.o \
 	ultima8/graphics/anim_dat.o \
+	ultima8/graphics/avi_player.o \
 	ultima8/graphics/base_soft_render_surface.o \
 	ultima8/graphics/frame_id.o \
 	ultima8/graphics/fade_to_modal_process.o \
@@ -456,6 +459,13 @@ MODULE_OBJS := \
 	ultima8/gumps/book_gump.o \
 	ultima8/gumps/container_gump.o \
 	ultima8/gumps/credits_gump.o \
+	ultima8/gumps/cru_ammo_gump.o \
+	ultima8/gumps/cru_energy_gump.o \
+	ultima8/gumps/cru_health_gump.o \
+	ultima8/gumps/cru_inventory_gump.o \
+	ultima8/gumps/cru_stat_gump.o \
+	ultima8/gumps/cru_status_gump.o \
+	ultima8/gumps/cru_weapon_gump.o \
 	ultima8/gumps/desktop_gump.o \
 	ultima8/gumps/fast_area_vis_gump.o \
 	ultima8/gumps/game_map_gump.o \
@@ -474,6 +484,7 @@ MODULE_OBJS := \
 	ultima8/gumps/paperdoll_gump.o \
 	ultima8/gumps/quit_gump.o \
 	ultima8/gumps/readable_gump.o \
+	ultima8/gumps/remorse_menu_gump.o \
 	ultima8/gumps/resizable_gump.o \
 	ultima8/gumps/scaler_gump.o \
 	ultima8/gumps/scroll_gump.o \
@@ -485,25 +496,18 @@ MODULE_OBJS := \
 	ultima8/gumps/widgets/edit_widget.o \
 	ultima8/gumps/widgets/sliding_widget.o \
 	ultima8/gumps/widgets/text_widget.o \
-	ultima8/kernel/allocator.o \
 	ultima8/kernel/core_app.o \
 	ultima8/kernel/delay_process.o \
-	ultima8/kernel/hid_keys.o \
 	ultima8/kernel/kernel.o \
-	ultima8/kernel/memory_manager.o \
 	ultima8/kernel/mouse.o \
 	ultima8/kernel/object.o \
 	ultima8/kernel/object_manager.o \
-	ultima8/kernel/pool.o \
 	ultima8/kernel/process.o \
-	ultima8/kernel/segmented_allocator.o \
-	ultima8/kernel/segmented_pool.o \
 	ultima8/misc/args.o \
 	ultima8/misc/debugger.o \
 	ultima8/misc/encoding.o \
 	ultima8/misc/id_man.o \
 	ultima8/misc/istring.o \
-	ultima8/misc/pent_include.o \
 	ultima8/misc/util.o \
 	ultima8/usecode/bit_set.o \
 	ultima8/usecode/uc_list.o \

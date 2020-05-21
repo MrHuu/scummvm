@@ -30,10 +30,6 @@
 namespace Ultima {
 namespace Ultima4 {
 
-#ifdef random
-#undef random
-#endif
-
 /**
  * An xml-scripting class. It loads and runs xml scripts that
  * take information and interact with the game environment itself.
@@ -284,7 +280,7 @@ private:
 	/**
 	 * Randomely executes script code
 	 */
-	ReturnCode random(Shared::XMLNode *script, Shared::XMLNode *current);
+	ReturnCode randomScript(Shared::XMLNode *script, Shared::XMLNode *current);
 
 	/**
 	 * Moves the player's current position
@@ -412,7 +408,7 @@ private:
 	 */
 private:
 	typedef Std::map<Common::String, Action> ActionMap;
-	static ActionMap _actionMap;
+	ActionMap _actionMap;
 
 private:
 	void removeCurrentVariable(const Common::String &name);

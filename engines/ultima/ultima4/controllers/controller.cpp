@@ -42,13 +42,19 @@ bool Controller::notifyKeyPressed(int key) {
 	return processed;
 }
 
+bool Controller::notifyMousePress(const Common::Point &mousePos) {
+	return mousePressed(mousePos);
+}
+
+
 int Controller::getTimerInterval() {
 	return _timerInterval;
 }
 
 void Controller::setActive() {
-	// Controllers by default won't use the keybindings
-	MetaEngine::setKeybindingsActive(false);
+	// By default, only the Escape action is turned on for controllers,
+	// to allow the different sorts of input prompts to be aborted
+	MetaEngine::setKeybindingMode(KBMODE_MINIMAL);
 }
 
 void Controller::timerFired() {

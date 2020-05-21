@@ -38,11 +38,6 @@
 namespace Ultima {
 namespace Ultima4 {
 
-/**
- * Attempt to move the avatar in the given direction.  User event
- * should be set if the avatar is being moved in response to a
- * keystroke.  Returns zero if the avatar is blocked.
- */
 void moveAvatar(MoveEvent &event) {
 	MapCoords newCoords;
 	int slowed = 0;
@@ -128,9 +123,6 @@ void moveAvatar(MoveEvent &event) {
 	event._result = (MoveResult)(MOVE_SUCCEEDED | MOVE_END_TURN);
 }
 
-/**
- * Moves the avatar while in dungeon view
- */
 void moveAvatarInDungeon(MoveEvent &event) {
 	MapCoords newCoords;
 	Direction realDir = dirNormalize((Direction)g_ultima->_saveGame->_orientation, event._dir); /* get our real direction */
@@ -325,6 +317,7 @@ int moveCombatObject(int act, Map *map, Creature *obj, MapCoords target) {
 void movePartyMember(MoveEvent &event) {
 	CombatController *ct = dynamic_cast<CombatController *>(eventHandler->getController());
 	CombatMap *cm = getCombatMap();
+	assert(cm && ct);
 	int member = ct->getFocus();
 	MapCoords newCoords;
 	PartyMemberVector *party = ct->getParty();
@@ -371,9 +364,10 @@ void movePartyMember(MoveEvent &event) {
 		// Handle dungeon room triggers
 		if (cm->isDungeonRoom()) {
 			Dungeon *dungeon = dynamic_cast<Dungeon *>(g_context->_location->_prev->_map);
-			int i;
+			assert(dungeon);
 			Trigger *triggers = dungeon->_rooms[dungeon->_currentRoom]._triggers;
 
+			int i;
 			for (i = 0; i < 4; i++) {
 				/*const Creature *m = creatures.getByTile(triggers[i].tile);*/
 

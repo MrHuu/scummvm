@@ -32,18 +32,19 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_class stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(SpriteProcess, Process)
+DEFINE_RUNTIME_CLASSTYPE_CODE(SpriteProcess)
 
 SpriteProcess::SpriteProcess()
-	: Process() {
-
+	: Process(), _shape(0), _frame(0), _firstFrame(0), _lastFrame(0),
+	_repeats(0), _delay(0), _x(0), _y(0), _z(0), _delayCounter(0),
+	_initialized(false) {
 }
 
-SpriteProcess::SpriteProcess(int Shape, int Frame, int LastFrame,
-                             int Repeats, int Delay, int x, int y, int z,
+SpriteProcess::SpriteProcess(int shape, int frame, int lastFrame,
+                             int repeats, int delay, int x, int y, int z,
                              bool delayed_init) :
-	_shape(Shape), _frame(Frame), _firstFrame(Frame), _lastFrame(LastFrame),
-	_repeats(Repeats), _delay(Delay * 2), _x(x), _y(y), _z(z), _delayCounter(0),
+	_shape(shape), _frame(frame), _firstFrame(frame), _lastFrame(lastFrame),
+	_repeats(repeats), _delay(delay * 2), _x(x), _y(y), _z(z), _delayCounter(0),
 	_initialized(false) {
 	if (!delayed_init)
 		init();
@@ -87,13 +88,13 @@ void SpriteProcess::run() {
 	_delayCounter = (_delayCounter + 1) % _delay;
 }
 
-// createSprite(_shape, _frame, end,               _delay, _x, _y, _z);
-// createSprite(_shape, _frame, end, unk, _repeats, _delay, _x, _y, _z);
+// createSprite(shape, frame, end,               delay, x, y, z);
+// createSprite(shape, frame, end, unk, repeats, delay, x, y, z);
 uint32 SpriteProcess::I_createSprite(const uint8 *args, unsigned int argsize) {
 	int repeats = 1;
-	ARG_SINT16(_shape);
-	ARG_SINT16(_frame);
-	ARG_SINT16(_lastFrame);
+	ARG_SINT16(shape);
+	ARG_SINT16(frame);
+	ARG_SINT16(lastFrame);
 
 	if (argsize == 18) {
 		ARG_SINT16(unknown);
@@ -101,11 +102,11 @@ uint32 SpriteProcess::I_createSprite(const uint8 *args, unsigned int argsize) {
 		repeats = repeats_count;
 	}
 
-	ARG_SINT16(_delay);
-	ARG_UINT16(_x);
-	ARG_UINT16(_y);
-	ARG_UINT8(_z);
-	Process *p = new SpriteProcess(_shape, _frame, _lastFrame, repeats, _delay, _x, _y, _z);
+	ARG_SINT16(delay);
+	ARG_UINT16(x);
+	ARG_UINT16(y);
+	ARG_UINT8(z);
+	Process *p = new SpriteProcess(shape, frame, lastFrame, repeats, delay, x, y, z);
 	return Kernel::get_instance()->addProcess(p);
 }
 

@@ -52,7 +52,7 @@ PartyMember::PartyMember(Party *p, SaveGamePlayerRecord *pr) :
 	_party(p) {
 	/* FIXME: we need to rename movement behaviors */
 	setMovementBehavior(MOVEMENT_ATTACK_AVATAR);
-	this->_ranged = Weapon::get(pr->_weapon)->getRange() ? 1 : 0;
+	this->_ranged = g_weapons->get(pr->_weapon)->getRange() ? 1 : 0;
 	setStatus(pr->_status);
 }
 
@@ -103,22 +103,26 @@ Common::String PartyMember::translate(Std::vector<Common::String> &parts) {
 			if (parts[1] == "cure") {
 				if (getStatus() == STAT_POISONED)
 					return "true";
-				else return "false";
+				else
+					return "false";
 			} else if (parts[1] == "heal" || parts[1] == "fullheal") {
 				if (getHp() < getMaxHp())
 					return "true";
-				else return "false";
+				else
+					return "false";
 			} else if (parts[1] == "resurrect") {
 				if (getStatus() == STAT_DEAD)
 					return "true";
-				else return "false";
+				else
+					return "false";
 			}
 		}
 	}
+
 	return "";
 }
 
-int PartyMember::getHp() const      {
+int PartyMember::getHp() const {
 	return _player->_hp;
 }
 
@@ -161,22 +165,22 @@ int PartyMember::getMaxMp() const {
 }
 
 const Weapon *PartyMember::getWeapon() const {
-	return Weapon::get(_player->_weapon);
+	return g_weapons->get(_player->_weapon);
 }
 
-const Armor *PartyMember::getArmor() const   {
-	return Armor::get(_player->armor);
+const Armor *PartyMember::getArmor() const {
+	return g_armors->get(_player->_armor);
 }
 
-Common::String PartyMember::getName() const          {
-	return _player->name;
+Common::String PartyMember::getName() const {
+	return _player->_name;
 }
 
-SexType PartyMember::getSex() const          {
+SexType PartyMember::getSex() const {
 	return _player->_sex;
 }
 
-ClassType PartyMember::getClass() const      {
+ClassType PartyMember::getClass() const {
 	return _player->_class;
 }
 
@@ -281,7 +285,6 @@ void PartyMember::awardXp(int xp) {
 
 bool PartyMember::heal(HealType type) {
 	switch (type) {
-
 	case HT_NONE:
 		return true;
 
@@ -368,7 +371,7 @@ EquipError PartyMember::setArmor(const Armor *a) {
 	if (type != ARMR_NONE)
 		_party->_saveGame->_armor[type]--;
 
-	_player->armor = type;
+	_player->_armor = type;
 	notifyOfChange();
 
 	return EQUIP_SUCCEEDED;
@@ -413,9 +416,11 @@ bool PartyMember::applyDamage(int damage, bool) {
 	if (isCombatMap(g_context->_location->_map) && getStatus() == STAT_DEAD) {
 		Coords p = getCoords();
 		Map *map = getMap();
+
+		assert(_party);
 		map->_annotations->add(p, g_tileSets->findTileByName("corpse")->getId())->setTTL(_party->size() * 2);
 
-		if (_party) {
+		{
 			_party->setChanged();
 			PartyEvent event(PartyEvent::PLAYER_KILLED, this);
 			event._player = this;
@@ -431,13 +436,13 @@ bool PartyMember::applyDamage(int damage, bool) {
 }
 
 int PartyMember::getAttackBonus() const {
-	if (Weapon::get(_player->_weapon)->alwaysHits() || _player->_dex >= 40)
+	if (g_weapons->get(_player->_weapon)->alwaysHits() || _player->_dex >= 40)
 		return 255;
 	return _player->_dex;
 }
 
 int PartyMember::getDefense() const {
-	return Armor::get(_player->armor)->getDefense();
+	return g_armors->get(_player->_armor)->getDefense();
 }
 
 bool PartyMember::dealDamage(Creature *m, int damage) {
@@ -456,7 +461,7 @@ bool PartyMember::dealDamage(Creature *m, int damage) {
 int PartyMember::getDamage() {
 	int maxDamage;
 
-	maxDamage = Weapon::get(_player->_weapon)->getDamage();
+	maxDamage = g_weapons->get(_player->_weapon)->getDamage();
 	maxDamage += _player->_str;
 	if (maxDamage > 255)
 		maxDamage = 255;
@@ -547,7 +552,8 @@ MapTile PartyMember::tileForClass(int klass) {
 /*-------------------------------------------------------------------*/
 
 Party::Party(SaveGame *s) : _saveGame(s), _transport(0), _torchDuration(0), _activePlayer(-1) {
-	if (MAP_DECEIT <= _saveGame->_location && _saveGame->_location <= MAP_ABYSS)
+	MapId map = _saveGame->_positions.back()._map;
+	if (map >= MAP_DECEIT && map <= MAP_ABYSS)
 		_torchDuration = _saveGame->_torchDuration;
 	for (int i = 0; i < _saveGame->_members; i++) {
 		// add the members to the party
@@ -560,6 +566,8 @@ Party::Party(SaveGame *s) : _saveGame(s), _transport(0), _torchDuration(0), _act
 }
 
 Party::~Party() {
+	for (uint idx = 0; idx < _members.size(); ++idx)
+		delete _members[idx];
 }
 
 void Party::notifyOfChange(PartyMember *pm, PartyEvent::Type eventType) {
@@ -625,11 +633,11 @@ Common::String Party::translate(Std::vector<Common::String> &parts) {
 
 		else if (parts.size() == 2) {
 			if (parts[0] == "weapon") {
-				const Weapon *w = Weapon::get(parts[1]);
+				const Weapon *w = g_weapons->get(parts[1]);
 				if (w)
 					return xu4_to_string(_saveGame->_weapons[w->getType()]);
 			} else if (parts[0] == "armor") {
-				const Armor *a = Armor::get(parts[1]);
+				const Armor *a = g_armors->get(parts[1]);
 				if (a)
 					return xu4_to_string(_saveGame->_armor[a->getType()]);
 			}
@@ -787,15 +795,20 @@ void Party::applyEffect(TileEffect effect) {
 		case EFFECT_NONE:
 		case EFFECT_ELECTRICITY:
 			_members[i]->applyEffect(effect);
+			break;
 		case EFFECT_LAVA:
 		case EFFECT_FIRE:
 		case EFFECT_SLEEP:
 			if (xu4_random(2) == 0)
 				_members[i]->applyEffect(effect);
+			break;
 		case EFFECT_POISONFIELD:
 		case EFFECT_POISON:
 			if (xu4_random(5) == 0)
 				_members[i]->applyEffect(effect);
+			break;
+		default:
+			break;
 		}
 	}
 }
@@ -833,7 +846,7 @@ bool Party::canPersonJoin(Common::String name, Virtue *v) {
 		return 0;
 
 	for (i = 1; i < 8; i++) {
-		if (name == _saveGame->_players[i].name) {
+		if (name == _saveGame->_players[i]._name) {
 			if (v)
 				*v = (Virtue) _saveGame->_players[i]._class;
 			return true;
@@ -970,7 +983,7 @@ bool Party::isPersonJoined(Common::String name) {
 		return false;
 
 	for (i = 1; i < _saveGame->_members; i++) {
-		if (name == _saveGame->_players[i].name)
+		if (name == _saveGame->_players[i]._name)
 			return true;
 	}
 	return false;
@@ -981,7 +994,7 @@ CannotJoinError Party::join(Common::String name) {
 	SaveGamePlayerRecord tmp;
 
 	for (i = _saveGame->_members; i < 8; i++) {
-		if (name == _saveGame->_players[i].name) {
+		if (name == _saveGame->_players[i]._name) {
 
 			/* ensure avatar is experienced enough */
 			if (_saveGame->_members + 1 > (_saveGame->_players[0]._hpMax / 100))

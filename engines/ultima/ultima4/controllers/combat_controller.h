@@ -70,6 +70,11 @@ public:
 		return true;
 	}
 
+	/**
+	 * Called when a controller is made active
+	 */
+	void setActive() override;
+
 	bool isCamping() const;
 	bool isWinOrLose() const;
 	Direction getExitDir() const;
@@ -152,10 +157,7 @@ public:
 	virtual void awardLoot();
 
 	// attack functions
-	/**
-	 * Key handler for choosing an attack direction
-	 */
-	void attack();
+	void attack(Direction dir = DIR_NONE, int distance = 0);
 	bool attackAt(const Coords &coords, PartyMember *attacker, int dir, int range, int distance);
 	bool rangedAttack(const Coords &coords, Creature *attacker);
 	void rangedMiss(const Coords &coords, Creature *attacker);
@@ -168,8 +170,7 @@ public:
 	static void attackFlash(const Coords &coords, const Common::String &tilename, int timeFactor);
 	static void doScreenAnimationsWhilePausing(int timeFactor);
 
-	// Key handlers
-	bool keyPressed(int key) override;
+	void keybinder(KeybindingAction action) override;
 
 	void finishTurn() override;
 
@@ -186,7 +187,7 @@ protected:
 	PartyMemberVector _party;
 	byte _focus;
 
-	const Creature *creatureTable[AREA_CREATURES];
+	const Creature *_creatureTable[AREA_CREATURES];
 	Creature *_creature;
 
 	bool _camping;
@@ -200,7 +201,11 @@ protected:
 private:
 	CombatController(const CombatController &);
 	const CombatController &operator=(const CombatController &);
+
+	void init();
 };
+
+extern CombatController *g_combat;
 
 /**
  * CombatMap class
@@ -208,6 +213,7 @@ private:
 class CombatMap : public Map {
 public:
 	CombatMap();
+	~CombatMap() override {}
 
 	/**
 	 * Returns a vector containing all of the creatures on the map
@@ -237,13 +243,13 @@ public:
 	static MapId mapForTile(const Tile *ground, const Tile *transport, Object *obj);
 
 	// Getters
-	bool isDungeonRoom() const      {
+	bool isDungeonRoom() const {
 		return _dungeonRoom;
 	}
-	bool isAltarRoom() const        {
+	bool isAltarRoom() const {
 		return _altarRoom != VIRT_NONE;
 	}
-	bool isContextual() const       {
+	bool isContextual() const {
 		return _contextual;
 	}
 	BaseVirtue getAltarRoom() const {
@@ -254,10 +260,10 @@ public:
 	void setAltarRoom(BaseVirtue ar) {
 		_altarRoom = ar;
 	}
-	void setDungeonRoom(bool d)     {
+	void setDungeonRoom(bool d) {
 		_dungeonRoom = d;
 	}
-	void setContextual(bool c)      {
+	void setContextual(bool c) {
 		_contextual = c;
 	}
 

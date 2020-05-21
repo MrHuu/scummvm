@@ -21,7 +21,7 @@
  */
 
 #include "ultima/ultima4/controllers/reagents_menu_controller.h"
-#include "ultima/ultima4/game/menu.h"
+#include "ultima/ultima4/views/menu.h"
 #include "ultima/ultima4/game/spell.h"
 
 namespace Ultima {
@@ -65,17 +65,20 @@ bool ReagentsMenuController::keyPressed(int key) {
 		eventHandler->setControllerDone();
 		break;
 
-	case Common::KEYCODE_ESCAPE:
-		_ingredients->revert();
-		eventHandler->setControllerDone();
-		break;
-
 	default:
 		return MenuController::keyPressed(key);
 	}
 
 	return true;
 }
+
+void ReagentsMenuController::keybinder(KeybindingAction action) {
+	if (action == KEYBIND_ESCAPE) {
+		_ingredients->revert();
+		eventHandler->setControllerDone();
+	}
+}
+
 
 } // End of namespace Ultima4
 } // End of namespace Ultima

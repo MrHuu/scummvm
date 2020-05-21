@@ -67,13 +67,18 @@ int usePortalAt(Location *location, MapCoords coords, PortalTriggerAction action
 		/* if it's a dungeon, then ladders are predictable.  Create one! */
 		if (location->_context == CTX_DUNGEON) {
 			Dungeon *dungeon = dynamic_cast<Dungeon *>(location->_map);
+			assert(dungeon);
+
 			if ((action & ACTION_KLIMB) && dungeon->ladderUpAt(coords))
 				createDngLadder(location, action, &dngLadder);
 			else if ((action & ACTION_DESCEND) && dungeon->ladderDownAt(coords))
 				createDngLadder(location, action, &dngLadder);
-			else return 0;
+			else
+				return 0;
 			portal = &dngLadder;
-		} else return 0;
+		} else {
+			return 0;
+		}
 	}
 
 	/* conditions not met for portal to work */
@@ -96,12 +101,14 @@ int usePortalAt(Location *location, MapCoords coords, PortalTriggerAction action
 		case ACTION_KLIMB:
 			if (portal->_exitPortal)
 				sprintf(msg, "Klimb up!\nLeaving...\n");
-			else sprintf(msg, "Klimb up!\nTo level %d\n", portal->_start.z + 1);
+			else
+				sprintf(msg, "Klimb up!\nTo level %d\n", portal->_start.z + 1);
 			break;
 		case ACTION_ENTER:
 			switch (destination->_type) {
 			case Map::CITY: {
 				City *city = dynamic_cast<City *>(destination);
+				assert(city);
 				g_screen->screenMessage("Enter %s!\n\n%s\n\n", city->_type.c_str(), city->getName().c_str());
 			}
 			break;
@@ -136,14 +143,14 @@ int usePortalAt(Location *location, MapCoords coords, PortalTriggerAction action
 	/* portal just exits to parent map */
 	if (portal->_exitPortal) {
 		g_game->exitToParentMap();
-		g_music->play();
+		g_music->playMapMusic();
 		return 1;
 	} else if (portal->_destid == location->_map->_id)
 		location->_coords = portal->_start;
 
 	else {
 		g_game->setMap(destination, portal->_saveLocation, portal);
-		g_music->play();
+		g_music->playMapMusic();
 	}
 
 	/* if the portal changes the map retroactively, do it here */
@@ -158,6 +165,7 @@ int usePortalAt(Location *location, MapCoords coords, PortalTriggerAction action
 
 	if (destination->_type == Map::SHRINE) {
 		Shrine *shrine = dynamic_cast<Shrine *>(destination);
+		assert(shrine);
 		shrine->enter();
 	}
 

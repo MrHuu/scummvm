@@ -32,10 +32,6 @@
 namespace Ultima {
 namespace Ultima4 {
 
-using Std::map;
-using Common::String;
-using Std::vector;
-
 bool ImageInfo::hasBlackBackground() {
 	return this->_filetype == "image/x-u4raw";
 }
@@ -48,7 +44,7 @@ public:
 	Common::String _name;
 	Common::String _location;
 	Common::String _extends;
-	map<Common::String, ImageInfo *> _info;
+	Std::map<Common::String, ImageInfo *> _info;
 };
 
 ImageMgr *ImageMgr::_instance = nullptr;
@@ -68,7 +64,7 @@ void ImageMgr::destroy() {
 	}
 }
 
-ImageMgr::ImageMgr() {
+ImageMgr::ImageMgr() : _baseSet(nullptr), _abyssData(nullptr) {
 	settings.addObserver(this);
 }
 
@@ -77,6 +73,8 @@ ImageMgr::~ImageMgr() {
 
 	for (Std::map<Common::String, ImageSet *>::iterator i = _imageSets.begin(); i != _imageSets.end(); i++)
 		delete i->_value;
+
+	delete[] _abyssData;
 }
 
 void ImageMgr::init() {
@@ -84,34 +82,33 @@ void ImageMgr::init() {
 	 * register the "screen" image representing the entire screen
 	 */
 	Image *screen = Image::createScreenImage();
-	ImageInfo *screenInfo = new ImageInfo();
 
-	screenInfo->_name = "screen";
-	screenInfo->_filename = "";
-	screenInfo->_width = screen->width();
-	screenInfo->_height = screen->height();
-	screenInfo->_depth = 0;
-	screenInfo->_prescale = 0;
-	screenInfo->_filetype = "";
-	screenInfo->_tiles = 0;
-	screenInfo->_introOnly = false;
-	screenInfo->_transparentIndex = -1;
-	screenInfo->_xu4Graphic = false;
-	screenInfo->_fixup = FIXUP_NONE;
-	screenInfo->_image = screen;
+	_screenInfo._name = "screen";
+	_screenInfo._filename = "";
+	_screenInfo._width = screen->width();
+	_screenInfo._height = screen->height();
+	_screenInfo._depth = 0;
+	_screenInfo._prescale = 0;
+	_screenInfo._filetype = "";
+	_screenInfo._tiles = 0;
+	_screenInfo._introOnly = false;
+	_screenInfo._transparentIndex = -1;
+	_screenInfo._xu4Graphic = false;
+	_screenInfo._fixup = FIXUP_NONE;
+	_screenInfo._image = screen;
 
 	/*
 	 * register all the images declared in the config files
 	 */
 	const Config *config = Config::getInstance();
-	vector<ConfigElement> graphicsConf = config->getElement("graphics").getChildren();
+	Std::vector<ConfigElement> graphicsConf = config->getElement("graphics").getChildren();
 	for (Std::vector<ConfigElement>::iterator conf = graphicsConf.begin(); conf != graphicsConf.end(); conf++) {
 		if (conf->getName() == "imageset") {
 			ImageSet *set = loadImageSetFromConf(*conf);
 			_imageSets[set->_name] = set;
 
 			// all image sets include the "screen" image
-			set->_info[screenInfo->_name] = screenInfo;
+			set->_info[_screenInfo._name] = &_screenInfo;
 		}
 	}
 
@@ -130,7 +127,7 @@ ImageSet *ImageMgr::loadImageSetFromConf(const ConfigElement &conf) {
 	set->_location = conf.getString("location");
 	set->_extends = conf.getString("extends");
 
-	vector<ConfigElement> children = conf.getChildren();
+	Std::vector<ConfigElement> children = conf.getChildren();
 	for (Std::vector<ConfigElement>::iterator i = children.begin(); i != children.end(); i++) {
 		if (i->getName() == "image") {
 			ImageInfo *info = loadImageInfoFromConf(*i);
@@ -163,7 +160,7 @@ ImageInfo *ImageMgr::loadImageInfoFromConf(const ConfigElement &conf) {
 	info->_fixup = static_cast<ImageFixup>(conf.getEnum("fixup", fixupEnumStrings));
 	info->_image = nullptr;
 
-	vector<ConfigElement> children = conf.getChildren();
+	Std::vector<ConfigElement> children = conf.getChildren();
 	for (Std::vector<ConfigElement>::iterator i = children.begin(); i != children.end(); i++) {
 		if (i->getName() == "subimage") {
 			SubImage *subimage = loadSubImageFromConf(info, *i);
@@ -183,12 +180,13 @@ SubImage *ImageMgr::loadSubImageFromConf(const ImageInfo *info, const ConfigElem
 
 	subimage = new SubImage();
 	subimage->_name = conf.getString("name");
-	subimage->width = conf.getInt("width");
-	subimage->height = conf.getInt("height");
+	subimage->setWidth(conf.getInt("width"));
+	subimage->setHeight(conf.getInt("height"));
 	subimage->_srcImageName = info->_name;
 	if (conf.exists("x") && conf.exists("y")) {
-		x = subimage->x = conf.getInt("x");
-		y = subimage->y = conf.getInt("y");
+		x = conf.getInt("x");
+		y = conf.getInt("y");
+		subimage->moveTo(x, y);
 	} else {
 		// Automatically increment our position through the base image
 		x += last_width;
@@ -197,13 +195,12 @@ SubImage *ImageMgr::loadSubImageFromConf(const ImageInfo *info, const ConfigElem
 			y += last_height;
 		}
 
-		subimage->x = x;
-		subimage->y = y;
+		subimage->moveTo(x, y);
 	}
 
 	// "remember" the width and height of this subimage
-	last_width = subimage->width;
-	last_height = subimage->height;
+	last_width = subimage->width();
+	last_height = subimage->height();
 
 	return subimage;
 }
@@ -336,10 +333,10 @@ void ImageMgr::fixupIntro(Image *im, int prescale) {
 		im->setPaletteFromImage(borderInfo->_image);
 
 		// update the color of "and" and "present"
-		im->setPaletteIndex(15, im->setColor(226, 226, 255));
+		(void)im->setPaletteIndex(15, im->setColor(226, 226, 255));
 
 		// update the color of "Origin Systems, Inc."
-		im->setPaletteIndex(9, im->setColor(129, 129, 255));
+		(void)im->setPaletteIndex(9, im->setColor(129, 129, 255));
 
 #ifdef TODO
 		borderInfo->_image->save("border.png");
@@ -398,30 +395,32 @@ void ImageMgr::fixupIntro(Image *im, int prescale) {
 }
 
 void ImageMgr::fixupAbyssVision(Image *im, int prescale) {
-	static uint *data = nullptr;
+	// Ignore fixups for xu4 PNG images - they're already correct
+	if (im->isIndexed())
+		return;
 
 	/*
 	 * Each VGA vision components must be XORed with all the previous
 	 * vision components to get the actual image.
 	 */
-	if (data != nullptr) {
+	if (_abyssData) {
 		for (int y = 0; y < im->height(); y++) {
 			for (int x = 0; x < im->width(); x++) {
 				uint index;
 				im->getPixelIndex(x, y, index);
-				index ^= data[y * im->width() + x];
+				index ^= _abyssData[y * im->width() + x];
 				im->putPixelIndex(x, y, index);
 			}
 		}
 	} else {
-		data = new uint[im->width() * im->height()];
+		_abyssData = new uint[im->width() * im->height()];
 	}
 
 	for (int y = 0; y < im->height(); y++) {
 		for (int x = 0; x < im->width(); x++) {
 			uint index;
 			im->getPixelIndex(x, y, index);
-			data[y * im->width() + x] = index;
+			_abyssData[y * im->width() + x] = index;
 		}
 	}
 }
@@ -672,7 +671,7 @@ void ImageMgr::freeIntroBackgrounds() {
 	}
 }
 
-const vector<Common::String> &ImageMgr::getSetNames() {
+const Std::vector<Common::String> &ImageMgr::getSetNames() {
 	return _imageSetNames;
 }
 

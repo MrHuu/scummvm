@@ -60,6 +60,10 @@ Tile::Tile(Tileset *tileset)
 	, _animationRule("") {
 }
 
+Tile::~Tile() {
+	deleteImage();
+}
+
 void Tile::loadProperties(const ConfigElement &conf) {
 	if (conf.getName() != "tile")
 		return;
@@ -83,7 +87,9 @@ void Tile::loadProperties(const ConfigElement &conf) {
 		rule = g_tileRules->findByName(conf.getString("rule"));
 		if (rule == nullptr)
 			rule = g_tileRules->findByName("default");
-	} else rule = g_tileRules->findByName("default");
+	} else {
+		rule = g_tileRules->findByName("default");
+	}
 
 	// Get the number of frames the tile has
 	_frames = conf.getInt("frames", 1);
@@ -153,18 +159,24 @@ void Tile::loadImage() {
 			info->_image->alphaOff();
 
 		if (info) {
-			_w = (subimage ? subimage->width *_scale : info->_width * _scale / info->_prescale);
-			_h = (subimage ? (subimage->height * _scale) / _frames : (info->_height * _scale / info->_prescale) / _frames);
+			_w = (subimage ? subimage->width() *_scale : info->_width * _scale / info->_prescale);
+			_h = (subimage ? (subimage->height() * _scale) / _frames : (info->_height * _scale / info->_prescale) / _frames);
 			_image = Image::create(_w, _h * _frames, false, Image::HARDWARE);
 
 
 			//info->image->alphaOff();
 
 			// Draw the tile from the image we found to our tile image
+			Image *tiles = info->_image;
+			assert(tiles);
+
 			if (subimage) {
-				Image *tiles = info->_image;
-				tiles->drawSubRectOn(_image, 0, 0, subimage->x * _scale, subimage->y * _scale, subimage->width * _scale, subimage->height * _scale);
-			} else info->_image->drawOn(_image, 0, 0);
+				tiles->drawSubRectOn(_image, 0, 0,
+					subimage->left * _scale, subimage->top * _scale,
+					subimage->width() * _scale, subimage->height() * _scale);
+			} else {
+				tiles->drawOn(_image, 0, 0);
+			}
 		}
 
 		if (_animationRule.size() > 0) {

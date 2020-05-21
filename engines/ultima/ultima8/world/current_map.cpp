@@ -126,7 +126,7 @@ void CurrentMap::writeback() {
 				}
 
 				// Reset the egg
-				Egg *egg = p_dynamic_cast<Egg *>(item);
+				Egg *egg = dynamic_cast<Egg *>(item);
 				if (egg) {
 					egg->reset();
 				}
@@ -237,9 +237,9 @@ void CurrentMap::addItem(Item *item) {
 	_items[cx][cy].push_front(item);
 	item->setExtFlag(Item::EXT_INCURMAP);
 
-	Egg *egg = p_dynamic_cast<Egg *>(item);
+	Egg *egg = dynamic_cast<Egg *>(item);
 	if (egg) {
-		EggHatcherProcess *ehp = p_dynamic_cast<EggHatcherProcess *>(Kernel::get_instance()->getProcess(_eggHatcher));
+		EggHatcherProcess *ehp = dynamic_cast<EggHatcherProcess *>(Kernel::get_instance()->getProcess(_eggHatcher));
 		assert(ehp);
 		ehp->addEgg(egg);
 	}
@@ -263,9 +263,9 @@ void CurrentMap::addItemToEnd(Item *item) {
 	_items[cx][cy].push_back(item);
 	item->setExtFlag(Item::EXT_INCURMAP);
 
-	Egg *egg = p_dynamic_cast<Egg *>(item);
+	Egg *egg = dynamic_cast<Egg *>(item);
 	if (egg) {
-		EggHatcherProcess *ehp = p_dynamic_cast<EggHatcherProcess *>(Kernel::get_instance()->getProcess(_eggHatcher));
+		EggHatcherProcess *ehp = dynamic_cast<EggHatcherProcess *>(Kernel::get_instance()->getProcess(_eggHatcher));
 		assert(ehp);
 		ehp->addEgg(egg);
 	}
@@ -485,7 +485,7 @@ void CurrentMap::areaSearch(UCList *itemlist, const uint8 *loopscript,
 
 				if (recurse) {
 					// recurse into child-containers
-					const Container *container = p_dynamic_cast<const Container *>(item);
+					const Container *container = dynamic_cast<const Container *>(item);
 					if (container)
 						container->containerSearch(itemlist, loopscript,
 						                           scriptsize, recurse);
@@ -582,7 +582,7 @@ TeleportEgg *CurrentMap::findDestination(uint16 id) {
 			item_list::iterator iter;
 			for (iter = _items[i][j].begin();
 			        iter != _items[i][j].end(); ++iter) {
-				TeleportEgg *egg = p_dynamic_cast<TeleportEgg *>(*iter);
+				TeleportEgg *egg = dynamic_cast<TeleportEgg *>(*iter);
 				if (egg) {
 					if (!egg->isTeleporter() && egg->getTeleportId() == id)
 						return egg;
@@ -697,7 +697,7 @@ bool CurrentMap::isValidPosition(int32 x, int32 y, int32 z,
 
 				// check xy overlap
 				if (!(x <= ix - ixd || x - xd >= ix ||
-				        y <= iy - iyd || y - yd >= iy)) {
+				      y <= iy - iyd || y - yd >= iy)) {
 					// check support
 					if (support == nullptr && si->is_solid() &&
 					        iz + izd == z) {
@@ -722,7 +722,7 @@ bool CurrentMap::isValidPosition(int32 x, int32 y, int32 z,
 	return valid;
 }
 
-bool CurrentMap::scanForValidPosition(int32 x, int32 y, int32 z, Item *item,
+bool CurrentMap::scanForValidPosition(int32 x, int32 y, int32 z, const Item *item,
                                       int movedir, bool wantsupport,
                                       int32 &tx, int32 &ty, int32 &tz) {
 	// TODO: clean this up. Currently the mask arrays are filled with more
@@ -890,7 +890,7 @@ bool CurrentMap::scanForValidPosition(int32 x, int32 y, int32 z, Item *item,
 bool CurrentMap::sweepTest(const int32 start[3], const int32 end[3],
                            const int32 dims[3], uint32 shapeflags,
                            ObjId item, bool blocking_only,
-                           Std::list<SweepItem> *hit) {
+                           Std::list<SweepItem> *hit) const {
 	const uint32 blockflagmask = (ShapeInfo::SI_SOLID | ShapeInfo::SI_DAMAGING);
 
 	int minx = ((start[0] - dims[0]) / _mapChunkSize) - 1;
@@ -1085,7 +1085,7 @@ bool CurrentMap::sweepTest(const int32 start[3], const int32 end[3],
 
 					// Small speed up.
 					if (sw_it != hit->end()) {
-						SweepItem &si = *sw_it;
+						const SweepItem &si = *sw_it;
 						if (si._hitTime > first) sw_it = hit->begin();
 					} else
 						sw_it = hit->begin();

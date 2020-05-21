@@ -27,6 +27,7 @@
 #include "ultima/ultima8/graphics/render_surface.h"
 #include "ultima/ultima8/ultima8.h"
 #include "ultima/ultima8/graphics/shape.h"
+#include "ultima/ultima8/graphics/shape_frame.h"
 #include "ultima/ultima8/graphics/shape_info.h"
 
 #include "ultima/ultima8/graphics/fonts/rendered_text.h"
@@ -49,23 +50,29 @@
 namespace Ultima {
 namespace Ultima8 {
 
-DEFINE_RUNTIME_CLASSTYPE_CODE(ShapeViewerGump, ModalGump)
+DEFINE_RUNTIME_CLASSTYPE_CODE(ShapeViewerGump)
 
 ShapeViewerGump::ShapeViewerGump()
-	: ModalGump(), _curFlex(0), _flex(nullptr), _curShape(0),
-	_curFrame(0), _background(0) {
+	: ModalGump(), _curFlex(0), _flex(nullptr), _curShape(0), _curFrame(0),
+	  _background(0), _fontNo(0), _shapeW(0), _shapeH(0), _shapeX(0), _shapeY(0) {
 
 }
 
 ShapeViewerGump::ShapeViewerGump(int x, int y, int width, int height,
                                  Std::vector<Std::pair<Std::string, ShapeArchive *> > &flexes,
                                  uint32 flags, int32 layer)
-		: ModalGump(x, y, width, height, 0, flags, layer),
-		_flexes(flexes), _curFlex(0), _curShape(0), _curFrame(0), _background(0) {
+		: ModalGump(x, y, width, height, 0, flags, layer), _flexes(flexes),
+		_curFlex(0), _curShape(0), _curFrame(0), _background(0), _fontNo(0),
+		_shapeW(0), _shapeH(0), _shapeX(0), _shapeY(0) {
 	if (_flexes.size())
 		_flex = _flexes[0].second;
 	else
 		_flex = nullptr;
+
+	if (GAME_IS_CRUSADER) {
+		// Default to a decent font on Crusader
+		_fontNo = 6;
+	}
 }
 
 ShapeViewerGump::~ShapeViewerGump() {
@@ -91,44 +98,85 @@ void ShapeViewerGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool /*s
 	Shape *shape_ = _flex->getShape(_curShape);
 	if (shape_ && _curFrame < shape_->frameCount())
 		surf->Paint(shape_, _curFrame, posx, posy);
-
+	
 	RenderedText *rendtext;
-	Font *font = FontManager::get_instance()->getGameFont(0, true);
+	Font *font = FontManager::get_instance()->getGameFont(_fontNo, true);
+	if (!font)
+		return;
+
 	unsigned int remaining;
 
-	char buf1[50];
-	char buf2[200];
-	if (!shape_) {
-		sprintf(buf1, "NULL");
-	} else {
-		sprintf(buf1, "Frame %d of %d", _curFrame, shape_->frameCount());
-	}
-	sprintf(buf2, "%s  :  Shape %d, %s", _flexes[_curFlex].first.c_str(),
-	        _curShape, buf1);
-	rendtext = font->renderText(buf2, remaining);
-	rendtext->draw(surf, 20, 10);
-	delete rendtext;
-
-	MainShapeArchive *mainshapes = p_dynamic_cast<MainShapeArchive *>(_flex);
-	if (!mainshapes || !shape_) return;
-
-	char buf3[128];
-	char buf4[128];
-	char buf5[128];
-	char buf6[512];
-	ShapeInfo *info = mainshapes->getShapeInfo(_curShape);
-	if (info) {
-		sprintf(buf3, "x: %d, y: %d, z: %d\n flags: 0x%04X, family: %d",
-		        info->_x, info->_y, info->_z, info->_flags, info->_family);
-		sprintf(buf4, "equip type: %d, unk. flags: 0x%02X\n weight: %d",
-		        info->_equipType, info->_unknown, info->_weight);
-		sprintf(buf5, "vol: %d\n animtype: %d, animdata: %d",
-		        info->_volume, info->_animType, info->_animData);
-		sprintf(buf6, "ShapeInfo: %s\n %s, %s\nUsecode: %s",
-		        buf3, buf4, buf5, GameData::get_instance()->getMainUsecode()->get_class_name(_curShape));
-		rendtext = font->renderText(buf6, remaining);
-		rendtext->draw(surf, 20, _dims.h - 58);
+	{
+		// Basic shape/frame information
+		char buf1[50];
+		char buf2[200];
+		if (!shape_) {
+			sprintf(buf1, "NULL");
+		} else {
+			sprintf(buf1, "Frame %d of %d", _curFrame+1, shape_->frameCount());
+		}
+		sprintf(buf2, "%s:  Shape %d, %s", _flexes[_curFlex].first.c_str(),
+				_curShape, buf1);
+		rendtext = font->renderText(buf2, remaining);
+		rendtext->draw(surf, 20, 10);
 		delete rendtext;
+	}
+	
+	{
+		// Dump the pixel val under the mouse cursor:
+		int32 mx = 0;
+		int32 my = 0;
+		char buf2[200];
+
+		Mouse::get_instance()->getMouseCoords(mx, my);
+		ScreenSpaceToGump(mx, my);
+		
+		int32 relx = mx - (posx - _shapeX);
+		int32 rely = my - (posy - _shapeY);
+		if (shape_ && relx >= 0 && rely >= 0 && relx < _shapeW && rely < _shapeH) {
+			// get color
+			relx -= _shapeX;
+			rely -= _shapeY;
+			const ShapeFrame *frame = shape_->getFrame(_curFrame);
+			if (frame && frame->hasPoint(relx, rely)) {
+				uint8 rawpx = frame->getPixelAtPoint(relx, rely);
+				uint8 px_r = shape_->getPalette()->_palette[rawpx * 3];
+				uint8 px_g = shape_->getPalette()->_palette[rawpx * 3 + 1];
+				uint8 px_b = shape_->getPalette()->_palette[rawpx * 3 + 2];
+				
+				sprintf(buf2, "px: (%d, %d): %d (%d, %d, %d)", relx, rely, rawpx, px_r, px_g, px_b);
+				rendtext = font->renderText(buf2, remaining);
+				rendtext->draw(surf, 20, 25);
+				delete rendtext;
+			}
+		}
+
+		
+	}
+ 
+	{
+		// Additional shapeinfo (only in main shapes archive)
+		MainShapeArchive *mainshapes = dynamic_cast<MainShapeArchive *>(_flex);
+		if (!mainshapes || !shape_) return;
+
+		char buf3[128];
+		char buf4[128];
+		char buf5[128];
+		char buf6[512];
+		ShapeInfo *info = mainshapes->getShapeInfo(_curShape);
+		if (info) {
+			sprintf(buf3, "x: %d, y: %d, z: %d\n flags: 0x%04X, family: %d",
+					info->_x, info->_y, info->_z, info->_flags, info->_family);
+			sprintf(buf4, "equip type: %d, unk. flags: 0x%02X\n weight: %d",
+					info->_equipType, info->_unknown, info->_weight);
+			sprintf(buf5, "vol: %d\n animtype: %d, animdata: %d",
+					info->_volume, info->_animType, info->_animData);
+			sprintf(buf6, "ShapeInfo: %s\n %s, %s\nUsecode: %s",
+					buf3, buf4, buf5, GameData::get_instance()->getMainUsecode()->get_class_name(_curShape));
+			rendtext = font->renderText(buf6, remaining);
+			rendtext->draw(surf, 20, _dims.h - 58);
+			delete rendtext;
+		}
 	}
 }
 
@@ -178,6 +226,7 @@ bool ShapeViewerGump::OnKeyDown(int key, int mod) {
 		}
 	}
 	break;
+	case Common::KEYCODE_COMMA:
 	case Common::KEYCODE_PAGEUP: {
 		if (_curFlex == 0)
 			_curFlex = _flexes.size() - 1;
@@ -190,6 +239,7 @@ bool ShapeViewerGump::OnKeyDown(int key, int mod) {
 		_curFrame = 0;
 	}
 	break;
+	case Common::KEYCODE_PERIOD:
 	case Common::KEYCODE_PAGEDOWN: {
 		if (_curFlex + 1 == _flexes.size())
 			_curFlex = 0;
@@ -202,6 +252,14 @@ bool ShapeViewerGump::OnKeyDown(int key, int mod) {
 		_curFrame = 0;
 	}
 	break;
+	case Common::KEYCODE_f: {
+		_fontNo++;
+		if (_fontNo >= GameData::get_instance()->getFonts()->getCount() ||
+			_fontNo > 17) {
+			_fontNo = 0;
+		}
+	}
+			break;
 	case Common::KEYCODE_ESCAPE: {
 		Close();
 	}
@@ -239,13 +297,13 @@ void ShapeViewerGump::U8ShapeViewer() {
 
 	Std::vector<Std::pair<Std::string, ShapeArchive *> > _flexes;
 	Std::pair<Std::string, ShapeArchive *> _flex;
-	_flex.first = "u8shapes";
+	_flex.first = "shapes";
 	_flex.second = gamedata->getMainShapes();
 	_flexes.push_back(_flex);
-	_flex.first = "u8gumps";
+	_flex.first = "gumps";
 	_flex.second = gamedata->getGumps();
 	_flexes.push_back(_flex);
-	_flex.first = "u8fonts";
+	_flex.first = "fonts";
 	_flex.second = gamedata->getFonts();
 	_flexes.push_back(_flex);
 	FileSystem *filesys = FileSystem::get_instance();

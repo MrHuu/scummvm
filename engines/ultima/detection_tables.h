@@ -44,6 +44,25 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 	},
 
 	{
+		// Ultima I - The First Age of Darkness, PC98 version
+		{
+			"ultima1",
+			0,
+			{
+				{"egctown.bin", 0, "4f7de68f6689cf9617aa1ea03240137e", 4896},
+				{"map.bin", 0, "f99633a0110ccf90837ab161be56cf1c", 13104},
+				AD_LISTEND
+			},
+			Common::JA_JPN,
+			Common::kPlatformPC98,
+			ADGF_UNSTABLE,
+			GUIO0()
+		},
+		GAME_ULTIMA1,
+		0
+	},
+
+	{
 		// Ultima I - The First Age of Darkness
 		{
 			"ultima1",
@@ -58,7 +77,6 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 		0
 	},
 
-
 	{
 		// Ultima IV - Quest of the Avatar
 		{
@@ -67,8 +85,8 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 			AD_ENTRY1s("britain.ult", "304fe52ce5f34b9181052363d74d7505", 1280),
 			Common::EN_ANY,
 			Common::kPlatformDOS,
-			ADGF_UNSTABLE,
-			GUIO0()
+			ADGF_TESTING,
+			GUIO1(GUIO_NOSPEECH)
 		},
 		GAME_ULTIMA4,
 		0
@@ -82,8 +100,8 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 			AD_ENTRY1s("britain.ult", "304fe52ce5f34b9181052363d74d7505", 1280),
 			Common::EN_ANY,
 			Common::kPlatformDOS,
-			ADGF_UNSTABLE,
-			GUIO0()
+			ADGF_TESTING,
+			GUIO1(GUIO_NOSPEECH)
 		},
 		GAME_ULTIMA4,
 		GF_VGA_ENHANCED
@@ -97,7 +115,7 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 			AD_ENTRY1s("converse.a", "5065716423ef1389e3f7b4946d815c26", 162615),
 			Common::EN_ANY,
 			Common::kPlatformDOS,
-			ADGF_UNSTABLE,
+			ADGF_TESTING,
 			GUIO0()
 		},
 		GAME_ULTIMA6,
@@ -112,11 +130,26 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 			AD_ENTRY1s("converse.a", "5065716423ef1389e3f7b4946d815c26", 162615),
 			Common::EN_ANY,
 			Common::kPlatformDOS,
-			ADGF_UNSTABLE,
+			ADGF_TESTING,
 			GUIO0()
 		},
 		GAME_ULTIMA6,
 		GF_VGA_ENHANCED
+	},
+
+	// PC98 Ultima 6
+	{
+		{
+			"ultima6",
+			0,
+			AD_ENTRY1s("converse.a", "99975e79e7cae3ee24a8e33982f60fe4", 190920),
+			Common::JA_JPN,
+			Common::kPlatformPC98,
+			ADGF_UNSTABLE,
+			GUIO0()
+		},
+		GAME_ULTIMA6,
+		0
 	},
 
 	// Ultima VIII - Ultima Collection 1998
@@ -153,11 +186,7 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 		{
 			"ultima8",
 			"Gold Edition",
-			{
-				{ "eusecode.flx", 0, "c61f1dacde591cb39d452264e281f234", 1251108 },
-				{ "fusecode.flx", 0, "4017eb8678ee24af0ce8c7647a05509b", 1300957 },
-				AD_LISTEND
-			},			
+			AD_ENTRY1s("fusecode.flx", "4017eb8678ee24af0ce8c7647a05509b", 1300957),
 			Common::FR_FRA,
 			Common::kPlatformDOS,
 			ADGF_UNSTABLE,
@@ -171,12 +200,22 @@ static const UltimaGameDescription GAME_DESCRIPTIONS[] = {
 		{
 			"ultima8",
 			"Gold Edition",
-			{
-				{"eusecode.flx", 0, "c61f1dacde591cb39d452264e281f234", 1251108},
-				{"gusecode.flx", 0, "d69599a46870b66c1b7c02710ed185bd", 1378604},
-				AD_LISTEND
-			},
+			AD_ENTRY1s("gusecode.flx", "d69599a46870b66c1b7c02710ed185bd", 1378604),
 			Common::DE_DEU,
+			Common::kPlatformDOS,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOMIDI)
+		},
+		GAME_ULTIMA8,
+		0
+	},
+
+	{
+		{
+			"ultima8",
+			"",
+			AD_ENTRY1s("jusecode.flx", "1793bb252b805bf8d59300690987c605", 1208003),
+			Common::JA_JPN,
 			Common::kPlatformDOS,
 			ADGF_UNSTABLE,
 			GUIO1(GUIO_NOMIDI)

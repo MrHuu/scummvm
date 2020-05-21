@@ -942,10 +942,6 @@ bool Script::play_cutscene(const char *script_file) {
 	script_file_path += script_file;
 
 	ConsoleHide();
-//if !SDL_VERSION_ATLEAST(2, 0, 0)
-#if 0
-	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY / 2, SDL_DEFAULT_REPEAT_INTERVAL * 2);
-#endif
 
 	return run_lua_file(script_file_path.c_str());
 }
@@ -1272,7 +1268,7 @@ bool Script::call_magic_get_spell_list(Spell **spell_list) {
 		lua_gettable(L, -2);
 
 		if (!lua_istable(L, -1)) { //we've hit the end of our targets
-			::debug("end = %d", i);
+			::debug(1, "end = %d", i);
 			lua_pop(L, 1);
 			break;
 		}
@@ -1289,7 +1285,7 @@ bool Script::call_magic_get_spell_list(Spell **spell_list) {
 
 		if (num < 256 && spell_list[num] == NULL) {
 			spell_list[num] = new Spell((uint8)num, (const char *)name, (const char *)invocation, re);
-			::debug("num = %d, reagents = %d, name = %s invocation = %s\n", num, re, name, invocation);
+			::debug(1, "num = %d, reagents = %d, name = %s invocation = %s\n", num, re, name, invocation);
 		}
 
 		lua_pop(L, 1);
@@ -2270,7 +2266,7 @@ static int nscript_u6link_gc(lua_State *L) {
 
 	releaseU6Link(link);
 
-	::debug("U6Link garbage collector!!");
+	::debug(1, "U6Link garbage collector!!");
 	return 0;
 }
 
@@ -2318,7 +2314,7 @@ static int nscript_print(lua_State *L) {
 	if (scroll) {
 		scroll->display_string(string);
 	} else {
-		::debug("%s", string);
+		::debug(1, "%s", string);
 	}
 	return 0;
 }
@@ -3501,7 +3497,7 @@ static int nscript_projectile_anim_multi(lua_State *L) {
 		lua_gettable(L, -2);
 
 		if (!lua_istable(L, -1)) { //we've hit the end of our targets
-			::debug("end = %d", i);
+			::debug(1, "end = %d", i);
 			lua_pop(L, 1);
 			break;
 		}

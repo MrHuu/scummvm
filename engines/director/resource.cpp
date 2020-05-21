@@ -355,7 +355,7 @@ void DirectorEngine::loadSharedCastsFrom(Common::String filename) {
 		}
 	}
 
-	Common::Array<uint16> cast = sharedCast->getResourceIDList(MKTAG('C','A','S','t'));
+	Common::Array<uint16> cast = sharedCast->getResourceIDList(MKTAG('C', 'A', 'S', 't'));
 	if (!_sharedScore->_loadedCast)
 		_sharedScore->_loadedCast = new Common::HashMap<int, Cast *>();
 
@@ -363,8 +363,10 @@ void DirectorEngine::loadSharedCastsFrom(Common::String filename) {
 		debug(0, "****** Loading %d CASt resources", cast.size());
 
 		for (Common::Array<uint16>::iterator iterator = cast.begin(); iterator != cast.end(); ++iterator) {
+			Common::SeekableSubReadStreamEndian *stream = sharedCast->getResource(MKTAG('C', 'A', 'S', 't'), *iterator);
 			Resource res = sharedCast->getResourceDetail(MKTAG('C', 'A', 'S', 't'), *iterator);
-			_sharedScore->loadCastData(*sharedCast->getResource(MKTAG('C', 'A', 'S', 't'), *iterator), *iterator, &res);
+			_sharedScore->loadCastData(*stream, *iterator, &res);
+			delete stream;
 		}
 	}
 
@@ -372,6 +374,17 @@ void DirectorEngine::loadSharedCastsFrom(Common::String filename) {
 	_sharedScore->loadSpriteImages(true);
 
 	_lingo->_archiveIndex = 0;
+}
+
+Cast *DirectorEngine::getCastMember(int castId) {
+	Cast *result = nullptr;
+	if (_currentScore) {
+		result = _currentScore->getCastMember(castId);
+	}
+	if (result == nullptr && _sharedScore) {
+		result = _sharedScore->getCastMember(castId);
+	}
+	return result;
 }
 
 } // End of namespace Director

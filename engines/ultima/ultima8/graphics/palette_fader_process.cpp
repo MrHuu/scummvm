@@ -31,9 +31,10 @@ namespace Ultima8 {
 PaletteFaderProcess *PaletteFaderProcess::_fader = nullptr;
 
 // p_dynamic_class stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(PaletteFaderProcess, Process)
+DEFINE_RUNTIME_CLASSTYPE_CODE(PaletteFaderProcess)
 
-PaletteFaderProcess::PaletteFaderProcess() : Process() {
+PaletteFaderProcess::PaletteFaderProcess() : Process(), _priority(0),
+	_counter(0), _maxCounter(0) {
 }
 
 PaletteFaderProcess::PaletteFaderProcess(PalTransforms trans,
@@ -128,14 +129,14 @@ bool PaletteFaderProcess::loadData(Common::ReadStream *rs, uint32 version) {
 uint32 PaletteFaderProcess::I_fadeToPaletteTransform(const uint8 *args,
         unsigned int /*argsize*/) {
 	ARG_UINT16(transform);
-	ARG_UINT16(_priority);
+	ARG_UINT16(priority);
 
 	// If current _fader has higher _priority, we do nothing
-	if (_fader && _fader->_priority > _priority) return 0;
+	if (_fader && _fader->_priority > priority) return 0;
 	else if (_fader) _fader->terminate();
 
 	_fader = new PaletteFaderProcess(static_cast<PalTransforms>(transform),
-	                                _priority, 45);
+	                                priority, 45);
 
 	return Kernel::get_instance()->addProcess(_fader);
 }

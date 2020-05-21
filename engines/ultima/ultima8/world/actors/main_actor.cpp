@@ -49,7 +49,7 @@ namespace Ultima {
 namespace Ultima8 {
 
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(MainActor, Actor)
+DEFINE_RUNTIME_CLASSTYPE_CODE(MainActor)
 
 MainActor::MainActor() : _justTeleported(false), _accumStr(0), _accumDex(0),
 	_accumInt(0) {
@@ -61,7 +61,7 @@ MainActor::~MainActor() {
 GravityProcess *MainActor::ensureGravityProcess() {
 	AvatarGravityProcess *p;
 	if (_gravityPid) {
-		p = p_dynamic_cast<AvatarGravityProcess *>(
+		p = dynamic_cast<AvatarGravityProcess *>(
 		        Kernel::get_instance()->getProcess(_gravityPid));
 	} else {
 		p = new AvatarGravityProcess(this, 0);
@@ -297,7 +297,7 @@ void MainActor::clearInCombat() {
 ProcId MainActor::die(uint16 damageType) {
 	ProcId animprocid = Actor::die(damageType);
 
-	Ultima8Engine *app = p_dynamic_cast<Ultima8Engine *>(Ultima8Engine::get_instance());
+	Ultima8Engine *app = Ultima8Engine::get_instance();
 	assert(app);
 
 	app->setAvatarInStasis(true);
@@ -484,7 +484,7 @@ uint32 MainActor::I_isAvatarInCombat(const uint8 * /*args*/,
 
 void MainActor::useInventoryItem(uint32 shapenum) {
 	if (Ultima8Engine::get_instance()->isAvatarInStasis()) {
-		pout << "Can't: avatarInStasis" << Std::endl;
+		pout << "Can't use item: avatarInStasis" << Std::endl;
 		return;
 	}
 	LOOPSCRIPT(script, LS_SHAPE_EQUAL(shapenum));

@@ -30,7 +30,7 @@
 #include "ultima/ultima4/conversation/conversation.h"
 #include "ultima/ultima4/game/context.h"
 #include "ultima/ultima4/game/player.h"
-#include "ultima/ultima4/game/stats.h"
+#include "ultima/ultima4/views/stats.h"
 #include "ultima/ultima4/gfx/screen.h"
 #include "ultima/ultima4/gfx/textcolor.h"
 #include "ultima/ultima4/map/annotation.h"
@@ -91,6 +91,7 @@ bool DebuggerActions::destroyAt(const Coords &coords) {
 	if (obj) {
 		if (isCreature(obj)) {
 			Creature *c = dynamic_cast<Creature *>(obj);
+			assert(c);
 			g_screen->screenMessage("%s Destroyed!\n", c->getName().c_str());
 		} else {
 			Tile *t = g_context->_location->_map->_tileSet->get(obj->getTile()._id);
@@ -103,43 +104,6 @@ bool DebuggerActions::destroyAt(const Coords &coords) {
 		return true;
 	}
 
-	return false;
-}
-
-bool DebuggerActions::attackAt(const Coords &coords) {
-	Object *under;
-	const Tile *ground;
-	Creature *m;
-
-	m = dynamic_cast<Creature *>(g_context->_location->_map->objectAt(coords));
-	/* nothing attackable: move on to next tile */
-	if (m == nullptr || !m->isAttackable())
-		return false;
-
-	/* attack successful */
-	/// TODO: CHEST: Make a user option to not make chests change battlefield
-	/// map (1 of 2)
-	ground = g_context->_location->_map->tileTypeAt(g_context->_location->_coords, WITH_GROUND_OBJECTS);
-	if (!ground->isChest()) {
-		ground = g_context->_location->_map->tileTypeAt(g_context->_location->_coords, WITHOUT_OBJECTS);
-		if ((under = g_context->_location->_map->objectAt(g_context->_location->_coords)) &&
-			under->getTile().getTileType()->isShip())
-			ground = under->getTile().getTileType();
-	}
-
-	/* You're attacking a townsperson!  Alert the guards! */
-	if ((m->getType() == Object::PERSON) && (m->getMovementBehavior() != MOVEMENT_ATTACK_AVATAR))
-		g_context->_location->_map->alertGuards();
-
-	/* not good karma to be killing the innocent.  Bad avatar! */
-	if (m->isGood() || /* attacking a good creature */
-			/* attacking a docile (although possibly evil) person in town */
-		((m->getType() == Object::PERSON) && (m->getMovementBehavior() != MOVEMENT_ATTACK_AVATAR)))
-		g_context->_party->adjustKarma(KA_ATTACKED_GOOD);
-
-	CombatController *cc = new CombatController(CombatMap::mapForTile(ground, g_context->_party->getTransport().getTileType(), m));
-	cc->init(m);
-	cc->begin();
 	return false;
 }
 
@@ -192,8 +156,11 @@ bool DebuggerActions::getChestTrapHandler(int player) {
 			(g_ultima->_saveGame->_players[player]._dex + 25 < xu4_random(100))) {
 			if (trapType == EFFECT_LAVA) /* bomb trap */
 				g_context->_party->applyEffect(trapType);
-			else g_context->_party->member(player)->applyEffect(trapType);
-		} else g_screen->screenMessage("Evaded!\n");
+			else
+				g_context->_party->member(player)->applyEffect(trapType);
+		} else {
+			g_screen->screenMessage("Evaded!\n");
+		}
 
 		return true;
 	}
@@ -232,7 +199,7 @@ bool DebuggerActions::mixReagentsForSpellU4(int spell) {
 		if (choice == '\n' || choice == '\r' || choice == ' ') {
 			g_screen->screenMessage("\n\nYou mix the Reagents, and...\n");
 
-			if (spellMix(spell, &ingredients))
+			if (g_spells->spellMix(spell, &ingredients))
 				g_screen->screenMessage("Success!\n\n");
 			else
 				g_screen->screenMessage("It Fizzles!\n\n");
@@ -270,7 +237,7 @@ bool DebuggerActions::mixReagentsForSpellU5(int spell) {
 
 	printN("How many? ");
 
-	int howmany = ReadIntController::get(2, TEXT_AREA_X + g_context->col, TEXT_AREA_Y + g_context->_line);
+	int howmany = ReadIntController::get(2, TEXT_AREA_X + g_context->_col, TEXT_AREA_Y + g_context->_line);
 	gameSpellMixHowMany(spell, howmany, &ingredients);
 
 	return true;
@@ -279,14 +246,14 @@ bool DebuggerActions::mixReagentsForSpellU5(int spell) {
 bool DebuggerActions::gameSpellMixHowMany(int spell, int num, Ingredients *ingredients) {
 	int i;
 
-	/* entered 0 mixtures, don't mix anything! */
+	// Entered 0 mixtures, don't mix anything!
 	if (num == 0) {
 		print("\nNone mixed!");
 		ingredients->revert();
 		return false;
 	}
 
-	/* if they ask for more than will give them 99, only use what they need */
+	// If they ask for more than will give them 99, only use what they need
 	if (num > 99 - g_ultima->_saveGame->_mixtures[spell]) {
 		num = 99 - g_ultima->_saveGame->_mixtures[spell];
 		print("\n%cOnly need %d!%c", FG_GREY, num, FG_WHITE);
@@ -294,7 +261,7 @@ bool DebuggerActions::gameSpellMixHowMany(int spell, int num, Ingredients *ingre
 
 	print("\nMixing %d...", num);
 
-	/* see if there's enough reagents to make number of mixtures requested */
+	// See if there's enough reagents to make number of mixtures requested
 	if (!ingredients->checkMultiple(num)) {
 		print("\n%cYou don't have enough reagents to mix %d spells!%c", FG_GREY, num, FG_WHITE);
 		ingredients->revert();
@@ -302,12 +269,12 @@ bool DebuggerActions::gameSpellMixHowMany(int spell, int num, Ingredients *ingre
 	}
 
 	print("\nYou mix the Reagents, and...");
-	if (spellMix(spell, ingredients)) {
+	if (g_spells->spellMix(spell, ingredients)) {
 		print("Success!\n");
-		/* mix the extra spells */
+		// Mix the extra spells
 		ingredients->multiply(num);
 		for (i = 0; i < num - 1; i++)
-			spellMix(spell, ingredients);
+			g_spells->spellMix(spell, ingredients);
 	} else {
 		print("It Fizzles!\n");
 	}
@@ -340,8 +307,8 @@ void DebuggerActions::gameCastSpell(uint spell, int caster, int param) {
 	SpellCastError spellError;
 	Common::String msg;
 
-	if (!spellCast(spell, caster, param, &spellError, true)) {
-		msg = spellGetErrorMessage(spell, spellError);
+	if (!g_spells->spellCast(spell, caster, param, &spellError, true)) {
+		msg = g_spells->spellGetErrorMessage(spell, spellError);
 		if (!msg.empty())
 			g_screen->screenMessage("%s", msg.c_str());
 	}
@@ -358,6 +325,7 @@ bool DebuggerActions::talkAt(const Coords &coords) {
 	}
 
 	city = dynamic_cast<City *>(g_context->_location->_map);
+	assert(city);
 	Person *talker = city ? city->personAt(coords) : nullptr;
 
 	// Make sure we have someone we can talk with
@@ -388,6 +356,10 @@ bool DebuggerActions::talkAt(const Coords &coords) {
 	conv._reply = talker->getConversationText(&conv, "");
 	conv._playerInput.clear();
 	talkRunConversation(conv, talker, false);
+
+	// Ensure the end of the conversation ends the line
+	if (g_context->_col != 0)
+		g_screen->screenMessage("\n");
 
 	return true;
 }
@@ -458,8 +430,7 @@ void DebuggerActions::talkRunConversation(Conversation &conv, Person *talker, bo
 
 		int maxlen;
 		switch (conv.getInputRequired(&maxlen)) {
-		case Conversation::INPUT_STRING:
-		{
+		case Conversation::INPUT_STRING: {
 			conv._playerInput = gameGetInput(maxlen);
 #ifdef IOS_ULTIMA4
 			g_screen->screenMessage("%s", conv.playerInput.c_str()); // Since we put this in a different window, we need to show it again.
@@ -469,8 +440,7 @@ void DebuggerActions::talkRunConversation(Conversation &conv, Person *talker, bo
 			showPrompt = true;
 			break;
 		}
-		case Conversation::INPUT_CHARACTER:
-		{
+		case Conversation::INPUT_CHARACTER: {
 			char message[2];
 #ifdef IOS_ULTIMA4
 			U4IOS::IOSConversationChoiceHelper yesNoHelper;
@@ -516,6 +486,16 @@ void DebuggerActions::gameLordBritishCheckLevels() {
 	}
 
 	g_screen->screenMessage("\nWhat would thou\nask of me?\n");
+}
+
+bool DebuggerActions::isCombat() const {
+	return dynamic_cast<CombatController *>(eventHandler->getController()) != nullptr;
+}
+
+int DebuggerActions::getCombatFocus() const {
+	CombatController *cc = dynamic_cast<CombatController *>(eventHandler->getController());
+	assert(cc);
+	return cc->getFocus();
 }
 
 } // End of namespace Ultima4

@@ -20,8 +20,13 @@
  *
  */
 
-#ifndef ULTIMA4_SOUND_SOUND_H
-#define ULTIMA4_SOUND_SOUND_H
+#ifndef ULTIMA4_SOUND_H
+#define ULTIMA4_SOUND_H
+
+#include "ultima/shared/std/containers.h"
+#include "audio/audiostream.h"
+#include "audio/mixer.h"
+#include "common/str.h"
 
 namespace Ultima {
 namespace Ultima4 {
@@ -61,12 +66,31 @@ enum Sound {
 	SOUND_MAX
 };
 
-int soundInit();
-void soundDelete();
-
 void soundPlay(Sound sound, bool onlyOnce = true, int specificDurationInTicks = -1);
 
 void soundStop(int channel = 1);
+
+class SoundManager {
+private:
+	Audio::Mixer *_mixer;
+	Audio::SoundHandle _soundHandle;
+	Std::vector<Common::String> _soundFilenames;
+	Std::vector<Audio::SeekableAudioStream *> _sounds;
+private:
+	bool load(Sound sound);
+
+	void play_sys(Sound sound, bool onlyOnce, int specificDurationMilli);
+	bool load_sys(Sound sound, const Common::String &filename);
+	void stop_sys(int channel);
+public:
+	SoundManager(Audio::Mixer *mixer);
+	~SoundManager();
+
+	void play(Sound sound, bool onlyOnce = true, int specificDurationInTicks = -1);
+	void stop(int channel = 1);
+};
+
+extern SoundManager *g_sound;
 
 } // End of namespace Ultima4
 } // End of namespace Ultima

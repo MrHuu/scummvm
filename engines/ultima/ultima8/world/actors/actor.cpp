@@ -56,12 +56,14 @@
 namespace Ultima {
 namespace Ultima8 {
 
+static const unsigned int BACKPACK_SHAPE = 529;
+
 // p_dynamic_cast stuff
-DEFINE_RUNTIME_CLASSTYPE_CODE(Actor, Container)
+DEFINE_RUNTIME_CLASSTYPE_CODE(Actor)
 
 Actor::Actor() : _strength(0), _dexterity(0), _intelligence(0),
 	  _hitPoints(0), _mana(0), _alignment(0), _enemyAlignment(0),
-	  _lastAnim(Animation::walk), _animFrame(0), _direction(0),
+	  _lastAnim(Animation::stand), _animFrame(0), _direction(0),
 		_fallStart(0), _unk0C(0), _actorFlags(0) {
 }
 
@@ -355,9 +357,8 @@ bool Actor::removeItem(Item *item) {
 }
 
 bool Actor::setEquip(Item *item, bool checkwghtvol) {
-	const unsigned int backpack_shape = 529; //!! *cough* constant
 	uint32 equiptype = item->getShapeInfo()->_equipType;
-	bool backpack = (item->getShape() == backpack_shape);
+	bool backpack = (item->getShape() == BACKPACK_SHAPE);
 
 	// valid item type?
 	if (equiptype == ShapeInfo::SE_NONE && !backpack) return false;
@@ -368,7 +369,7 @@ bool Actor::setEquip(Item *item, bool checkwghtvol) {
 		if ((*iter)->getObjId() == item->getObjId()) continue;
 
 		uint32 cet = (*iter)->getShapeInfo()->_equipType;
-		bool cbackpack = ((*iter)->getShape() == backpack_shape);
+		bool cbackpack = ((*iter)->getShape() == BACKPACK_SHAPE);
 
 		// already have an item with the same equiptype
 		if (cet == equiptype || (cbackpack && backpack)) return false;
@@ -383,12 +384,10 @@ bool Actor::setEquip(Item *item, bool checkwghtvol) {
 }
 
 uint16 Actor::getEquip(uint32 type) const {
-	const unsigned int backpack_shape = 529; //!! *cough* constant
-
 	Std::list<Item *>::const_iterator iter;
 	for (iter = _contents.begin(); iter != _contents.end(); ++iter) {
 		uint32 cet = (*iter)->getShapeInfo()->_equipType;
-		bool cbackpack = ((*iter)->getShape() == backpack_shape);
+		bool cbackpack = ((*iter)->getShape() == BACKPACK_SHAPE);
 
 		if ((*iter)->hasFlags(FLG_EQUIPPED) &&
 		        (cet == type || (cbackpack && type == 7))) { // !! constant
@@ -460,7 +459,7 @@ Animation::Result Actor::tryAnim(Animation::Sequence anim, int dir,
 	if (!tracker.init(this, anim, dir, state))
 		return Animation::FAILURE;
 
-	AnimAction *animaction = tracker.getAnimAction();
+	const AnimAction *animaction = tracker.getAnimAction();
 
 	if (!animaction) return Animation::FAILURE;
 
@@ -840,7 +839,7 @@ ProcId Actor::killAllButFallAnims(bool death) {
 	ProcessIter iter = Kernel::get_instance()->getProcessBeginIterator();
 	ProcessIter endproc = Kernel::get_instance()->getProcessEndIterator();
 	for (; iter != endproc; ++iter) {
-		ActorAnimProcess *p = p_dynamic_cast<ActorAnimProcess *>(*iter);
+		ActorAnimProcess *p = dynamic_cast<ActorAnimProcess *>(*iter);
 		if (!p) continue;
 		if (p->getItemNum() != _objId) continue;
 		if (p->is_terminated()) continue;
@@ -964,7 +963,7 @@ CombatProcess *Actor::getCombatProcess() {
 	Process *p = Kernel::get_instance()->findProcess(_objId, 0xF2); // CONSTANT!
 	if (!p)
 		return nullptr;
-	CombatProcess *cp = p_dynamic_cast<CombatProcess *>(p);
+	CombatProcess *cp = dynamic_cast<CombatProcess *>(p);
 	assert(cp);
 
 	return cp;
@@ -995,7 +994,8 @@ void Actor::clearInCombat() {
 	if ((_actorFlags & ACT_INCOMBAT) == 0) return;
 
 	CombatProcess *cp = getCombatProcess();
-	cp->terminate();
+	if (cp)
+		cp->terminate();
 
 	clearActorFlag(ACT_INCOMBAT);
 }
@@ -1612,7 +1612,7 @@ uint32 Actor::I_setEquip(const uint8 *args, unsigned int /*argsize*/) {
 		return 0;
 
 	// check it was added to the right slot
-	assert(item->getZ() == type + 1 || (item->getShape() == 529 && type == 6));
+	assert(item->getZ() == type + 1 || (item->getShape() == BACKPACK_SHAPE && type == 6));
 
 	return 1;
 }

@@ -24,21 +24,33 @@
 #define ULTIMA4_H
 
 #include "ultima/shared/engine/ultima.h"
+#include "ultima/shared/std/containers.h"
 
 namespace Ultima {
 namespace Ultima4 {
 
+class Armors;
+class Codex;
 class Config;
 class Context;
+class Death;
 class DialogueLoaders;
 class ImageLoaders;
+class Items;
 class GameController;
+class MapLoaders;
+class Moongates;
 class Music;
+class ResponseParts;
 struct SaveGame;
 class Screen;
+class Shrines;
+class SoundManager;
+class Spells;
 class TileMaps;
 class TileRules;
 class TileSets;
+class Weapons;
 
 class Ultima4Engine : public Shared::UltimaEngine {
 private:
@@ -56,17 +68,29 @@ protected:
 	 */
 	bool isDataRequired(Common::String &folder, int &majorVersion, int &minorVersion) override;
 public:
+	Armors *_armors;
+	Codex *_codex;
 	Config *_config;
 	Context *_context;
+	Death *_death;
 	DialogueLoaders *_dialogueLoaders;
 	ImageLoaders *_imageLoaders;
 	GameController *_game;
+	Items *_items;
+	MapLoaders *_mapLoaders;
+	Moongates *_moongates;
 	Music *_music;
+	ResponseParts *_responseParts;
 	SaveGame *_saveGame;
 	Screen *_screen;
+	Shrines *_shrines;
+	SoundManager *_soundManager;
+	Spells *_spells;
 	TileMaps *_tileMaps;
 	TileRules *_tileRules;
 	TileSets *_tileSets;
+	Weapons *_weapons;
+	Std::vector<Common::String> _hawkwindText;
 public:
 	Ultima4Engine(OSystem *syst, const Ultima::UltimaGameDescription *gameDesc);
 	~Ultima4Engine() override;
@@ -74,9 +98,7 @@ public:
 	/**
 	 * Returns true if a savegame can be loaded
 	 */
-	bool canLoadGameStateCurrently(bool isAutosave = false) override {
-		return canSaveGameStateCurrently(isAutosave);
-	}
+	bool canLoadGameStateCurrently(bool isAutosave = false) override;
 
 	/**
 	 * Returns true if the game can be saved

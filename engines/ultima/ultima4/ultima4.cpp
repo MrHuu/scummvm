@@ -22,6 +22,7 @@
 
 #include "ultima/ultima4/ultima4.h"
 #include "ultima/ultima4/controllers/intro_controller.h"
+#include "ultima/ultima4/conversation/conversation.h"
 #include "ultima/ultima4/conversation/dialogueloader.h"
 #include "ultima/ultima4/core/config.h"
 #include "ultima/ultima4/core/debugger.h"
@@ -29,12 +30,20 @@
 #include "ultima/ultima4/core/utils.h"
 #include "ultima/ultima4/events/event_handler.h"
 #include "ultima/ultima4/filesys/savegame.h"
+#include "ultima/ultima4/game/armor.h"
+#include "ultima/ultima4/game/codex.h"
 #include "ultima/ultima4/game/context.h"
+#include "ultima/ultima4/game/death.h"
 #include "ultima/ultima4/game/game.h"
+#include "ultima/ultima4/game/item.h"
+#include "ultima/ultima4/game/moongate.h"
 #include "ultima/ultima4/game/person.h"
+#include "ultima/ultima4/game/weapon.h"
 #include "ultima/ultima4/gfx/screen.h"
 #include "ultima/ultima4/gfx/imageloader.h"
 #include "ultima/ultima4/gfx/imagemgr.h"
+#include "ultima/ultima4/map/maploader.h"
+#include "ultima/ultima4/map/shrine.h"
 #include "ultima/ultima4/map/tilemap.h"
 #include "ultima/ultima4/map/tileset.h"
 #include "ultima/ultima4/sound/music.h"
@@ -48,36 +57,61 @@ namespace Ultima4 {
 Ultima4Engine *g_ultima;
 
 Ultima4Engine::Ultima4Engine(OSystem *syst, const Ultima::UltimaGameDescription *gameDesc) :
-		Shared::UltimaEngine(syst, gameDesc), _saveSlotToLoad(-1), _config(nullptr),
-		_context(nullptr), _dialogueLoaders(nullptr), _game(nullptr), _music(nullptr),
-		_imageLoaders(nullptr), _saveGame(nullptr), _screen(nullptr), _tileMaps(nullptr),
-		_tileRules(nullptr), _tileSets(nullptr) {
+		Shared::UltimaEngine(syst, gameDesc), _saveSlotToLoad(-1), _armors(nullptr),
+		_codex(nullptr), _config(nullptr), _context(nullptr), _death(nullptr),
+		_dialogueLoaders(nullptr), _game(nullptr), _items(nullptr), _music(nullptr),
+		_imageLoaders(nullptr), _mapLoaders(nullptr), _moongates(nullptr),
+		_responseParts(nullptr), _saveGame(nullptr), _screen(nullptr), _shrines(nullptr),
+		_soundManager(nullptr), _spells(nullptr), _tileMaps(nullptr), _tileRules(nullptr),
+		_tileSets(nullptr), _weapons(nullptr) {
 	g_ultima = this;
+	g_armors = nullptr;
+	g_codex = nullptr;
 	g_context = nullptr;
+	g_death = nullptr;
 	g_game = nullptr;
+	g_items = nullptr;
+	g_mapLoaders = nullptr;
+	g_moongates = nullptr;
+	g_music = nullptr;
+	g_responseParts = nullptr;
 	g_screen = nullptr;
+	g_shrines = nullptr;
+	g_sound = nullptr;
+	g_spells = nullptr;
 	g_tileMaps = nullptr;
 	g_tileRules = nullptr;
 	g_tileSets = nullptr;
+	g_weapons = nullptr;
 }
 
 Ultima4Engine::~Ultima4Engine() {
+	delete _armors;
+	delete _codex;
 	delete _config;
 	delete _context;
+	delete _death;
 	delete _dialogueLoaders;
 	delete _game;
 	delete _imageLoaders;
+	delete _items;
+	delete _mapLoaders;
+	delete _moongates;
 	delete _music;
+	delete _responseParts;
 	delete _saveGame;
 	delete _screen;
+	delete _shrines;
+	delete _soundManager;
+	delete _spells;
 	delete _tileMaps;
 	delete _tileRules;
 	delete _tileSets;
+	delete _weapons;
 
 	ImageMgr::destroy();
 
 	//delete g_music;
-	soundDelete();
 }
 
 bool Ultima4Engine::initialize() {
@@ -86,32 +120,39 @@ bool Ultima4Engine::initialize() {
 
 	// Initialize the sub-systems
 	_config = new Config();
+	_armors = new Armors();
+	_codex = new Codex();
 	_context = new Context();
+	_death = new Death();
 	_dialogueLoaders = new DialogueLoaders();
+	_items = new Items();
+	_mapLoaders = new MapLoaders();
+	_moongates = new Moongates();
+	_music = new Music(_mixer);
+	_soundManager = new SoundManager(_mixer);
+	_responseParts = new ResponseParts();
 	_screen = new Screen();
 	_screen->init();
+	_shrines = new Shrines();
+	_spells = new Spells();
 	_tileRules = new TileRules();
 	_tileSets = new TileSets();
 	_tileMaps = new TileMaps();
 	_game = new GameController();
 	_imageLoaders = new ImageLoaders();
-	_music = new Music();
 	_saveGame = new SaveGame();
+	_weapons = new Weapons();
 
 	setDebugger(new Debugger());
-	soundInit();
 	creatureMgr->getInstance();
 
 	_saveSlotToLoad = ConfMan.hasKey("save_slot") ? ConfMan.getInt("save_slot") : -1;
-
 
 	return true;
 }
 
 void Ultima4Engine::startup() {
 	bool skipInfo = _saveSlotToLoad != -1;
-
-	soundInit();
 
 	if (!skipInfo) {
 		// do the intro
@@ -161,8 +202,13 @@ void Ultima4Engine::setToJourneyOnwards() {
 	assert(_saveSlotToLoad);
 }
 
-bool Ultima4Engine::canSaveGameStateCurrently(bool isAutosave) {
+bool Ultima4Engine::canLoadGameStateCurrently(bool isAutosave) {
 	return g_game != nullptr && g_context != nullptr && eventHandler->getController() == g_game;
+}
+
+bool Ultima4Engine::canSaveGameStateCurrently(bool isAutosave) {
+	return g_game != nullptr && g_context != nullptr && eventHandler->getController() == g_game
+		&& (g_context->_location->_context & CTX_CAN_SAVE_GAME);
 }
 
 Common::Error Ultima4Engine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
@@ -192,7 +238,7 @@ void Ultima4Engine::quitGame() {
 
 	// Do an event poll to all the quit message to be processed
 	Common::Event e;
-	g_system->getEventManager()->pollEvent(e);
+	(void)g_system->getEventManager()->pollEvent(e);
 }
 
 } // End of namespace Ultima4

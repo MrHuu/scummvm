@@ -116,6 +116,7 @@ public:
 	uint16 getPaletteColorCount() const { return _currentPaletteLength; }
 	void loadSharedCastsFrom(Common::String filename);
 	void clearSharedCast();
+	Cast *getCastMember(int castId);
 	void loadPatterns();
 	uint32 transformColor(uint32 color);
 	Graphics::MacPatterns &getPatterns();
@@ -126,7 +127,7 @@ public:
 	Archive *createArchive();
 
 	// events.cpp
-	void processEvents();
+	void processEvents(bool bufferLingoEvents = false);
 	void setDraggedSprite(uint16 id);
 	void releaseDraggedSprite();
 	uint32 getMacTicks();

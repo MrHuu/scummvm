@@ -53,10 +53,10 @@ struct SelectedText {
 
 class MacEditableText : public MacText, public MacWidget {
 public:
-	MacEditableText(MacWidget *parent, int x, int y, int w, int h, MacWindowManager *wm, Common::U32String s, const MacFont *font, int fgcolor, int bgcolor,
-			int maxWidth = -1, TextAlign textAlignment = kTextAlignLeft, int interlinear = 0);
+	MacEditableText(MacWidget *parent, int x, int y, int w, int h, MacWindowManager *wm, const Common::U32String &s, const MacFont *font, int fgcolor, int bgcolor,
+			int maxWidth, TextAlign textAlignment = kTextAlignLeft, int interlinear = 0);
 	MacEditableText(MacWidget *parent, int x, int y, int w, int h, MacWindowManager *wm, const Common::String &s, const MacFont *font, int fgcolor, int bgcolor,
-			int maxWidth = -1, TextAlign textAlignment = kTextAlignLeft, int interlinear = 0);
+			int maxWidth, TextAlign textAlignment = kTextAlignLeft, int interlinear = 0);
 			// 0 pixels between the lines by default
 	virtual ~MacEditableText();
 
@@ -68,12 +68,9 @@ public:
 	virtual bool draw(bool forceRedraw = false) override;
 	virtual void blit(ManagedSurface *g, Common::Rect &dest) override;
 
-	void setTextFont(const MacFont *macFont);
-	const MacFont *getTextFont();
-
 	virtual void setActive(bool active) override;
 
-	void appendText(Common::U32String str, const MacFont *macFont, bool skipAdd = false);
+	void appendText(const Common::U32String &str, const MacFont *macFont, bool skipAdd = false);
 	void appendText(const Common::String &str, const MacFont *macFont, bool skipAdd = false);
 	void clearText();
 
@@ -82,15 +79,12 @@ public:
 
 	void undrawCursor();
 
-	const Common::U32String getInput() { return _inputText; }
-	void clearInput();
-	void appendInput(Common::U32String str);
-	void appendInput(const Common::String &str);
-
 	Common::U32String getSelection(bool formatted = false, bool newlines = true);
 	void clearSelection();
 	Common::U32String cutSelection();
 	const SelectedText *getSelectedText() { return &_selectedText; }
+
+	Common::U32String getEditedString();
 
 private:
 	void init();
@@ -98,20 +92,16 @@ private:
 
 	void scroll(int delta);
 
-	void undrawInput();
-	void drawInput();
 	void drawSelection();
 	void updateCursorPos();
 
 	void startMarking(int x, int y);
 	void updateTextSelection(int x, int y);
 
-	void drawScrollbar();
-	void setScroll(float scrollPos, float scrollSize);
-
 public:
 	int _cursorX, _cursorY;
 	bool _cursorState;
+	int _cursorRow, _cursorCol;
 
 	bool _cursorDirty;
 	Common::Rect *_cursorRect;
@@ -122,20 +112,14 @@ public:
 	int _scrollPos;
 
 private:
-	const MacFont *_font;
-	const Font *_fontRef;
-
 	ManagedSurface *_cursorSurface;
+
+	int _editableRow;
 
 	bool _inTextSelection;
 	SelectedText _selectedText;
 
 	int _maxWidth;
-	Common::U32String _inputText;
-	uint _inputTextHeight;
-	bool _inputIsDirty;
-
-	bool _scrollbarIsDirty;
 
 	MacMenu *_menu;
 };

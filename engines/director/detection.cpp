@@ -62,8 +62,8 @@ Common::String DirectorEngine::getEXEName() const {
 }
 
 bool DirectorEngine::hasFeature(EngineFeature f) const {
-	return
-		(f == kSupportsRTL);
+	return false;
+		//(f == kSupportsReturnToLauncher);
 }
 
 } // End of Namespace Director
@@ -74,6 +74,7 @@ static const PlainGameDescriptor directorGames[] = {
 	{ "directortest-all",	"Macromedia Director All Movies Test Target" },
 	{ "theapartment",	"The Apartment, Interactive demo" },
 	{ "gundam0079",	"Gundam 0079: The War for Earth" },
+	{ "ironhelix",	"Iron Helix" },
 	{ "jewels",		"Jewels of the Oracle" },
 	{ "jman",		"The Journeyman Project" },
 	{ "majestic",	"Majestic Part I: Alien Encounter" },

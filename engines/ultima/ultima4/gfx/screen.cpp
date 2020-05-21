@@ -33,11 +33,11 @@
 #include "ultima/ultima4/gfx/imagemgr.h"
 #include "ultima/ultima4/gfx/screen.h"
 #include "ultima/ultima4/gfx/textcolor.h"
-#include "ultima/ultima4/map/dungeonview.h"
 #include "ultima/ultima4/map/location.h"
 #include "ultima/ultima4/map/tileanim.h"
 #include "ultima/ultima4/map/tileset.h"
-#include "ultima/ultima4/map/tileview.h"
+#include "ultima/ultima4/views/dungeonview.h"
+#include "ultima/ultima4/views/tileview.h"
 #include "ultima/ultima4/map/annotation.h"
 #include "ultima/ultima4/ultima4.h"
 #include "common/system.h"
@@ -75,6 +75,9 @@ Screen::Screen() : _filterScaler(nullptr), _currentMouseCursor(-1),
 
 Screen::~Screen() {
 	clear();
+	for (uint idx = 0; idx < _tileAnimSets.size(); ++idx)
+		delete _tileAnimSets[idx];
+
 	g_screen = nullptr;
 }
 
@@ -89,8 +92,6 @@ void Screen::init() {
 	screenLoadGraphicsFromConf();
 
 	debug(1, "using %s scaler\n", settings._filter.c_str());
-
-	KeyHandler::setKeyRepeat(settings._keyDelay, settings._keyInterval);
 
 	/* find the tile animations for our tileset */
 	_tileAnims = nullptr;
@@ -243,7 +244,7 @@ void Screen::screenTextAt(int x, int y, const char *fmt, ...) {
 }
 
 void Screen::screenPrompt() {
-	if (_needPrompt && _cursorEnabled && g_context->col == 0) {
+	if (_needPrompt && _cursorEnabled && g_context->_col == 0) {
 		screenMessage("%c", CHARSET_PROMPT);
 		_needPrompt = 0;
 	}
@@ -285,9 +286,9 @@ void Screen::screenMessage(const char *fmt, ...) {
 
 		/* backspace */
 		if (buffer[i] == '\b') {
-			g_context->col--;
-			if (g_context->col < 0) {
-				g_context->col += 16;
+			g_context->_col--;
+			if (g_context->_col < 0) {
+				g_context->_col += 16;
 				g_context->_line--;
 			}
 			continue;
@@ -307,11 +308,11 @@ void Screen::screenMessage(const char *fmt, ...) {
 		}
 
 		/* check for word wrap */
-		if ((g_context->col + wordlen > 16) || buffer[i] == '\n' || g_context->col == 16) {
+		if ((g_context->_col + wordlen > 16) || buffer[i] == '\n' || g_context->_col == 16) {
 			if (buffer[i] == '\n' || buffer[i] == ' ')
 				i++;
 			g_context->_line++;
-			g_context->col = 0;
+			g_context->_col = 0;
 #ifdef IOS_ULTIMA4
 			recursed = true;
 #endif
@@ -321,17 +322,17 @@ void Screen::screenMessage(const char *fmt, ...) {
 
 		/* code for move cursor right */
 		if (buffer[i] == 0x12) {
-			g_context->col++;
+			g_context->_col++;
 			continue;
 		}
 		/* don't show a space in column 1.  Helps with Hawkwind. */
-		if (buffer[i] == ' ' && g_context->col == 0)
+		if (buffer[i] == ' ' && g_context->_col == 0)
 			continue;
-		screenShowChar(buffer[i], TEXT_AREA_X + g_context->col, TEXT_AREA_Y + g_context->_line);
-		g_context->col++;
+		screenShowChar(buffer[i], TEXT_AREA_X + g_context->_col, TEXT_AREA_Y + g_context->_line);
+		g_context->_col++;
 	}
 
-	screenSetCursorPos(TEXT_AREA_X + g_context->col, TEXT_AREA_Y + g_context->_line);
+	screenSetCursorPos(TEXT_AREA_X + g_context->_col, TEXT_AREA_Y + g_context->_line);
 	screenShowCursor();
 
 	_needPrompt = 1;
@@ -464,6 +465,8 @@ void Screen::screenUpdate(TileView *view, bool showmap, bool blackout) {
 
 	if (blackout) {
 		screenEraseMapArea();
+	} else if (g_context->_location->_viewMode == VIEW_GEM) {
+		// No need to render view when cheat overhead map showing
 	} else if (g_context->_location->_map->_flags & FIRST_PERSON) {
 		DungeonViewer.display(g_context, view);
 		screenRedrawMapArea();
@@ -517,10 +520,10 @@ void Screen::screenDrawImage(const Common::String &name, int x, int y) {
 
 		if (info) {
 			info->_image->drawSubRect(x, y,
-			                          subimage->x * (settings._scale / info->_prescale),
-			                          subimage->y * (settings._scale / info->_prescale),
-			                          subimage->width * (settings._scale / info->_prescale),
-			                          subimage->height * (settings._scale / info->_prescale));
+			                          subimage->left * (settings._scale / info->_prescale),
+			                          subimage->top * (settings._scale / info->_prescale),
+			                          subimage->width() * (settings._scale / info->_prescale),
+			                          subimage->height() * (settings._scale / info->_prescale));
 			return;
 		}
 	}
@@ -1119,42 +1122,21 @@ void Screen::screenEraseTextArea(int x, int y, int width, int height) {
 }
 
 void Screen::screenShake(int iterations) {
-	int shakeOffset;
-	unsigned short i;
-	Image *screen = imageMgr->get("screen")->_image;
-	Image *bottom;
-
-	// the MSVC8 binary was generating a Access Violation when using
-	// drawSubRectOn() or drawOn() to draw the screen surface on top
-	// of itself.  Occured on settings.scale 2 and 4 only.
-	// Therefore, a temporary Image buffer is used to store the area
-	// that gets clipped at the bottom.
-
 	if (settings._screenShakes) {
-		// specify the size of the offset, and create a buffer
-		// to store the offset row plus 1
-		shakeOffset = 1;
-		bottom = Image::create(SCALED(320), SCALED(shakeOffset + 1), false, Image::HARDWARE);
+		// specify the size of the shake
+		const int SHAKE_OFFSET = 1 * settings._scale;
 
-		for (i = 0; i < iterations; i++) {
-			// store the bottom row
-			screen->drawOn(bottom, 0, SCALED((shakeOffset + 1) - 200));
-
-			// shift the screen down and make the top row black
-			screen->drawSubRectOn(screen, 0, SCALED(shakeOffset), 0, 0, SCALED(320), SCALED(200 - (shakeOffset + 1)));
-			bottom->drawOn(screen, 0, SCALED(200 - (shakeOffset)));
-			screen->fillRect(0, 0, SCALED(320), SCALED(shakeOffset), 0, 0, 0);
-			update();
+		for (int i = 0; i < iterations; ++i) {
+			// Shift the screen down
+			g_system->setShakePos(0, SHAKE_OFFSET);
+			g_system->updateScreen();
 			EventHandler::sleep(settings._shakeInterval);
 
-			// shift the screen back up, and replace the bottom row
-			screen->drawOn(screen, 0, 0 - SCALED(shakeOffset));
-			bottom->drawOn(screen, 0, SCALED(200 - (shakeOffset + 1)));
-			update();
+			// shift the screen back up
+			g_system->setShakePos(0, 0);
+			g_system->updateScreen();
 			EventHandler::sleep(settings._shakeInterval);
 		}
-		// free the bottom row image
-		delete bottom;
 	}
 }
 
@@ -1231,7 +1213,7 @@ void Screen::screenGemUpdate() {
 	Layout *layout = screenGetGemLayout(g_context->_location->_map);
 
 
-	//TODO, move the code responsible for determining 'peer' visibility to a non SDL specific part of the code.
+	// TODO: Move the code responsible for determining 'peer' visibility to a non SDL specific part of the code.
 	if (g_context->_location->_map->_type == Map::DUNGEON) {
 		//DO THE SPECIAL DUNGEON MAP TRAVERSAL
 		Std::vector<Std::vector<int> > drawnTiles(layout->_viewport.width(), Std::vector<int>(layout->_viewport.height(), 0));
@@ -1383,9 +1365,6 @@ Image *Screen::screenScaleDown(Image *src, int scale) {
 	dest = Image::create(src->width() / scale, src->height() / scale, src->isIndexed(), Image::HARDWARE);
 	if (!dest)
 		return nullptr;
-
-	if (!dest)
-		dest = Image::duplicate(src);
 
 	if (dest->isIndexed())
 		dest->setPaletteFromImage(src);
