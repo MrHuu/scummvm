@@ -29,9 +29,7 @@
 #include "common/util.h"                 // for ARRAYSIZE
 #include "common/system.h"               // for g_system
 #include "engines/engine.h"              // for Engine, g_engine
-#include "graphics/colormasks.h"         // for createPixelFormat
 #include "graphics/palette.h"            // for PaletteManager
-#include "graphics/transparent_surface.h" // for TransparentSurface
 #include "sci/console.h"                 // for Console
 #include "sci/engine/features.h"         // for GameFeatures
 #include "sci/engine/state.h"            // for EngineState
@@ -67,8 +65,8 @@ bool VideoPlayer::open(const Common::String &fileName) {
 	// KQ7 2.00b videos are compressed in 24bpp Cinepak, so cannot play on a
 	// system with no RGB support
 	if (_decoder->getPixelFormat().bytesPerPixel != 1) {
-		void showScummVMDialog(const Common::String &message, const char* altButton = nullptr, bool alignCenter = true);
-		showScummVMDialog(Common::String::format(_("Cannot play back %dbpp video on a system with maximum color depth of 8bpp"), _decoder->getPixelFormat().bpp()));
+		void showScummVMDialog(const Common::U32String &message, const Common::U32String &altButton = Common::U32String(""), bool alignCenter = true);
+		showScummVMDialog(Common::U32String::format(_("Cannot play back %dbpp video on a system with maximum color depth of 8bpp"), _decoder->getPixelFormat().bpp()));
 		_decoder->close();
 		return false;
 	}
@@ -82,19 +80,26 @@ bool VideoPlayer::startHQVideo() {
 	// Optimize rendering performance for unscaled videos, and allow
 	// better-than-NN interpolation for videos that are scaled
 	if (shouldStartHQVideo()) {
-		// TODO: Search for and use the best supported format (which may be
-		// lower than 32bpp) once the scaling code in Graphics supports
-		// 16bpp/24bpp, and once the SDL backend can correctly communicate
-		// supported pixel formats above whatever format is currently used by
-		// _hwsurface. Right now, this will either show an error dialog (OpenGL)
-		// or just crash entirely (SDL) if the backend does not support this
-		// 32bpp pixel format, which sucks since this code really ought to be
-		// able to fall back to NN scaling for games with 256-color videos
-		// without any error.
-		const Graphics::PixelFormat format(4, 8, 8, 8, 8, 24, 16, 8, 0);
-		g_sci->_gfxFrameout->setPixelFormat(format);
-		_hqVideoMode = (g_system->getScreenFormat() == format);
-		return _hqVideoMode;
+		const Common::List<Graphics::PixelFormat> outFormats = g_system->getSupportedFormats();
+		Graphics::PixelFormat bestFormat = outFormats.front();
+		if (bestFormat.bytesPerPixel != 2 && bestFormat.bytesPerPixel != 4) {
+			Common::List<Graphics::PixelFormat>::const_iterator it;
+			for (it = outFormats.begin(); it != outFormats.end(); ++it) {
+				if (it->bytesPerPixel == 2 || it->bytesPerPixel == 4) {
+					bestFormat = *it;
+					break;
+				}
+			}
+		}
+
+		if (bestFormat.bytesPerPixel != 2 && bestFormat.bytesPerPixel != 4) {
+			warning("Failed to find any valid output pixel format");
+			_hqVideoMode = false;
+		} else {
+			g_sci->_gfxFrameout->setPixelFormat(bestFormat);
+			_hqVideoMode = (g_system->getScreenFormat() != Graphics::PixelFormat::createFormatCLUT8());
+			return _hqVideoMode;
+		}
 	} else {
 		_hqVideoMode = false;
 	}
@@ -243,20 +248,16 @@ void VideoPlayer::renderFrame(const Graphics::Surface &nextFrame) const {
 
 	if (_decoder->getWidth() != _drawRect.width() || _decoder->getHeight() != _drawRect.height()) {
 		Graphics::Surface *const unscaledFrame(convertedFrame);
-		// TODO: The only reason TransparentSurface is used here because it is
-		// where common scaler code is right now, which should just be part of
-		// Graphics::Surface (or some free functions).
-		const Graphics::TransparentSurface tsUnscaledFrame(*unscaledFrame);
 #ifdef USE_RGB_COLOR
 		if (_hqVideoMode) {
-			convertedFrame = tsUnscaledFrame.scaleT<Graphics::FILTER_BILINEAR>(_drawRect.width(), _drawRect.height());
+			convertedFrame = unscaledFrame->scale(_drawRect.width(), _drawRect.height(), true);
 		} else {
 #elif 1
 		{
 #else
 		}
 #endif
-			convertedFrame = tsUnscaledFrame.scaleT<Graphics::FILTER_NEAREST>(_drawRect.width(), _drawRect.height());
+			convertedFrame = unscaledFrame->scale(_drawRect.width(), _drawRect.height(), false);
 		}
 		assert(convertedFrame);
 		if (freeConvertedFrame) {

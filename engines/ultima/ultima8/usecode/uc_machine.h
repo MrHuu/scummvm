@@ -34,7 +34,7 @@ class Debugger;
 class Process;
 class UCProcess;
 class ConvertUsecode;
-class BitSet;
+class GlobalStorage;
 class UCList;
 class idMan;
 
@@ -88,7 +88,6 @@ public:
 	INTRINSIC(I_urandom);
 	INTRINSIC(I_rndRange);
 	INTRINSIC(I_numToStr);
-	INTRINSIC(I_getCurrentTimerTick);
 
 protected:
 	void loadIntrinsics(Intrinsic *i, unsigned int icount);
@@ -98,7 +97,7 @@ private:
 	Intrinsic *_intrinsics;
 	unsigned int _intrinsicCount;
 
-	BitSet *_globals;
+	GlobalStorage *_globals;
 
 	Std::map<uint16, UCList *> _listHeap;
 	Std::map<uint16, Std::string> _stringHeap;

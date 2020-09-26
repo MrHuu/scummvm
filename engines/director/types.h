@@ -25,6 +25,10 @@
 
 namespace Director {
 
+enum MovieFlag {
+	kMovieFlagAllowOutdatedLingo	= (1 << 8)
+};
+
 enum CastType {
 	kCastTypeNull = 0,
 	kCastBitmap = 1,
@@ -43,13 +47,41 @@ enum CastType {
 
 enum ScriptType {
 	kNoneScript = -1,
-	kMovieScript = 0,
-	kSpriteScript = 1,
-	kFrameScript = 2,
-	kCastScript = 3,
-	kGlobalScript = 4,
-	kScoreScript = 5,
-	kMaxScriptType = 5	// Sync with score.cpp:45, array scriptTypes[]
+	kScoreScript = 0,
+	kCastScript = 1,
+	kMovieScript = 2,
+	kEventScript = 3,
+	kMaxScriptType = 3	// Sync with score-loading.cpp:45, array scriptTypes[]
+};
+
+enum ScriptFlag {
+	kScriptFlagUnused		= (1 << 0x0),
+	kScriptFlagFuncsGlobal	= (1 << 0x1),
+	kScriptFlagVarsGlobal	= (1 << 0x2),	// Occurs in event scripts (which have no local vars). Correlated with use of alternate global var opcodes.
+	kScriptFlagUnk3			= (1 << 0x3),
+	kScriptFlagFactoryDef	= (1 << 0x4),
+	kScriptFlagUnk5			= (1 << 0x5),
+	kScriptFlagUnk6			= (1 << 0x6),
+	kScriptFlagUnk7			= (1 << 0x7),
+	kScriptFlagHasFactory	= (1 << 0x8),
+	kScriptFlagEventScript	= (1 << 0x9),
+	kScriptFlagEventScript2	= (1 << 0xa),
+	kScriptFlagUnkB			= (1 << 0xb),
+	kScriptFlagUnkC			= (1 << 0xc),
+	kScriptFlagUnkD			= (1 << 0xd),
+	kScriptFlagUnkE			= (1 << 0xe),
+	kScriptFlagUnkF			= (1 << 0xf)
+};
+
+enum ObjectType {
+	kNoneObj = 0,
+	kFactoryObj = 1 << 0,
+	kXObj = 1 << 1,
+	kScriptObj = 1 << 2,
+	kXtraObj = 1 << 3,
+	kAllObj = kFactoryObj | kXObj | kScriptObj | kXtraObj,
+	kWindowObj = 1 << 4,
+	kCastMemberObj = 1 << 5
 };
 
 enum ShapeType {
@@ -92,6 +124,13 @@ enum ButtonType {
 	kTypeRadio
 };
 
+enum FrameRateType {
+	kFrameRateDefault = -1,
+	kFrameRateNormal = 0,
+	kFrameRateFastest = 1,
+	kFrameRateFixed = 2
+};
+
 enum SpriteType {
 	kInactiveSprite					= 0,	// turns the sprite off
 	kBitmapSprite					= 1,
@@ -108,7 +147,7 @@ enum SpriteType {
 	kOutlinedRectangleSprite		= 12,	// QuickDraw
 	kOutlinedRoundedRectangleSprite	= 13,	// QuickDraw
 	kOutlinedOvalSprite				= 14,	// QuickDraw
-	kThinkLineSprite				= 15,	// 2pt width line
+	kThickLineSprite				= 15,	// 2pt width line
 	kCastMemberSprite				= 16,	// Specified by cast member
 	kFilmLoopSpite					= 17,
 	kDirMovieSprite					= 18
@@ -147,6 +186,7 @@ enum LEvent {
 	kEventEndSprite,
 
 	kEventNone,
+	kEventGeneric,
 	kEventEnterFrame,
 	kEventPrepareFrame,
 	kEventIdle,
@@ -172,7 +212,9 @@ enum LEvent {
 	kEventMouseUpOutSide,
 	kEventMouseWithin,
 
-	kEventStart
+	kEventStartUp,
+
+	kEventMenuCallback
 };
 
 enum TransitionType {
@@ -231,10 +273,45 @@ enum TransitionType {
 	kTransDissolveBits
 };
 
+// TODO: Can there be any more built-in palette types?
+enum PaletteType {
+	kClutSystemMac = -1,
+	kClutRainbow = -2,
+	kClutGrayscale = -3,
+	kClutPastels = -4,
+	kClutVivid = -5,
+	kClutNTSC = -6,
+	kClutMetallic = -7,
+	kClutSystemWin = -101
+};
+
 enum {
 	kCursorDefault,
 	kCursorMouseDown,
 	kCursorMouseUp
+};
+
+enum PlayState {
+	kPlayNotStarted,
+	kPlayStarted,
+	kPlayStopped
+};
+
+enum SymbolType {
+	VOIDSYM,
+	OPCODE,
+	CBLTIN,	// builtin command
+	FBLTIN,	// builtin function
+	HBLTIN,	// builtin handler (can be called as either command or func)
+	KBLTIN,	// builtin constant
+	HANDLER	// user-defined handler
+};
+
+enum ChunkType {
+	kChunkChar,
+	kChunkWord,
+	kChunkItem,
+	kChunkLine
 };
 
 struct Datum;

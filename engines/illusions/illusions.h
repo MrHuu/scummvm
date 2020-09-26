@@ -39,7 +39,8 @@
 
 namespace Illusions {
 
-char *debugW2I(byte *wstr);
+char *debugW2I(uint16 *wstr);
+void swapBytesInWideString(byte * wstr);
 
 #define ILLUSIONS_SAVEGAME_VERSION 0
 
@@ -145,6 +146,7 @@ public:
 	int16 _menuChoiceOfs;
 
 	int getGameId() const;
+	Common::Language getGameLanguage() const;
 
 	void runUpdateFunctions();
 	int updateActors(uint flags);

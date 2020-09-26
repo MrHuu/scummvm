@@ -25,6 +25,7 @@
 
 #include "common/scummsys.h"
 #include "common/str-enc.h"
+#include "common/ustr.h"
 
 #include <stdarg.h>
 
@@ -128,6 +129,9 @@ public:
 	/** Construct a string consisting of the given character. */
 	explicit String(char c);
 
+	/** Construct a new string from the given u32 string. */
+	String(const U32String &str);
+
 	~String();
 
 	String &operator=(const char *str);
@@ -172,6 +176,7 @@ public:
 	bool contains(const String &x) const;
 	bool contains(const char *x) const;
 	bool contains(char x) const;
+	bool contains(uint32 x) const;
 
 	/** Return uint64 corrensponding to String's contents. */
 	uint64 asUint64() const;
@@ -398,6 +403,8 @@ protected:
 	void decRefCount(int *oldRefCount);
 	void initWithCStr(const char *str, uint32 len);
 
+	bool pointerInOwnBuffer(const char *str) const;
+
 	void decodeUTF8(U32String &dst) const;
 	void decodeOneByte(U32String &dst, CodePage page) const;
 };
@@ -567,5 +574,7 @@ extern char *scumm_strdup(const char *in);
 
 extern int scumm_compareDictionary(const char *s1, const char *s2);
 extern const char *scumm_skipArticle(const char *s1);
+
+extern const char *scumm_strcasestr(const char *s, const char *find);
 
 #endif

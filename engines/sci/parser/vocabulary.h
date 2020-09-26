@@ -208,6 +208,41 @@ public:
 	 */
 	void lookupWord(ResultWordList &retval, const char *word, int word_len);
 
+	/**
+	 * Looks up a single word in the words list, taking into account suffixes, and updating parent_retval if a matching prefix is found
+	 * Note: there is no equivalent in Sierra SCI, added to support specific languages translations
+	 * For other languages, it does nothing
+	 * @param parent_retval     parent's function list of matches
+	 * @param retval            the list of matches
+	 * @param word              pointer to the word to look up
+	 * @param word_len          length of the word to look up
+	 */
+	void lookupWordPrefix(ResultWordListList &parent_retval, ResultWordList &retval, const char *word, int word_len);
+
+	/**
+	 * Helper function for lookupWordPrefix, checking specific prefix for match
+	 * Intended for nouns and prepositions, and the prefix has meaning as another word
+	 * @param parent_retval     lookupWordPrefix's parent's function list of matches
+	 * @param retval            lookupWordPrefix's list of matches
+	 * @param word              pointer to the word to look up
+	 * @param word_len          length of the word to look up
+	 * @param prefix            the prefix to look for in the word
+	 * @param meaning           the meaning of that prefix
+	 * @return true on prefix match, false on prefix not matching
+	 */
+	bool lookupSpecificPrefixWithMeaning(ResultWordListList &parent_retval, ResultWordList &retval, const char *word, int word_len, unsigned char prefix, const char *meaning);
+
+	/**
+	 * Helper function for lookupWordPrefix, checking specific prefix for match
+	 * Intended for verbs, and the prefix doesn't have any meaning
+	 * @param parent_retval     lookupWordPrefix's parent's function list of matches
+	 * @param retval            lookupWordPrefix's list of matches
+	 * @param word              pointer to the word to look up
+	 * @param word_len          length of the word to look up
+	 * @param prefix            the prefix to look for in the word
+	 * @return true on prefix match, false on prefix not matching
+	 */
+	bool lookupVerbPrefix(ResultWordListList &parent_retval, ResultWordList &retval, Common::String word, int word_len, Common::String prefix);
 
 	/**
 	 * Tokenizes a string and compiles it into word_ts.
@@ -370,6 +405,11 @@ private:
 	WordMap _parserWords;
 	SynonymList _synonyms; /**< The list of synonyms */
 	Common::Array<Common::List<AltInput> > _altInputs;
+
+	struct PrefixMeaning {
+		unsigned char prefix;
+		const char *meaning;
+	};
 
 	int _pronounReference;
 

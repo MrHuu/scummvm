@@ -403,7 +403,7 @@ uint Character::getStat(Attribute attrib, bool baseOnly) const {
 		attr._permanent += attr._temporary;
 	}
 
-	return MAX(attr._permanent, (uint)0);
+	return MAX(attr._permanent, 0);
 }
 
 int Character::statColor(int amount, int threshold) {
@@ -485,24 +485,26 @@ bool Character::noActions() {
 	}
 }
 
-void Character::setAward(int awardId, bool value) {
+static int fixAwardId(int awardId) {
 	int v = awardId;
 	if (awardId == 73)
 		v = 126;
 	else if (awardId == 81)
 		v = 127;
 
-	_awards[v] = value ? 1 : 0;
+	return v;
+}
+
+void Character::setAward(int awardId, bool value) {
+	_awards[fixAwardId(awardId)] = value ? 1 : 0;
 }
 
 bool Character::hasAward(int awardId) const {
-	int v = awardId;
-	if (awardId == 73)
-		v = 126;
-	else if (awardId == 81)
-		v = 127;
+	return _awards[fixAwardId(awardId)] ? true : false;
+}
 
-	return _awards[v];
+int Character::getAwardCount(int awardId) const {
+	return _awards[fixAwardId(awardId)];
 }
 
 int Character::getArmorClass(bool baseOnly) const {
@@ -548,7 +550,7 @@ int Character::getThievery() const {
 }
 
 uint Character::getCurrentLevel() const {
-	return MAX(_level._permanent + _level._temporary, (uint)0);
+	return MAX(_level._permanent + _level._temporary, 0);
 }
 
 int Character::itemScan(int itemId) const {

@@ -78,8 +78,8 @@ MacTextWindow::MacTextWindow(MacWindowManager *wm, const MacFont *font, int fgco
 		g_system->getTimerManager()->installTimerProc(&cursorTimerHandler, 200000, this, "textWindowCursor");
 }
 
-void MacTextWindow::resize(int w, int h) {
-	if (_surface.w == w && _surface.h == h)
+void MacTextWindow::resize(int w, int h, bool inner) {
+	if (_composeSurface->w == w && _composeSurface->h == h)
 		return;
 
 	undrawInput();
@@ -154,7 +154,7 @@ bool MacTextWindow::draw(bool forceRedraw) {
 	_cursorDirty = false;
 
 	// Compose
-	_mactext->draw(_composeSurface, 0, _scrollPos, _surface.w - 2, _scrollPos + _surface.h - 2, kConWOverlap - 2, kConWOverlap - 2);
+	_mactext->draw(_composeSurface, 0, _scrollPos, _composeSurface->w - 2, _scrollPos + _composeSurface->h - 2, kConWOverlap - 2, kConWOverlap - 2);
 
 	if (_cursorState)
 		_composeSurface->blitFrom(*_cursorSurface, *_cursorRect, Common::Point(_cursorX + kConWOverlap - 2, _cursorY + kConHOverlap - 2));
@@ -162,7 +162,7 @@ bool MacTextWindow::draw(bool forceRedraw) {
 	if (_selectedText.endY != -1)
 		drawSelection();
 
-	_composeSurface->transBlitFrom(_borderSurface, kColorGreen);
+	_composeSurface->transBlitFrom(_borderSurface, _wm->_colorGreen);
 
 	return true;
 }
@@ -171,13 +171,13 @@ bool MacTextWindow::draw(ManagedSurface *g, bool forceRedraw) {
 	if (!draw(forceRedraw))
 		return false;
 
-	g->transBlitFrom(*_composeSurface, _composeSurface->getBounds(), Common::Point(_dims.left - 2, _dims.top - 2), kColorGreen2);
+	g->transBlitFrom(*_composeSurface, _composeSurface->getBounds(), Common::Point(_dims.left - 2, _dims.top - 2), _wm->_colorGreen2);
 
 	return true;
 }
 
 void MacTextWindow::blit(ManagedSurface *g, Common::Rect &dest) {
-	g->transBlitFrom(*_composeSurface, _composeSurface->getBounds(), dest, kColorGreen2);
+	g->transBlitFrom(*_composeSurface, _composeSurface->getBounds(), dest, _wm->_colorGreen2);
 }
 
 void MacTextWindow::drawSelection() {

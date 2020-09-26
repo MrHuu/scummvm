@@ -78,6 +78,14 @@ class Encoding {
 		 */
 		static char *convert(const String &to, const String &from, const char *string, size_t length);
 
+		static char *convert(const String &to, const String &from, const String &s) {
+			return convert(to, from, s.c_str(), s.size());
+		}
+
+		static char *convert(const String &to, const U32String &s) {
+			return convert(to, "UTF-32", (const char *)s.c_str(), s.size() * 4);
+		}
+
 		/**
 		 * @return The encoding, which is currently being converted from
 		 */
@@ -171,22 +179,6 @@ class Encoding {
 		 * @return Converted string (must be freed) or nullptr if the conversion failed
 		 */
 		static char *convertIconv(const char *to, const char *from, const char *string, size_t length);
-
-		/**
-		 * Tries to use the TransMan to convert the string. It can convert only
-		 * between UTF-32 and the current GUI charset. It also tries to convert
-		 * from the current GUI charset to UTF-32 and then it calls convert() again.
-		 *
-		 * The result has to be freed after use.
-		 *
-		 * @param to Name of the encoding the strings will be converted to
-		 * @param from Name of the encoding the strings will be converted from
-		 * @param string String that should be converted.
-		 * @param length Length of the string to convert in bytes.
-		 *
-		 * @return Converted string (must be freed) or nullptr if the conversion failed
-		 */
-		static char *convertTransManMapping(const char *to, const char *from, const char *string, size_t length);
 
 		/**
 		 * Uses conversion table to convert the string to unicode and from that

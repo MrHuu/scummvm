@@ -386,7 +386,7 @@ static const uint8 gammaTables[GfxPalette32::numGammaTables][256] = {
 	_cycleMap(),
 
 	// Gamma correction
-	_gammaLevel(-1),
+	_gammaLevel(g_sci->_features->useMacGammaLevel() ? 2 : -1),
 	_gammaChanged(false) {
 
 	for (int i = 0, len = ARRAYSIZE(_fadeTable); i < len; ++i) {
@@ -535,16 +535,10 @@ void GfxPalette32::updateHardware() {
 	memset(bpal + (maxIndex + 1) * 3, 0, (255 - maxIndex - 1) * 3);
 #endif
 
-	if (g_sci->getPlatform() == Common::kPlatformMacintosh) {
-		bpal[255 * 3    ] = 0;
-		bpal[255 * 3 + 1] = 0;
-		bpal[255 * 3 + 2] = 0;
-	} else {
-		// The last color must always be white
-		bpal[255 * 3    ] = 255;
-		bpal[255 * 3 + 1] = 255;
-		bpal[255 * 3 + 2] = 255;
-	}
+	// The last color must always be white
+	bpal[255 * 3    ] = 255;
+	bpal[255 * 3 + 1] = 255;
+	bpal[255 * 3 + 2] = 255;
 
 	// If the system is in a high color mode, which can happen during video
 	// playback, attempting to send the palette to OSystem is illegal and will

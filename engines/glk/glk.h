@@ -31,6 +31,7 @@
 #include "glk/glk_types.h"
 #include "glk/streams.h"
 #include "glk/pc_speaker.h"
+#include "glk/quetzal.h"
 
 namespace Glk {
 
@@ -49,7 +50,8 @@ enum GlkDebugChannels {
 	kDebugCore      = 1 << 0,
 	kDebugScripts   = 1 << 1,
 	kDebugGraphics  = 1 << 2,
-	kDebugSound     = 1 << 3
+	kDebugSound     = 1 << 3,
+	kDebugSpeech    = 1 << 4
 };
 
 
@@ -95,14 +97,30 @@ protected:
 	virtual void initGraphicsMode();
 
 	/**
+	 * Create the debugger
+	 */
+	virtual void createDebugger();
+
+	/**
 	 * Create the screen
 	 */
 	virtual Screen *createScreen();
 
 	/**
+	 * Loads the configuration
+	 */
+	virtual void createConfiguration();
+
+	/**
 	 * Main game loop for the individual interpreters
 	 */
 	virtual void runGame() = 0;
+
+	/**
+	 * Switches Glk from the default black on white color scheme
+	 * to white on black
+	 */
+	void switchToWhiteOnBlack();
 public:
 	Blorb *_blorb;
 	Clipboard *_clipboard;
@@ -128,16 +146,12 @@ public:
 	/**
 	 * Returns true if a savegame can be loaded
 	 */
-	bool canLoadGameStateCurrently() override {
-		return true;
-	}
+	bool canLoadGameStateCurrently() override;
 
 	/**
 	 * Returns true if the game can be saved
 	 */
-	bool canSaveGameStateCurrently() override {
-		return true;
-	}
+	bool canSaveGameStateCurrently() override;
 
 	/**
 	 * Returns the language
@@ -202,6 +216,16 @@ public:
 	 * Save the game to a given slot
 	 */
 	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+
+	/**
+	 * Loads Quetzal chunks from the passed savegame
+	 */
+	virtual Common::Error loadGameChunks(QuetzalReader &quetzal);
+
+	/**
+	 * Writes out the Quetzal chunks within a savegame
+	 */
+	virtual Common::Error saveGameChunks(QuetzalWriter &quetzal);
 
 	/**
 	 * Load a savegame from the passed Quetzal file chunk stream

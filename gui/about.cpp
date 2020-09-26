@@ -93,30 +93,30 @@ AboutDialog::AboutDialog()
 	int i;
 
 	for (i = 0; i < 1; i++)
-		_lines.push_back("");
+		_lines.push_back(U32String(""));
 
 	Common::String version("C0""ScummVM ");
 	version += gScummVMVersion;
 	_lines.push_back(version);
 
-	Common::String date = Common::String::format(_("(built on %s)"), gScummVMBuildDate);
-	_lines.push_back("C2" + date);
+	Common::U32String date = Common::U32String::format(_("(built on %s)"), gScummVMBuildDate);
+	_lines.push_back(U32String("C2") + date);
 
 	for (i = 0; i < ARRAYSIZE(copyright_text); i++)
-		addLine(copyright_text[i]);
+		addLine(U32String(copyright_text[i]));
 
-	Common::String features("C1");
+	Common::U32String features("C1");
 	features += _("Features compiled in:");
-	addLine(features.c_str());
+	addLine(features);
 	Common::String featureList("C0");
 	featureList += gScummVMFeatures;
-	addLine(featureList.c_str());
+	addLine(featureList);
 
-	_lines.push_back("");
+	_lines.push_back(U32String(""));
 
-	Common::String engines("C1");
+	Common::U32String engines("C1");
 	engines += _("Available engines:");
-	addLine(engines.c_str());
+	addLine(engines);
 
 	const PluginList &plugins = EngineMan.getPlugins();
 	PluginList::const_iterator iter = plugins.begin();
@@ -124,52 +124,37 @@ AboutDialog::AboutDialog()
 		Common::String str;
 		str = "C0";
 		str += (*iter)->getName();
-		addLine(str.c_str());
+		addLine(str);
 
 		str = "C2";
 		str += (*iter)->get<MetaEngine>().getOriginalCopyright();
-		addLine(str.c_str());
+		addLine(str);
 
 		//addLine("");
 	}
 
 	for (i = 0; i < ARRAYSIZE(gpl_text); i++)
-		addLine(gpl_text[i]);
+		addLine(U32String(gpl_text[i]));
 
-	_lines.push_back("");
+	_lines.push_back(U32String(""));
 
 	for (i = 0; i < ARRAYSIZE(credits); i++)
-		addLine(credits[i]);
+		addLine(U32String(credits[i]));
 }
 
-void AboutDialog::addLine(const char *str) {
-	if (*str == 0) {
-		_lines.push_back("");
+void AboutDialog::addLine(const U32String &str) {
+	U32String::const_iterator strBeginItr = str.begin();
+	if (*strBeginItr == 0) {
+		_lines.push_back(U32String(""));
 	} else {
-		Common::String format(str, 2);
-		str += 2;
+		Common::U32String format(str.begin(), str.begin() + 2);
+		strBeginItr += 2;
+		U32String renderStr(strBeginItr, str.end());
 
-		static Common::String asciiStr;
-		if (format[0] == 'A') {
-			bool useAscii = false;
-#ifdef USE_TRANSLATION
-			// We could use TransMan.getCurrentCharset() but rather than compare strings
-			// it is easier to use TransMan.getCharsetMapping() (non null in case of non
-			// ISO-8859-1 mapping)
-			useAscii = (TransMan.getCharsetMapping() != nullptr);
-#endif
-			if (useAscii)
-				asciiStr = str;
-			return;
-		}
-		StringArray wrappedLines;
-		if (!asciiStr.empty()) {
-			g_gui.getFont().wordWrapText(asciiStr, _w - 2 * _xOff, wrappedLines);
-			asciiStr.clear();
-		} else
-			g_gui.getFont().wordWrapText(str, _w - 2 * _xOff, wrappedLines);
+		U32StringArray wrappedLines;
+		g_gui.getFont().wordWrapText(renderStr, _w - 2 * _xOff, wrappedLines);
 
-		for (StringArray::const_iterator i = wrappedLines.begin(); i != wrappedLines.end(); ++i) {
+		for (U32StringArray::const_iterator i = wrappedLines.begin(); i != wrappedLines.end(); ++i) {
 			_lines.push_back(format + *i);
 		}
 	}
@@ -203,11 +188,14 @@ void AboutDialog::drawDialog(DrawLayer layerToDraw) {
 	int y = _y + _yOff - (_scrollPos % _lineHeight);
 
 	for (int line = firstLine; line < lastLine; line++) {
-		const char *str = _lines[line].c_str();
+		U32String str = _lines[line];
+		U32String::const_iterator strLineItrBegin = _lines[line].begin();
+		U32String::const_iterator strLineItrEnd = _lines[line].end();
+
 		Graphics::TextAlign align = Graphics::kTextAlignCenter;
 		ThemeEngine::WidgetStateInfo state = ThemeEngine::kStateEnabled;
-		if (*str) {
-			switch (str[0]) {
+		if (strLineItrBegin != strLineItrEnd) {
+			switch (*strLineItrBegin) {
 			case 'C':
 				align = Graphics::kTextAlignCenter;
 				break;
@@ -221,7 +209,7 @@ void AboutDialog::drawDialog(DrawLayer layerToDraw) {
 				error("Unknown scroller opcode '%c'", str[0]);
 				break;
 			}
-			switch (str[1]) {
+			switch (*(strLineItrBegin + 1)) {
 			case '0':
 				state = ThemeEngine::kStateEnabled;
 				break;
@@ -242,16 +230,17 @@ void AboutDialog::drawDialog(DrawLayer layerToDraw) {
 			default:
 				error("Unknown color type '%c'", str[1]);
 			}
-			str += 2;
+			strLineItrBegin += 2;
 		}
 		// Trim leading whitespaces if center mode is on
 		if (align == Graphics::kTextAlignCenter)
-			while (*str && *str == ' ')
-				str++;
+			while (strLineItrBegin != strLineItrEnd && *strLineItrBegin == ' ')
+				strLineItrBegin++;
 
-		if (*str)
+		U32String renderStr(strLineItrBegin, strLineItrEnd);
+		if (!renderStr.empty())
 			g_gui.theme()->drawText(Common::Rect(_x + _xOff, y, _x + _w - _xOff, y + g_gui.theme()->getFontHeight()),
-			                        str, state, align, ThemeEngine::kTextInversionNone, 0, false,
+			                        renderStr, state, align, ThemeEngine::kTextInversionNone, 0, false,
 			                        ThemeEngine::kFontStyleBold, ThemeEngine::kFontColorNormal, true, _textDrawableArea);
 		y += _lineHeight;
 	}
@@ -476,7 +465,6 @@ void EE::run() {
 			case Common::EVENT_RETURN_TO_LAUNCHER:
 				_shouldQuit = true;
 				break;
-
 			case Common::EVENT_LBUTTONDOWN:
 				break;
 			case Common::EVENT_KEYDOWN:
@@ -595,13 +583,12 @@ void EE::processKeyDown(Common::Event &e) {
 }
 
 void EE::getPos() {
-	int tx, velx, bnd;
-
 	for (int i = 0; i < 2; i++) {
 		if (_keymove[i][kDirUp] && _frameindex[i] == -1)
 			_frameindex[i] = 0;
-		tx = _x[i] + (velx = _keymove[i][kDirLeft] + _keymove[i][kDirRight]);
-		bnd = 3 + i * 155;
+		int velx = _keymove[i][kDirLeft] + _keymove[i][kDirRight];
+		int tx = _x[i] + velx;
+		int bnd = 3 + i * 155;
 		if (velx > 0) {
 			if (tx < bnd + 119)
 				_x[i] = tx;
@@ -705,9 +692,7 @@ void EE::calcscore() {
 }
 
 int EE::destination(int pl, int destx, int tol) {
-	int xp;
-
-	xp = _x[pl];
+	int xp = _x[pl];
 	if (abs(xp - destx) < tol) {
 		_keymove[pl][kDirLeft] = 0;
 		_keymove[pl][kDirRight] = 0;
@@ -726,16 +711,13 @@ int EE::destination(int pl, int destx, int tol) {
 int reset = false;
 
 bool EE::moveball() {
-	int rbvelx, rbvely;
-	bool hitfloor;
-
 	if (!reset) {
 		_bx = 4096; _by = 8640; _bvelx = 125; _bvely = -259;
 		reset = true;
 	}
 
-	rbvelx = _bvelx;
-	rbvely = _bvely;
+	int rbvelx = _bvelx;
+	int rbvely = _bvely;
 	if (rbvelx > 319) rbvelx = 319;
 	if (rbvelx < -319) rbvelx = -319;
 	if (rbvely > 319) rbvely = 319;
@@ -771,6 +753,7 @@ bool EE::moveball() {
 		rbvelx -= rbvelx >> 4;
 		rbvely -= rbvely >> 4;
 	}
+	bool hitfloor;
 	if (_by > 11392) {
 		_by = 11392;
 		rbvely = -rbvely;
@@ -793,14 +776,12 @@ bool EE::moveball() {
 }
 
 void EE::docollisions() {
-	int dx, dy, dist, rndoff;
-
 	for (int i = 0; i < 2; i++) {
-		dx = _tbx - _x[i] - i * 7;
-		dy = (_tby - _y[i]) >> 1;
-		dist = (dx >> 2) * dx + dy * dy;
+		int dx = _tbx - _x[i] - i * 7;
+		int dy = (_tby - _y[i]) >> 1;
+		int dist = (dx >> 2) * dx + dy * dy;
 		if (dist < 110) {
-			rndoff = 8 - (_rnd & 15);
+			int rndoff = 8 - (_rnd & 15);
 			if (_frameindex[i] > -1)
 				_bvely = -abs(_bvely) + (jump[_frameindex[i]] << (3 << _servevel));
 			else
@@ -849,7 +830,7 @@ void EE::docollisions() {
 		} else if ((_tbx > 147 && 161 - _tbx >= polecol[91 - _tby]) ||
 				   (_tbx < 148 && _tbx - 133 >= polecol[91 - _tby])) {
 			if (_bvely > 0) {
-				dx = _tbx - 145;
+				int dx = _tbx - 145;
 				if (dx < -5) _bvelx = -abs(_bvelx);
 				if (dx > 5) _bvelx = abs(_bvelx);
 				_bvely = -abs(_bvely);
@@ -862,11 +843,10 @@ void EE::docollisions() {
 
 
 void EE::computer0() {
-	int ystep, destx, dx, rndoff, dest = 0;
-
 	_keymove[0][kDirUp] = 0;
 	if (_tby < _bytop) _bytop = _tby;
-	rndoff = 5 - _rnd % 10;
+	int rndoff = 5 - _rnd % 10;
+	int dest = 0;
 	if (_serve && ((_server & 1) == 0)) {
 		switch (_compserve) {
 		case 0:
@@ -911,6 +891,7 @@ void EE::computer0() {
 		}
 		_keymove[0][kDirUp] = dest;
 	} else if (_bvely > 0 && _tbx < 140) {
+		int ystep, destx;
 		if (_bvely >> 6 == 0)
 			ystep = 0;
 		else
@@ -921,7 +902,7 @@ void EE::computer0() {
 		else
 			destx = _tbx + (_bvelx >> 6) * ystep - 4;
 
-		dx = _x[0] - _tbx;
+		int dx = _x[0] - _tbx;
 
 		if (abs(_bvelx) < 128 && _bytop < 75) {
 			if ((_tby < 158) ^ (_bvelx < 0))
@@ -949,12 +930,11 @@ void EE::computer0() {
 }
 
 void EE::computer1() {
-	int ystep, destx, dx, rndoff, dest = 0;
-
 	_keymove[1][kDirUp] = 0;
 	if (_tby < _bytop) _bytop = _tby;
-	rndoff = 5 - _rnd % 10;
+	int rndoff = 5 - _rnd % 10;
 	if (_serve && ((_server & 1) == 1)) {
+		int dest = 0;
 		switch (_compserve) {
 		case 0:
 			dest = destination(1, 232, 2);
@@ -998,6 +978,7 @@ void EE::computer1() {
 		}
 		_keymove[1][kDirUp] = dest;
 	} else if (_bvely > 0 && _tbx > 125) {
+		int ystep, destx;
 		if (_bvely >> 6 == 0)
 			ystep = 0;
 		else
@@ -1008,7 +989,7 @@ void EE::computer1() {
 		else
 			destx = _tbx + (_bvelx >> 6) * ystep - 4;
 
-		dx = _x[1] - _tbx;
+		int dx = _x[1] - _tbx;
 
 		if (abs(_bvelx) < 128 && _bytop < 75) {
 			if ((_tby < 158) ^ (_bvelx < 0))
@@ -1041,11 +1022,9 @@ void EE::init() {
 	_rnd = 0;
 	_starter = _winner = _hits = 0;
 	_bvelx = _bvely = 0;
-	_tbx = 200;
-	_tby = 20;
+	_tbx = 200; _tby = 20;
 	_bytop = 200;
-	_x[0] = 64;
-	_x[1] = 226;
+	_x[0] = 64; _x[1] = 226;
 
 	_air = false;
 
@@ -1332,7 +1311,7 @@ static const uint32 head[38] = {
 };
 
 static const uint32 legs[42] = {
-	0xa0000000, 0x00000000, 0x80000000, 0x00000002, 0x80000000, 0x00000002,0xa0000000,
+	0xa0000000, 0x00000000, 0x80000000, 0x00000002, 0x80000000, 0x00000002, 0xa0000000,
 	0x00000000, 0x50000000, 0x00000000, 0xf0000000, 0x00000003, 0xfc000000, 0x000003ff,
 
 	0xa0000000, 0x00000002, 0x0a000000, 0x0000000a, 0x02400000, 0x00000028, 0x00700000,

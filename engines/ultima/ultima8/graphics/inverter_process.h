@@ -30,6 +30,7 @@
 namespace Ultima {
 namespace Ultima8 {
 
+/** The process to tear and flip the screen, triggered by some game events in U8 */
 class InverterProcess : public Process {
 public:
 	InverterProcess();
@@ -50,9 +51,9 @@ public:
 	INTRINSIC(I_invertScreen);
 
 	bool loadData(Common::ReadStream *rs, uint32 version);
-protected:
 	void saveData(Common::WriteStream *ws) override;
 
+protected:
 	static InverterProcess *_inverter;
 	unsigned int _targetState;
 };

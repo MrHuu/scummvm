@@ -23,6 +23,7 @@
 #ifndef STARTREK_H
 #define STARTREK_H
 
+#include "common/cosinetables.h"
 #include "common/events.h"
 #include "common/list.h"
 #include "common/ptr.h"
@@ -61,6 +62,7 @@ namespace StarTrek {
 class StarTrekEngine;
 class Room;
 class Console;
+class Resource;
 
 typedef String(StarTrekEngine::*TextGetterFunc)(int, uintptr, String *);
 
@@ -241,32 +243,10 @@ public:
 	void initBridge(bool b) {}; // TODO
 	void cleanupBridge() {}; // TODO
 
-	Common::MemoryReadStreamEndian *loadFile(Common::String filename, int fileIndex = 0);
-	Common::MemoryReadStreamEndian *loadBitmapFile(Common::String baseName);
-
-	/**
-	 * TODO: Figure out what the extra parameters are, and if they're important.
-	 */
-	Common::MemoryReadStreamEndian *loadFileWithParams(Common::String filename, bool unk1, bool unk2, bool unk3);
-
 	void playMovie(Common::String filename);
 	void playMovieMac(Common::String filename);
 
 	uint16 getRandomWord();
-	/**
-	 * ".txt" files are just lists of strings. This traverses the file to get a particular
-	 * string index.
-	 */
-	Common::String getLoadedText(int textIndex);
-
-
-	// math.cpp
-	/**
-	 * Unit of the angle is "quadrants" (90 degrees = 1.0)
-	 */
-	Fixed14 sin(Angle angle);
-	Fixed14 cos(Angle angle);
-	Angle atan2(int32 deltaX, int32 deltaZ);
 
 	// awaymission.cpp
 	void initAwayMission();
@@ -292,7 +272,6 @@ public:
 	Fixed8 getActorScaleAtPosition(int16 y);
 	void addAction(const Action &action);
 	void addAction(byte type, byte b1, byte b2, byte b3);
-	bool checkItemInteractionExists(int action, int activeItem, int passiveItem, int16 arg6);
 	void handleAwayMissionAction();
 
 	void checkTouchedLoadingZone(int16 x, int16 y);
@@ -314,6 +293,7 @@ public:
 	// intro.cpp
 private:
 	void playIntro();
+	void showCreditsScreen(R3 *creditsBuffer, int index, bool deletePrevious = true);
 	/**
 	 * Initializes an object to spawn at one position and move toward another position.
 	 * @param ticks The number of ticks it should take for the object to reach the destination
@@ -447,13 +427,6 @@ public:
 	void removeNextEvent();
 	bool popNextEvent(TrekEvent *e, bool poll = true);
 	void addEventToQueue(const TrekEvent &e);
-	void clearEventBuffer();
-	void updateEvents();
-	void updateTimerEvent();
-	void updateMouseEvents();
-	void updateKeyboardEvents();
-	void updateClockTicks();
-	bool checkKeyPressed();
 
 	Common::EventManager *getEventMan() {
 		return _eventMan;
@@ -487,7 +460,6 @@ public:
 	 * "readTextFromArrayWithChoices" replaces this.
 	 */
 	String readTextFromRdf(int choiceIndex, uintptr data, String *headerTextOutput);
-	String readTextFromBuffer(int choiceIndex, uintptr data, String *headerTextOutput);
 
 	/**
 	 * Shows text with the given header and main text.
@@ -682,9 +654,6 @@ public:
 	Common::MemoryReadStreamEndian *_mapFile;
 	Fixed16 _playerActorScale;
 
-	Common::String _txtFilename;
-	Common::String _loadedText; // TODO: might be OK to delete this
-
 	// Queue of "actions" (ie. next frame, clicked on object) for away mission or bridge
 	Common::Queue<Action> _actionQueue;
 
@@ -764,12 +733,13 @@ public:
 	Graphics *_gfx;
 	Sound *_sound;
 	IWFile *_iwFile;
+	Resource *_resource;
 
 private:
 	Common::RandomSource _randomSource;
 	Common::SineTable _sineTable;
+	Common::CosineTable _cosineTable;
 	Room *_room;
-	Common::MacResManager *_macResFork;
 };
 
 // Static function

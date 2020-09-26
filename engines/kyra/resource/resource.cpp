@@ -28,29 +28,7 @@
 
 namespace Kyra {
 
-class EndianAwareStreamWrapper : public Common::SeekableReadStreamEndian {
-public:
-	EndianAwareStreamWrapper(Common::SeekableReadStream *stream, bool bigEndian, bool disposeAfterUse = true) : Common::SeekableReadStreamEndian(bigEndian), _stream(stream), _dispose(disposeAfterUse) {}
-	~EndianAwareStreamWrapper() override { if (_dispose) delete _stream; }
-
-	// Common::Stream interface
-	bool err() const override { return _stream->err(); }
-
-	// Common::ReadStream interface
-	bool eos() const override { return _stream->eos(); }
-	uint32 read(void *dataPtr, uint32 dataSize) override { return _stream->read(dataPtr, dataSize); }
-
-	// Common::SeekableReadStream interface
-	int32 pos() const override { return _stream->pos(); }
-	int32 size() const override { return _stream->size(); }
-	bool seek(int32 offset, int whence = SEEK_SET) override { return _stream->seek(offset, whence); }
-	
-private:
-	Common::SeekableReadStream *_stream;
-	bool _dispose;
-};
-
-Resource::Resource(KyraEngine_v1 *vm) : _archiveCache(), _files(), _archiveFiles(), _protectedFiles(), _loaders(), _vm(vm) {
+Resource::Resource(KyraEngine_v1 *vm) : _archiveCache(), _files(), _archiveFiles(), _protectedFiles(), _loaders(), _vm(vm), _bigEndianPlatForm(vm->gameFlags().platform == Common::kPlatformAmiga || vm->gameFlags().platform == Common::kPlatformSegaCD) {
 	initializeLoaders();
 
 	// Initialize directories for playing from CD or with original
@@ -118,10 +96,16 @@ bool Resource::reset() {
 					continue;
 
 				Common::Archive *archive = loadArchive(name, *i);
-				if (archive)
-					_files.add(name, archive, 0, false);
-				else
+
+				if (archive) {
+					// Hack for the Spanish version of EOB1. It has an invalid item.dat file in the
+					// game directory that needs to have a lower priority than the one in EOBDATA6.PAK.
+					bool highPrio = (_vm->game() == GI_EOB1 && _vm->gameFlags().lang == Common::ES_ESP && archive->hasFile("ITEM.DAT"));
+					_files.add(name, archive, highPrio ? 4 : 0, false);
+				}
+				else {
 					error("Couldn't load PAK file '%s'", name.c_str());
+				}
 			}
 		}
 	} else if (_vm->game() == GI_KYRA2) {
@@ -338,9 +322,9 @@ Common::SeekableReadStream *Resource::createReadStream(const Common::String &fil
 	return _files.createReadStreamForMember(file);
 }
 
-Common::SeekableReadStreamEndian *Resource::createEndianAwareReadStream(const Common::String &file) {
+Common::SeekableReadStreamEndian *Resource::createEndianAwareReadStream(const Common::String &file, int endianness) {
 	Common::SeekableReadStream *stream = _files.createReadStreamForMember(file);
-	return stream ? new EndianAwareStreamWrapper(stream, _vm->gameFlags().platform == Common::kPlatformAmiga) : 0;
+	return stream ? new EndianAwareStreamWrapper(stream, (endianness == kForceBE) ? true : (endianness == kForceLE ? false : _bigEndianPlatForm)) : 0;
 }
 
 Common::Archive *Resource::loadArchive(const Common::String &name, Common::ArchiveMemberPtr member) {

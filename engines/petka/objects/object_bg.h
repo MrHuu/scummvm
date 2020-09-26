@@ -27,16 +27,31 @@
 
 namespace Petka {
 
+// Linear Interpolation
+struct Perspective {
+	double f0;
+	double k; // seems to be (f1 - f0) always in files
+	int y0;
+	int y1;
+	double f1;
+};
+
 class QObjectBG : public QMessageObject {
 public:
 	QObjectBG();
 	void processMessage(const QMessage &msg) override;
 	void draw() override;
+	void goTo();
+	void setEntrance(const Common::String &name);
+	void play(int id, int type) override {}
+
+	void readInisData(Common::INIFile &names, Common::INIFile &cast, Common::INIFile *bgs) override;
 
 public:
-	int _showMap;
+	bool _showMap;
 	int _fxId;
 	int _musicId;
+	Perspective _persp;
 };
 
 } // End of namespace Petka

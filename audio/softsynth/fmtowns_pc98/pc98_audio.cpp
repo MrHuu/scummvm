@@ -24,7 +24,7 @@
 #include "audio/softsynth/fmtowns_pc98/towns_pc98_fmsynth.h"
 #include "common/mutex.h"
 
-class PC98AudioCoreInternal : public TownsPC98_FmSynth {
+class PC98AudioCoreInternal final : public TownsPC98_FmSynth {
 private:
 	PC98AudioCoreInternal(Audio::Mixer *mixer, PC98AudioCore *owner, PC98AudioPluginDriver *driver, PC98AudioPluginDriver::EmuType type);
 public:
@@ -86,7 +86,7 @@ PC98AudioCoreInternal::~PC98AudioCoreInternal() {
 	_ready = false;
 
 	/*
-	
+
 	*/
 }
 
@@ -125,10 +125,10 @@ bool PC98AudioCoreInternal::init() {
 		return false;
 
 	reset();
-	
+
 	writeReg(0, 0x26, 0xDD);
 	writeReg(0, 0x25, 0x01);
-	writeReg(0, 0x24, 0x00);	
+	writeReg(0, 0x24, 0x00);
 	writeReg(0, 0x27, 0x30);
 
 	setVolumeChannelMasks(-1, 0);

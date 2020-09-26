@@ -28,6 +28,7 @@
 #include "common/tokenizer.h"
 #include "common/translation.h"
 
+#include "graphics/conversion.h"
 #include "graphics/cursorman.h"
 #include "graphics/fontman.h"
 #include "graphics/surface.h"
@@ -137,6 +138,13 @@ static const DrawDataInfo kDrawDataDefaults[] = {
 	{kDDDropDownButtonPressedLeft,  "dropdown_button_pressed_left",  kDrawLayerForeground, kDDDropDownButtonIdle},
 	{kDDDropDownButtonPressedRight, "dropdown_button_pressed_right", kDrawLayerForeground, kDDDropDownButtonIdle},
 
+	{kDDDropDownButtonIdleRTL,			"dropdown_button_idle_rtl",				kDrawLayerBackground, kDDNone},
+	{kDDDropDownButtonHoverLeftRTL,		"dropdown_button_hover_left_rtl",		kDrawLayerForeground, kDDDropDownButtonIdleRTL},
+	{kDDDropDownButtonHoverRightRTL,	"dropdown_button_hover_right_rtl",		kDrawLayerForeground, kDDDropDownButtonIdleRTL},
+	{kDDDropDownButtonDisabledRTL,		"dropdown_button_disabled_rtl",			kDrawLayerForeground, kDDNone},
+	{kDDDropDownButtonPressedLeftRTL,	"dropdown_button_pressed_left_rtl",		kDrawLayerForeground, kDDDropDownButtonIdleRTL},
+	{kDDDropDownButtonPressedRightRTL,	"dropdown_button_pressed_right_rtl",	kDrawLayerForeground, kDDDropDownButtonIdleRTL},
+
 	{kDDSliderFull,                 "slider_full",      kDrawLayerForeground,  kDDNone},
 	{kDDSliderHover,                "slider_hover",     kDrawLayerForeground,  kDDNone},
 	{kDDSliderDisabled,             "slider_disabled",  kDrawLayerForeground,  kDDNone},
@@ -165,6 +173,10 @@ static const DrawDataInfo kDrawDataDefaults[] = {
 	{kDDPopUpIdle,                  "popup_idle",       kDrawLayerBackground,   kDDNone},
 	{kDDPopUpHover,                 "popup_hover",      kDrawLayerForeground,  kDDPopUpIdle},
 	{kDDPopUpDisabled,              "popup_disabled",   kDrawLayerBackground,   kDDNone},
+
+	{kDDPopUpIdleRTL,				"popup_idle_rtl",		kDrawLayerBackground,   kDDNone},
+	{kDDPopUpHoverRTL,              "popup_hover_rtl",		kDrawLayerForeground,	kDDPopUpIdleRTL},
+	{kDDPopUpDisabledRTL,           "popup_disabled_rtl",   kDrawLayerBackground,   kDDNone},
 
 	{kDDCaret,                      "caret",        kDrawLayerForeground,  kDDNone},
 	{kDDSeparator,                  "separator",    kDrawLayerBackground,   kDDNone},
@@ -213,7 +225,11 @@ ThemeEngine::ThemeEngine(Common::String id, GraphicsMode mode) :
 
 	_cursorHotspotX = _cursorHotspotY = 0;
 	_cursorWidth = _cursorHeight = 0;
+#ifndef USE_RGB_COLOR
+	_cursorFormat = Graphics::PixelFormat::createFormatCLUT8();
+	_cursorTransparent = 255;
 	_cursorPalSize = 0;
+#endif
 
 	// We prefer files in archive bundles over the common search paths.
 	_themeFiles.add("default", &SearchMan, 0, false);
@@ -387,8 +403,10 @@ void ThemeEngine::refresh() {
 		_system->showOverlay();
 
 		if (_useCursor) {
+#ifndef USE_RGB_COLOR
 			CursorMan.replaceCursorPalette(_cursorPal, 0, _cursorPalSize);
-			CursorMan.replaceCursor(_cursor, _cursorWidth, _cursorHeight, _cursorHotspotX, _cursorHotspotY, 255, true);
+#endif
+			CursorMan.replaceCursor(_cursor, _cursorWidth, _cursorHeight, _cursorHotspotX, _cursorHotspotY, _cursorTransparent, true, &_cursorFormat);
 		}
 	}
 }
@@ -507,9 +525,22 @@ bool ThemeEngine::addTextData(const Common::String &drawDataId, TextData textId,
 	return true;
 }
 
-bool ThemeEngine::addFont(TextData textId, const Common::String &file, const Common::String &scalableFile, const int pointsize) {
+bool ThemeEngine::addFont(TextData textId, const Common::String &language, const Common::String &file, const Common::String &scalableFile, const int pointsize) {
 	if (textId == -1)
 		return false;
+
+	if (!language.empty() && !language.equals("*")) {
+#ifdef USE_TRANSLATION
+		Common::String cl = TransMan.getCurrentLanguage();
+		if (!cl.matchString(language, true))
+			return true;	// Skip
+
+		if (_texts[textId] != nullptr)	// We already loaded something
+			return true;
+#else
+		return true;	// Safely ignore
+#endif
+	}
 
 	if (_texts[textId] != nullptr)
 		delete _texts[textId];
@@ -929,10 +960,44 @@ void ThemeEngine::drawDDText(TextData type, TextColor color, const Common::Rect 
 	addDirtyRect(dirty);
 }
 
+void ThemeEngine::drawDDText(TextData type, TextColor color, const Common::Rect &r, const Common::U32String &text,
+	bool restoreBg, bool ellipsis, Graphics::TextAlign alignH, TextAlignVertical alignV,
+	int deltax, const Common::Rect &drawableTextArea) {
+
+	if (type == kTextDataNone || !_texts[type] || _layerToDraw == kDrawLayerBackground)
+		return;
+
+	Common::Rect area = r;
+	area.clip(_screen.w, _screen.h);
+
+	Common::Rect dirty = drawableTextArea;
+	if (dirty.isEmpty()) dirty = area;
+	else dirty.clip(area);
+
+	if (!_clip.isEmpty()) {
+		dirty.clip(_clip);
+	}
+
+	// HACK: One small pixel should be invisible enough
+	if (dirty.isEmpty()) dirty = Common::Rect(0, 0, 1, 1);
+
+	if (restoreBg)
+		restoreBackground(dirty);
+
+	_vectorRenderer->setFgColor(_textColors[color]->r, _textColors[color]->g, _textColors[color]->b);
+#ifdef USE_TRANSLATION
+	_vectorRenderer->drawString(_texts[type]->_fontPtr, TransMan.convertBiDiString(text), area, alignH, alignV, deltax, ellipsis, dirty);
+#else
+	_vectorRenderer->drawString(_texts[type]->_fontPtr, text, area, alignH, alignV, deltax, ellipsis, dirty);
+#endif
+
+	addDirtyRect(dirty);
+}
+
 /**********************************************************
  * Widget drawing functions
  *********************************************************/
-void ThemeEngine::drawButton(const Common::Rect &r, const Common::String &str, WidgetStateInfo state, uint16 hints) {
+void ThemeEngine::drawButton(const Common::Rect &r, const Common::U32String &str, WidgetStateInfo state, uint16 hints) {
 	if (!ready())
 		return;
 
@@ -948,28 +1013,29 @@ void ThemeEngine::drawButton(const Common::Rect &r, const Common::String &str, W
 		dd = kDDButtonPressed;
 
 	drawDD(dd, r, 0, hints & WIDGET_CLEARBG);
-	drawDDText(getTextData(dd), getTextColor(dd), r, str, false, true, _widgets[dd]->_textAlignH,
+	drawDDText(getTextData(dd), getTextColor(dd), r, str, false, true, convertTextAlignH(_widgets[dd]->_textAlignH, false),
 	           _widgets[dd]->_textAlignV);
 }
 
-void ThemeEngine::drawDropDownButton(const Common::Rect &r, uint32 dropdownWidth, const Common::String &str,
-                                     ThemeEngine::WidgetStateInfo buttonState, bool inButton, bool inDropdown) {
+void ThemeEngine::drawDropDownButton(const Common::Rect &r, uint32 dropdownWidth, const Common::U32String &str,
+                                     ThemeEngine::WidgetStateInfo buttonState, bool inButton, bool inDropdown, bool rtl) {
 	if (!ready())
 		return;
 
 	DrawData dd;
+
 	if (buttonState == kStateHighlight && inButton)
-		dd = kDDDropDownButtonHoverLeft;
+		dd = rtl ? kDDDropDownButtonHoverLeftRTL : kDDDropDownButtonHoverLeft;
 	else if (buttonState == kStateHighlight && inDropdown)
-		dd = kDDDropDownButtonHoverRight;
+		dd = rtl ? kDDDropDownButtonHoverRightRTL : kDDDropDownButtonHoverRight;
 	else if (buttonState == kStateDisabled)
-		dd = kDDDropDownButtonDisabled;
+		dd = rtl ? kDDDropDownButtonDisabledRTL : kDDDropDownButtonDisabled;
 	else if (buttonState == kStatePressed && inButton)
-		dd = kDDDropDownButtonPressedLeft;
+		dd = rtl ? kDDDropDownButtonPressedLeftRTL : kDDDropDownButtonPressedLeft;
 	else if (buttonState == kStatePressed && inDropdown)
-		dd = kDDDropDownButtonPressedRight;
+		dd = rtl ? kDDDropDownButtonPressedRightRTL : kDDDropDownButtonPressedRight;
 	else
-		dd = kDDDropDownButtonIdle;
+		dd = rtl ? kDDDropDownButtonIdleRTL : kDDDropDownButtonIdle;
 
 	drawDD(dd, r);
 
@@ -977,7 +1043,7 @@ void ThemeEngine::drawDropDownButton(const Common::Rect &r, uint32 dropdownWidth
 	Common::Rect textRect = r;
 	textRect.left  = r.left  + dropdownWidth;
 	textRect.right = r.right - dropdownWidth;
-	drawDDText(getTextData(dd), getTextColor(dd), textRect, str, false, true, _widgets[dd]->_textAlignH,
+	drawDDText(getTextData(dd), getTextColor(dd), textRect, str, false, true, convertTextAlignH(_widgets[dd]->_textAlignH, rtl),
 	           _widgets[dd]->_textAlignV);
 }
 
@@ -988,7 +1054,7 @@ void ThemeEngine::drawLineSeparator(const Common::Rect &r) {
 	drawDD(kDDSeparator, r);
 }
 
-void ThemeEngine::drawCheckbox(const Common::Rect &r, const Common::String &str, bool checked, WidgetStateInfo state) {
+void ThemeEngine::drawCheckbox(const Common::Rect &r, const Common::U32String &str, bool checked, WidgetStateInfo state, bool rtl) {
 	if (!ready())
 		return;
 
@@ -1003,21 +1069,27 @@ void ThemeEngine::drawCheckbox(const Common::Rect &r, const Common::String &str,
 
 	const int checkBoxSize = MIN((int)r.height(), getFontHeight());
 
+	r2.left = rtl ? r.right - checkBoxSize : r2.left;
 	r2.bottom = r2.top + checkBoxSize;
 	r2.right = r2.left + checkBoxSize;
 
 	drawDD(dd, r2);
 
-	r2.left = r2.right + checkBoxSize;
-	r2.right = r.right;
+	if (rtl) {
+		r2.right = r2.left - checkBoxSize;
+		r2.left = r.left;
+	} else {
+		r2.left = r2.right + checkBoxSize;
+		r2.right = r.right;
+	}
 
 	if (r2.right > r2.left) {
-		drawDDText(getTextData(dd), getTextColor(dd), r2, str, true, false, _widgets[kDDCheckboxDefault]->_textAlignH,
+		drawDDText(getTextData(dd), getTextColor(dd), r2, str, true, false, convertTextAlignH(_widgets[dd]->_textAlignH, rtl),
 		           _widgets[dd]->_textAlignV);
 	}
 }
 
-void ThemeEngine::drawRadiobutton(const Common::Rect &r, const Common::String &str, bool checked, WidgetStateInfo state) {
+void ThemeEngine::drawRadiobutton(const Common::Rect &r, const Common::U32String &str, bool checked, WidgetStateInfo state, bool rtl) {
 	if (!ready())
 		return;
 
@@ -1032,19 +1104,25 @@ void ThemeEngine::drawRadiobutton(const Common::Rect &r, const Common::String &s
 
 	const int checkBoxSize = MIN((int)r.height(), getFontHeight());
 
+	r2.left = rtl ? r2.right - checkBoxSize : r2.left;
 	r2.bottom = r2.top + checkBoxSize;
 	r2.right = r2.left + checkBoxSize;
 
 	drawDD(dd, r2);
 
-	r2.left = r2.right + checkBoxSize;
-	r2.right = MAX(r2.left, r.right);
+	if (rtl) {
+		r2.right = r2.left - checkBoxSize;
+		r2.left = r.left;
+	} else {
+		r2.left = r2.right + checkBoxSize;
+		r2.right = MAX(r2.left, r.right);
+	}
 
-	drawDDText(getTextData(dd), getTextColor(dd), r2, str, true, false, _widgets[kDDRadiobuttonDefault]->_textAlignH,
-	           _widgets[dd]->_textAlignV);
+	drawDDText(getTextData(dd), getTextColor(dd), r2, str, true, false, convertTextAlignH(_widgets[dd]->_textAlignH, rtl),
+		_widgets[dd]->_textAlignV);
 }
 
-void ThemeEngine::drawSlider(const Common::Rect &r, int width, WidgetStateInfo state) {
+void ThemeEngine::drawSlider(const Common::Rect &r, int width, WidgetStateInfo state, bool rtl) {
 	if (!ready())
 		return;
 
@@ -1058,6 +1136,11 @@ void ThemeEngine::drawSlider(const Common::Rect &r, int width, WidgetStateInfo s
 	Common::Rect r2 = r;
 	r2.setWidth(MIN((int16)width, r.width()));
 	//	r2.top++; r2.bottom--; r2.left++; r2.right--;
+
+	if (rtl) {
+		r2.left = r.right - r2.width();
+		r2.right = r.right;
+	}
 
 	drawWidgetBackground(r, kWidgetBackgroundSlider);
 
@@ -1132,24 +1215,24 @@ void ThemeEngine::drawCaret(const Common::Rect &r, bool erase) {
 		drawDD(kDDCaret, r);
 }
 
-void ThemeEngine::drawPopUpWidget(const Common::Rect &r, const Common::String &sel, int deltax, WidgetStateInfo state) {
+void ThemeEngine::drawPopUpWidget(const Common::Rect &r, const Common::U32String &sel, int deltax, WidgetStateInfo state, bool rtl) {
 	if (!ready())
 		return;
 
-	DrawData dd = kDDPopUpIdle;
+	DrawData dd = rtl ? kDDPopUpIdleRTL : kDDPopUpIdle;
 
 	if (state == kStateEnabled)
-		dd = kDDPopUpIdle;
+		dd = rtl ? kDDPopUpIdleRTL : kDDPopUpIdle;
 	else if (state == kStateHighlight)
-		dd = kDDPopUpHover;
+		dd = rtl ? kDDPopUpHoverRTL : kDDPopUpHover;
 	else if (state == kStateDisabled)
-		dd = kDDPopUpDisabled;
+		dd = rtl ? kDDPopUpDisabledRTL : kDDPopUpDisabled;
 
 	drawDD(dd, r);
 
 	if (!sel.empty() && r.width() >= 13 && r.height() >= 1) {
 		Common::Rect text(r.left + 3, r.top + 1, r.right - 10, r.bottom);
-		drawDDText(getTextData(dd), getTextColor(dd), text, sel, true, false, _widgets[dd]->_textAlignH,
+		drawDDText(getTextData(dd), getTextColor(dd), text, sel, true, false, convertTextAlignH(_widgets[dd]->_textAlignH, rtl),
 		           _widgets[dd]->_textAlignV, deltax);
 	}
 }
@@ -1199,7 +1282,7 @@ void ThemeEngine::drawWidgetBackground(const Common::Rect &r, WidgetBackground b
 }
 
 void ThemeEngine::drawTab(const Common::Rect &r, int tabHeight, const Common::Array<int> &tabWidths,
-                          const Common::Array<Common::String> &tabs, int active) {
+                          const Common::Array<Common::U32String> &tabs, int active, bool rtl) {
 	if (!ready())
 		return;
 
@@ -1207,22 +1290,37 @@ void ThemeEngine::drawTab(const Common::Rect &r, int tabHeight, const Common::Ar
 
 	drawDD(kDDTabBackground, Common::Rect(r.left, r.top, r.right, r.top + tabHeight));
 
+	const int numTabs = (int)tabs.size();
 	int width = 0;
-	int activePos = -1;
-	for (int i = 0; i < (int)tabs.size(); width += tabWidths[i++]) {
-		if (r.left + width > r.right || r.left + width + tabWidths[i] > r.right)
-			continue;
 
-		if (i == active) {
+	if (rtl) {
+		for (int i = 0; i < numTabs; i++) {
+			width += tabWidths[i];
+		}
+		width = r.width() - width;
+	}
+
+	int activePos = -1;
+	for (int i = 0; i < numTabs; i++) {
+		int current = rtl ? (numTabs - i - 1) : i;
+
+		if (r.left + width > r.right || r.left + width + tabWidths[current] > r.right) {
+			width += tabWidths[current];
+			continue;
+		}
+
+		if (current == active) {
 			activePos = width;
+			width += tabWidths[current];
 			continue;
 		}
 
 
-		Common::Rect tabRect(r.left + width, r.top, r.left + width + tabWidths[i], r.top + tabHeight);
+		Common::Rect tabRect(r.left + width, r.top, r.left + width + tabWidths[current], r.top + tabHeight);
 		drawDD(kDDTabInactive, tabRect);
-		drawDDText(getTextData(kDDTabInactive), getTextColor(kDDTabInactive), tabRect, tabs[i], false, false,
-		           _widgets[kDDTabInactive]->_textAlignH, _widgets[kDDTabInactive]->_textAlignV);
+		drawDDText(getTextData(kDDTabInactive), getTextColor(kDDTabInactive), tabRect, tabs[current], false, false,
+		           convertTextAlignH(_widgets[kDDTabInactive]->_textAlignH, rtl), _widgets[kDDTabInactive]->_textAlignV);
+		width += tabWidths[current];
 	}
 
 	if (activePos >= 0) {
@@ -1231,11 +1329,11 @@ void ThemeEngine::drawTab(const Common::Rect &r, int tabHeight, const Common::Ar
 		const uint16 tabRight = MAX(r.right - tabRect.right, 0);
 		drawDD(kDDTabActive, tabRect, (tabLeft << 16) | (tabRight & 0xFFFF));
 		drawDDText(getTextData(kDDTabActive), getTextColor(kDDTabActive), tabRect, tabs[active], false, false,
-		           _widgets[kDDTabActive]->_textAlignH, _widgets[kDDTabActive]->_textAlignV);
+		           convertTextAlignH(_widgets[kDDTabActive]->_textAlignH, rtl), _widgets[kDDTabActive]->_textAlignV);
 	}
 }
 
-void ThemeEngine::drawText(const Common::Rect &r, const Common::String &str, WidgetStateInfo state,
+void ThemeEngine::drawText(const Common::Rect &r, const Common::U32String &str, WidgetStateInfo state,
                            Graphics::TextAlign align, TextInversionState inverted, int deltax, bool useEllipsis,
                            FontStyle font, FontColor color, bool restore, const Common::Rect &drawableTextArea) {
 	if (!ready())
@@ -1403,19 +1501,10 @@ void ThemeEngine::applyScreenShading(ShadingStyle style) {
 }
 
 bool ThemeEngine::createCursor(const Common::String &filename, int hotspotX, int hotspotY) {
-	if (!_system->hasFeature(OSystem::kFeatureCursorPalette))
-		return true;
-
 	// Try to locate the specified file among all loaded bitmaps
 	const Graphics::Surface *cursor = _bitmaps[filename];
 	if (!cursor)
 		return false;
-
-#ifdef USE_RGB_COLOR
-	_cursorFormat.bytesPerPixel = 1;
-	_cursorFormat.rLoss = _cursorFormat.gLoss = _cursorFormat.bLoss = _cursorFormat.aLoss = 8;
-	_cursorFormat.rShift = _cursorFormat.gShift = _cursorFormat.bShift = _cursorFormat.aShift = 0;
-#endif
 
 	// Set up the cursor parameters
 	_cursorHotspotX = hotspotX;
@@ -1423,6 +1512,23 @@ bool ThemeEngine::createCursor(const Common::String &filename, int hotspotX, int
 
 	_cursorWidth = cursor->w;
 	_cursorHeight = cursor->h;
+
+#ifdef USE_RGB_COLOR
+	_cursorFormat = cursor->format;
+	_cursorTransparent = _cursorFormat.RGBToColor(0xFF, 0, 0xFF);
+
+	// Allocate a new buffer for the cursor
+	delete[] _cursor;
+	_cursor = new byte[_cursorWidth * _cursorHeight * _cursorFormat.bytesPerPixel];
+	assert(_cursor);
+	Graphics::copyBlit(_cursor, (const byte *)cursor->getPixels(),
+	                   _cursorWidth * _cursorFormat.bytesPerPixel, cursor->pitch,
+	                   _cursorWidth, _cursorHeight, _cursorFormat.bytesPerPixel);
+
+	_useCursor = true;
+#else
+	if (!_system->hasFeature(OSystem::kFeatureCursorPalette))
+		return true;
 
 	// Allocate a new buffer for the cursor
 	delete[] _cursor;
@@ -1481,6 +1587,7 @@ bool ThemeEngine::createCursor(const Common::String &filename, int hotspotX, int
 
 	_useCursor = true;
 	_cursorPalSize = colorsFound;
+#endif
 
 	return true;
 }
@@ -1499,6 +1606,10 @@ int ThemeEngine::getFontHeight(FontStyle font) const {
 }
 
 int ThemeEngine::getStringWidth(const Common::String &str, FontStyle font) const {
+	return ready() ? _texts[fontStyleToData(font)]->_fontPtr->getStringWidth(str) : 0;
+}
+
+int ThemeEngine::getStringWidth(const Common::U32String &str, FontStyle font) const {
 	return ready() ? _texts[fontStyleToData(font)]->_fontPtr->getStringWidth(str) : 0;
 }
 
@@ -1532,11 +1643,6 @@ DrawData ThemeEngine::parseDrawDataId(const Common::String &name) const {
 
 const Graphics::Font *ThemeEngine::loadScalableFont(const Common::String &filename, const Common::String &charset, const int pointsize, Common::String &name) {
 #ifdef USE_FREETYPE2
-#ifdef USE_TRANSLATION
-	const uint32 *mapping = TransMan.getCharsetMapping();
-#else
-	const uint32 *mapping = 0;
-#endif
 	name = Common::String::format("%s-%s@%d", filename.c_str(), charset.c_str(), pointsize);
 
 	// Try already loaded fonts.
@@ -1550,7 +1656,7 @@ const Graphics::Font *ThemeEngine::loadScalableFont(const Common::String &filena
 	for (Common::ArchiveMemberList::const_iterator i = members.begin(), end = members.end(); i != end; ++i) {
 		Common::SeekableReadStream *stream = (*i)->createReadStream();
 		if (stream) {
-			font = Graphics::loadTTFFont(*stream, pointsize, Graphics::kTTFSizeModeCharacter, 0, Graphics::kTTFRenderModeLight, mapping);
+			font = Graphics::loadTTFFont(*stream, pointsize, Graphics::kTTFSizeModeCharacter, 0, Graphics::kTTFRenderModeLight);
 			delete stream;
 
 			if (font)
@@ -1559,7 +1665,7 @@ const Graphics::Font *ThemeEngine::loadScalableFont(const Common::String &filena
 	}
 
 	// Try loading the font from the common fonts archive.
-	font = Graphics::loadTTFFontFromArchive(filename, pointsize, Graphics::kTTFSizeModeCharacter, 0, Graphics::kTTFRenderModeLight, mapping);
+	font = Graphics::loadTTFFontFromArchive(filename, pointsize, Graphics::kTTFSizeModeCharacter, 0, Graphics::kTTFRenderModeLight);
 	if (font)
 		return font;
 #endif
@@ -1931,15 +2037,19 @@ Common::String ThemeEngine::getThemeId(const Common::String &filename) {
 
 void ThemeEngine::showCursor() {
 	if (_useCursor) {
+#ifndef USE_RGB_COLOR
 		CursorMan.pushCursorPalette(_cursorPal, 0, _cursorPalSize);
-		CursorMan.pushCursor(_cursor, _cursorWidth, _cursorHeight, _cursorHotspotX, _cursorHotspotY, 255, true);
+#endif
+		CursorMan.pushCursor(_cursor, _cursorWidth, _cursorHeight, _cursorHotspotX, _cursorHotspotY, _cursorTransparent, true, &_cursorFormat);
 		CursorMan.showMouse(true);
 	}
 }
 
 void ThemeEngine::hideCursor() {
 	if (_useCursor) {
+#ifndef USE_RGB_COLOR
 		CursorMan.popCursorPalette();
+#endif
 		CursorMan.popCursor();
 	}
 }

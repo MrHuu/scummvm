@@ -362,7 +362,7 @@ void Inventory2::slideIn() {
 
 	ex->_field_2C = 10;
 	ex->_z = _isInventoryOut;
-	ex->_field_20 = !_isInventoryOut;
+	ex->_invId = !_isInventoryOut;
 	ex->_excFlags |= 3;
 	ex->postMessage();
 }
@@ -374,7 +374,7 @@ void Inventory2::slideOut() {
 
 	ex->_field_2C = 10;
 	ex->_z = _isInventoryOut;
-	ex->_field_20 = !_isInventoryOut;
+	ex->_invId = !_isInventoryOut;
 	ex->_excFlags |= 3;
 	ex->postMessage();
 }
@@ -425,7 +425,7 @@ int Inventory2::selectItem(int itemId) {
 	if (_scene) {
 		int idx = getInventoryPoolItemIndexById(itemId);
 
-		Picture *pic = _scene->getPictureObjectById(_itemsPool[idx].pictureObjectId1, 0)->_picture.get();
+		Picture *pic = _scene->getPictureObjectById(_itemsPool[idx].pictureObjectId1, 0)->_picture;
 		g_fp->getGameLoaderInputController()->setCursorItemPicture(pic);
 	}
 

@@ -79,8 +79,11 @@ public:
 	INTRINSIC(I_playSFXCru);
 	INTRINSIC(I_playAmbientSFXCru);
 	INTRINSIC(I_isSFXPlaying);
+	INTRINSIC(I_isSFXPlayingForObject);
 	INTRINSIC(I_setVolumeSFX);
 	INTRINSIC(I_stopSFX);
+	INTRINSIC(I_stopSFXCru);
+	INTRINSIC(I_stopAllSFX);
 
 	void run() override;
 
@@ -94,8 +97,10 @@ public:
 		playSFX(sfxNum, priority, objId, loops, no_duplicates, pitchShift, volume, -1, -1);
 	}
 
+	//! stop sfx on object.  set sfxNum = -1 to stop all for object.
 	void stopSFX(int sfxNum, ObjId objId);
 	bool isSFXPlaying(int sfxNum);
+	bool isSFXPlayingForObject(int sfxNum, ObjId objId);
 	void setVolumeSFX(int sfxNum, uint8 volume);
 
 	bool playSpeech(const Std::string &barked, int shapenum, ObjId objId,
@@ -120,9 +125,9 @@ public:
 	void stopAllExceptSpeech();
 
 	bool loadData(Common::ReadStream *rs, uint32 version);
+	void saveData(Common::WriteStream *ws) override;
 
 private:
-	void saveData(Common::WriteStream *ws) override;
 	uint32 _paused;
 
 	//! play the next speech sample for the text in this SampleInfo

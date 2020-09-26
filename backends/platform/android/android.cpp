@@ -56,6 +56,7 @@
 #include "common/config-manager.h"
 
 #include "backends/audiocd/default/default-audiocd.h"
+#include "backends/events/default/default-events.h"
 #include "backends/mutex/pthread/pthread-mutex.h"
 #include "backends/saves/default/default-saves.h"
 #include "backends/timer/default/default-timer.h"
@@ -140,7 +141,7 @@ OSystem_Android::~OSystem_Android() {
 	delete _timerManager;
 	_timerManager = 0;
 
-	deleteMutex(_event_queue_lock);
+	delete _event_queue_lock;
 
 	delete _savefileManager;
 	_savefileManager = 0;
@@ -310,16 +311,22 @@ void OSystem_Android::initBackend() {
 	ConfMan.registerDefault("aspect_ratio", true);
 	ConfMan.registerDefault("touchpad_mouse_mode", true);
 	ConfMan.registerDefault("onscreen_control", true);
-	// The swap_menu_and_back is a legacy configuration key
+	// The swap_menu_and_back is a deprecated configuration key
 	// It is no longer relevant, after introducing the keymapper functionality
 	// since the behaviour of the menu and back buttons is now handled by the keymapper.
-	// The key is thus registered to default to a "false" value
-	ConfMan.registerDefault("swap_menu_and_back", false);
+	// We now ignore it completely
 
-	ConfMan.setInt("autosave_period", 0);
+	ConfMan.registerDefault("autosave_period", 0);
 	ConfMan.setBool("FM_high_quality", false);
 	ConfMan.setBool("FM_medium_quality", true);
 
+	// we need a relaxed delay for the remapping timeout since handling touch interface and virtual keyboard can be slow
+	// and especially in some occasions when we need to pull down (hide) the keyboard and map a system key (like the AC_Back) button.
+	// 8 seconds should be enough
+	ConfMan.registerDefault("remap_timeout_delay_ms", 8000);
+	if (!ConfMan.hasKey("remap_timeout_delay_ms")) {
+		ConfMan.setInt("remap_timeout_delay_ms", 8000);
+	}
 
 	if (!ConfMan.hasKey("browser_lastpath")) {
 		// TODO remove the debug message eventually
@@ -327,10 +334,12 @@ void OSystem_Android::initBackend() {
 		ConfMan.set("browser_lastpath", "/");
 	}
 
-	if (ConfMan.hasKey("touchpad_mouse_mode"))
+	if (ConfMan.hasKey("touchpad_mouse_mode")) {
 		_touchpad_mode = ConfMan.getBool("touchpad_mouse_mode");
-	else
+	} else {
 		ConfMan.setBool("touchpad_mouse_mode", true);
+		_touchpad_mode = true;
+	}
 
 	if (ConfMan.hasKey("onscreen_control"))
 		JNI::showKeyboardControl(ConfMan.getBool("onscreen_control"));
@@ -340,6 +349,7 @@ void OSystem_Android::initBackend() {
 	// BUG: "transient" ConfMan settings get nuked by the options
 	// screen. Passing the savepath in this way makes it stick
 	// (via ConfMan.registerDefault)
+	// TODO is this right to save full path?
 	_savefileManager = new DefaultSaveFileManager(ConfMan.get("savepath"));
 	// TODO remove the debug message eventually
 	LOGD("Setting DefaultSaveFileManager path to: %s", ConfMan.get("savepath").c_str());
@@ -347,7 +357,7 @@ void OSystem_Android::initBackend() {
 	_mutexManager = new PthreadMutexManager();
 	_timerManager = new DefaultTimerManager();
 
-	_event_queue_lock = createMutex();
+	_event_queue_lock = new Common::Mutex();
 
 	gettimeofday(&_startTime, 0);
 
@@ -368,7 +378,10 @@ void OSystem_Android::initBackend() {
 
 	JNI::setReadyForEvents(true);
 
-	ModularBackend::initBackend();
+	_eventManager = new DefaultEventManager(this);
+	_audiocdManager = new DefaultAudioCDManager();
+
+	BaseBackend::initBackend();
 }
 
 bool OSystem_Android::hasFeature(Feature f) {
@@ -379,7 +392,7 @@ bool OSystem_Android::hasFeature(Feature f) {
 			f == kFeatureClipboardSupport) {
 		return true;
 	}
-	return ModularBackend::hasFeature(f);
+	return ModularGraphicsBackend::hasFeature(f);
 }
 
 void OSystem_Android::setFeatureState(Feature f, bool enable) {
@@ -399,7 +412,7 @@ void OSystem_Android::setFeatureState(Feature f, bool enable) {
 		JNI::showKeyboardControl(enable);
 		break;
 	default:
-		ModularBackend::setFeatureState(f, enable);
+		ModularGraphicsBackend::setFeatureState(f, enable);
 		break;
 	}
 }
@@ -413,7 +426,7 @@ bool OSystem_Android::getFeatureState(Feature f) {
 	case kFeatureOnScreenControl:
 		return ConfMan.getBool("onscreen_control");
 	default:
-		return ModularBackend::getFeatureState(f);
+		return ModularGraphicsBackend::getFeatureState(f);
 	}
 }
 
@@ -421,18 +434,10 @@ Common::KeymapperDefaultBindings *OSystem_Android::getKeymapperDefaultBindings()
 	Common::KeymapperDefaultBindings *keymapperDefaultBindings = new Common::KeymapperDefaultBindings();
 
 	// The swap_menu_and_back is a legacy configuration key
-	// It is only checked here for compatibility with old config files
-	// where it may have been set as "true"
-	// TODO Why not just ignore it entirely anyway?
-	if (ConfMan.hasKey("swap_menu_and_back")  && ConfMan.getBool("swap_menu_and_back")) {
-		keymapperDefaultBindings->setDefaultBinding(Common::kGlobalKeymapName, "MENU", "AC_BACK");
-		keymapperDefaultBindings->setDefaultBinding("engine-default", Common::kStandardActionSkip, "MENU");
-		keymapperDefaultBindings->setDefaultBinding(Common::kGuiKeymapName, "CLOS", "MENU");
-	} else {
-		keymapperDefaultBindings->setDefaultBinding(Common::kGlobalKeymapName, "MENU", "MENU");
-		keymapperDefaultBindings->setDefaultBinding("engine-default", Common::kStandardActionSkip, "AC_BACK");
-		keymapperDefaultBindings->setDefaultBinding(Common::kGuiKeymapName, "CLOS", "AC_BACK");
-	}
+	// We now ignore it entirely (it as always false -- ie. back short press is AC_BACK)
+	keymapperDefaultBindings->setDefaultBinding(Common::kGlobalKeymapName, "MENU", "MENU");
+	keymapperDefaultBindings->setDefaultBinding("engine-default", Common::kStandardActionSkip, "AC_BACK");
+	keymapperDefaultBindings->setDefaultBinding(Common::kGuiKeymapName, "CLOS", "AC_BACK");
 
 	return keymapperDefaultBindings;
 }
@@ -526,18 +531,18 @@ Common::String OSystem_Android::getSystemLanguage() const {
 }
 
 bool OSystem_Android::openUrl(const Common::String &url) {
-	return JNI::openUrl(url.c_str());
+	return JNI::openUrl(url);
 }
 
 bool OSystem_Android::hasTextInClipboard() {
 	return JNI::hasTextInClipboard();
 }
 
-Common::String OSystem_Android::getTextFromClipboard() {
+Common::U32String OSystem_Android::getTextFromClipboard() {
 	return JNI::getTextFromClipboard();
 }
 
-bool OSystem_Android::setTextInClipboard(const Common::String &text) {
+bool OSystem_Android::setTextInClipboard(const Common::U32String &text) {
 	return JNI::setTextInClipboard(text);
 }
 
@@ -551,6 +556,10 @@ Common::String OSystem_Android::getSystemProperty(const char *name) const {
 	int len = __system_property_get(name, value);
 
 	return Common::String(value, len);
+}
+
+char *OSystem_Android::convertEncoding(const char *to, const char *from, const char *string, size_t length) {
+	return JNI::convertEncoding(to, from, string, length);
 }
 
 #endif

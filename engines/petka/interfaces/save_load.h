@@ -27,25 +27,29 @@
 
 namespace Petka {
 
-class InterfaceSaveLoad : public Interface {
+enum {
+	kSaveMode,
+	kLoadMode
+};
+
+class InterfaceSaveLoad : public SubInterface {
 public:
 	InterfaceSaveLoad();
 
-	void startSaveLoad(bool saveMode);
-	void stop() override;
+	void start(int id) override;
 
-	void onLeftButtonDown(const Common::Point p) override;
-	void onRightButtonDown(const Common::Point p) override;
-	void onMouseMove(const Common::Point p) override;
+	bool loadMode() { return _loadMode; }
+
+	void onLeftButtonDown(Common::Point p) override;
+	void onRightButtonDown(Common::Point p) override;
+	void onMouseMove(Common::Point p) override;
 
 private:
-	int findSaveLoadRectIndex(const Common::Point p);
+	int findSaveLoadRectIndex(Common::Point p);
 
 private:
 	bool _loadMode;
 	uint _page;
-	int _savedCursorId;
-
 	Common::Rect _saveRects[6];
 	Common::Rect _nextPageRect;
 	Common::Rect _prevPageRect;

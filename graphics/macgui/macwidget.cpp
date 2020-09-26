@@ -22,30 +22,45 @@
 
 #include "common/system.h"
 
+#include "graphics/macgui/macwindowmanager.h"
 #include "graphics/macgui/macwidget.h"
 
 namespace Graphics {
 
-MacWidget::MacWidget(MacWidget *parent, int x, int y, int w, int h, bool focusable) :
-		_focusable(focusable), _parent(parent) {
+MacWidget::MacWidget(MacWidget *parent, int x, int y, int w, int h, MacWindowManager *wm, bool focusable, uint16 border, uint16 gutter, uint16 shadow, uint fgcolor, uint bgcolor) :
+	_focusable(focusable), _parent(parent), _border(border), _gutter(gutter), _shadow(shadow), _wm(wm) {
 	_contentIsDirty = true;
+	_priority = 0;
 
 	_dims.left = x;
-	_dims.right = x + w;
+	_dims.right = x + w + (2 * border) + (2 * gutter) + shadow;
 	_dims.top = y;
-	_dims.bottom = y + h;
+	_dims.bottom = y + h + (2 * border) + gutter + shadow;
+
+	_fgcolor = fgcolor;
+	_bgcolor = bgcolor;
 
 	if (parent)
 		parent->_children.push_back(this);
 
-	_composeSurface = nullptr;
+	_composeSurface = new ManagedSurface(_dims.width(), _dims.height(), _wm->_pixelformat);
+	_composeSurface->clear(_bgcolor);
 
 	_active = false;
+	_editable = false;
 }
 
 MacWidget::~MacWidget() {
 	if (_parent)
 		_parent->removeWidget(this, false);
+
+	if (_wm)
+		_wm->clearWidgetRefs(this);
+
+	if (_composeSurface) {
+		_composeSurface->free();
+		delete _composeSurface;
+	}
 }
 
 void MacWidget::setActive(bool active) {
@@ -58,7 +73,37 @@ void MacWidget::setActive(bool active) {
 	_active = active;
 }
 
+bool MacWidget::draw(bool forceRedraw) {
+	_contentIsDirty = false;
+
+	return false;
+}
+
+bool MacWidget::draw(ManagedSurface *g, bool forceRedraw) {
+	_contentIsDirty = false;
+
+	return false;
+}
+
+void MacWidget::blit(ManagedSurface *g, Common::Rect &dest) {
+	g->transBlitFrom(*_composeSurface, _composeSurface->getBounds(), dest, _wm->_colorGreen2);
+}
+
+void MacWidget::setColors(uint32 fg, uint32 bg) {
+	_fgcolor = fg;
+	_bgcolor = bg;
+
+	_contentIsDirty = true;
+}
+
+bool MacWidget::processEvent(Common::Event &event) {
+	return false;
+}
+
 void MacWidget::removeWidget(MacWidget *child, bool del) {
+	if (_children.size() == 0)
+		return;
+
 	for (uint i = 0; i < _children.size(); i++) {
 		if (_children[i] == child) {
 			if (del)
@@ -82,12 +127,17 @@ MacWidget *MacWidget::findEventHandler(Common::Event &event, int dx, int dy) {
 			pos = g_system->getEventManager()->getMousePos();
 
 			if (_dims.contains(pos.x - dx, pos.y - dy)) {
+				uint priority = 0;
+				MacWidget *widget = nullptr;
+
 				for (uint i = 0; i < _children.size(); i++) {
 					MacWidget *res = _children[i]->findEventHandler(event, dx + _dims.left, dy + _dims.top);
-					if (res)
-						return res;
+					if (res && res->_priority > priority) {
+						priority = res->_priority;
+						widget = res;
+					}
 				}
-				return this;
+				return widget ? widget : this;
 			}
 			break;
 		}

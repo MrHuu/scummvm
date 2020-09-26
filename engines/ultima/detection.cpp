@@ -27,7 +27,6 @@
 #include "common/savefile.h"
 #include "common/str-array.h"
 #include "common/memstream.h"
-#include "common/translation.h"
 #include "ultima/shared/early/ultima_early.h"
 #include "ultima/ultima4/ultima4.h"
 #include "ultima/ultima4/meta_engine.h"
@@ -39,7 +38,9 @@
 namespace Ultima {
 
 static const PlainGameDescriptor ULTIMA_GAMES[] = {
+#ifndef RELEASE_BUILD
 	{ "ultima1", "Ultima I - The First Age of Darkness" },
+#endif
 	{ "ultima4", "Ultima IV - Quest of the Avatar" },
 	{ "ultima4_enh", "Ultima IV - Quest of the Avatar - Enhanced" },
 	{ "ultima6", "Ultima VI - The False Prophet" },
@@ -70,9 +71,11 @@ bool UltimaMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGa
 	const Ultima::UltimaGameDescription *gd = (const Ultima::UltimaGameDescription *)desc;
 	if (gd) {
 		switch (gd->gameId) {
+#ifndef RELEASE_BUILD
 		case Ultima::GAME_ULTIMA1:
 			*engine = new Ultima::Shared::UltimaEarlyEngine(syst, gd);
 			break;
+#endif
 		case Ultima::GAME_ULTIMA4:
 			*engine = new Ultima::Ultima4::Ultima4Engine(syst, gd);
 			break;
@@ -98,20 +101,6 @@ int UltimaMetaEngine::getMaximumSaveSlot() const {
 	return MAX_SAVES;
 }
 
-const char *UltimaMetaEngine::getSavegamePattern(const char *target) const {
-	static char buffer[100];
-	snprintf(buffer, 100, "%s.###", target == nullptr ? getEngineId() : target);
-
-	return buffer;
-}
-
-const char *UltimaMetaEngine::getSavegameFile(int saveGameIdx, const char *target) const {
-	static char buffer[100];
-	snprintf(buffer, 100, "%s.%.3d", target == nullptr ? getEngineId() : target, saveGameIdx);
-
-	return buffer;
-}
-
 SaveStateList UltimaMetaEngine::listSaves(const char *target) const {
 	SaveStateList saveList = AdvancedMetaEngine::listSaves(target);
 
@@ -123,11 +112,11 @@ SaveStateList UltimaMetaEngine::listSaves(const char *target) const {
 }
 
 Common::KeymapArray UltimaMetaEngine::initKeymaps(const char *target) const {
-	Common::String gameId = getGameId(target);
+	const Common::String gameId = getGameId(target);
 	if (gameId == "ultima4" || gameId == "ultima4_enh")
 		return Ultima::Ultima4::MetaEngine::initKeymaps();
 	if (gameId == "ultima8" || gameId == "remorse" || gameId == "regret")
-		return Ultima::Ultima8::MetaEngine::initKeymaps();
+		return Ultima::Ultima8::MetaEngine::initKeymaps(gameId);
 
 	return Common::KeymapArray();
 }

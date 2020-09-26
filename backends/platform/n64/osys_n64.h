@@ -31,7 +31,6 @@
 #include "base/main.h"
 
 #include "graphics/surface.h"
-#include "graphics/colormasks.h"
 #include "graphics/palette.h"
 #include "graphics/pixelformat.h"
 
@@ -168,13 +167,14 @@ public:
 
 	virtual void showOverlay();
 	virtual void hideOverlay();
+	virtual bool isOverlayVisible() const { return _overlayVisible; }
 	virtual void clearOverlay();
 	virtual void grabOverlay(void *buf, int pitch);
 	virtual void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h);
 	virtual int16 getOverlayHeight();
 	virtual int16 getOverlayWidth();
 	virtual Graphics::PixelFormat getOverlayFormat() const {
-		return Graphics::createPixelFormat<555>();
+		return Graphics::PixelFormat(2, 5, 5, 5, 0, 11, 6, 1, 0);
 	}
 
 	virtual bool showMouse(bool visible);

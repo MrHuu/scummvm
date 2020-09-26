@@ -3,7 +3,9 @@ MODULE := engines/director
 MODULE_OBJS = \
 	archive.o \
 	cast.o \
-	cachedmactext.o \
+	castmember.o \
+	channel.o \
+	cursor.o \
 	detection.o \
 	director.o \
 	events.o \
@@ -16,9 +18,10 @@ MODULE_OBJS = \
 	sound.o \
 	sprite.o \
 	stxt.o \
+	tests.o \
 	transitions.o \
 	util.o \
-	lingo/lingo-gr.o \
+	window.o \
 	lingo/lingo.o \
 	lingo/lingo-builtins.o \
 	lingo/lingo-bytecode.o \
@@ -26,12 +29,19 @@ MODULE_OBJS = \
 	lingo/lingo-codegen.o \
 	lingo/lingo-events.o \
 	lingo/lingo-funcs.o \
+	lingo/lingo-gr.o \
 	lingo/lingo-lex.o \
+	lingo/lingo-object.o \
+	lingo/lingo-patcher.o \
 	lingo/lingo-preprocessor.o \
-	lingo/lingo-the.o
+	lingo/lingo-the.o \
+	lingo/xlibs/fileio.o \
+	lingo/xlibs/flushxobj.o \
+	lingo/xlibs/palxobj.o \
+	lingo/xlibs/winxobj.o
 
 director-grammar:
-	flex engines/director/lingo/lingo-lex.l
+	`brew --prefix flex`/bin/flex engines/director/lingo/lingo-lex.l
 	`brew --prefix bison`/bin/bison -dv engines/director/lingo/lingo-gr.y
 
 # This module can be built as a plugin

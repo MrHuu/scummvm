@@ -129,6 +129,10 @@ void PopUpDialog::reflowLayout() {
 void PopUpDialog::drawDialog(DrawLayer layerToDraw) {
 	Dialog::drawDialog(layerToDraw);
 
+	if (g_gui.useRTL()) {
+		_x = g_system->getOverlayWidth() - _x - _w + g_gui.getOverlayOffset();
+	}
+
 	// Draw the menu border
 	g_gui.theme()->drawWidgetBackground(Common::Rect(_x, _y, _x + _w, _y + _h), ThemeEngine::kWidgetBackgroundPlain);
 
@@ -195,12 +199,13 @@ void PopUpDialog::handleMouseLeft(int button) {
 	_lastRead = -1;
 }
 
-void PopUpDialog::read(Common::String str) {
+void PopUpDialog::read(const Common::U32String &str) {
 #ifdef USE_TTS
 	if (ConfMan.hasKey("tts_enabled", "scummvm") &&
 			ConfMan.getBool("tts_enabled", "scummvm")) {
 		Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
-		ttsMan->say(str);
+		if (ttsMan != nullptr)
+			ttsMan->say(str);
 	}
 #endif
 }
@@ -283,7 +288,7 @@ void PopUpDialog::setWidth(uint16 width) {
 	_w = width;
 }
 
-void PopUpDialog::appendEntry(const Common::String &entry) {
+void PopUpDialog::appendEntry(const Common::U32String &entry) {
 	_entries.push_back(entry);
 }
 
@@ -385,16 +390,33 @@ void PopUpDialog::drawMenuEntry(int entry, bool hilite) {
 		w = _w - 2;
 	}
 
-	Common::String &name(_entries[entry]);
+	Common::U32String &name(_entries[entry]);
+
+	Common::Rect r1(x, y, x + w, y + _lineHeight);
+	Common::Rect r2(x + 1, y + 2, x + w, y + 2 + _lineHeight);
+	Graphics::TextAlign alignment = Graphics::kTextAlignLeft;
+	int pad = _leftPadding;
+
+	if (g_gui.useRTL()) {
+		if (_twoColumns) {
+			r1.translate(this->getWidth() - w, 0);		// Shift the line-separator to the "first" col of RTL popup
+		}
+
+		r2.left = g_system->getOverlayWidth() - r2.left - w + g_gui.getOverlayOffset();
+		r2.right = r2.left + w;
+
+		alignment = Graphics::kTextAlignRight;
+		pad = _rightPadding;
+	}
 
 	if (name.size() == 0) {
 		// Draw a separator
-		g_gui.theme()->drawLineSeparator(Common::Rect(x, y, x + w, y + _lineHeight));
+		g_gui.theme()->drawLineSeparator(r1);
 	} else {
 		g_gui.theme()->drawText(
-			Common::Rect(x + 1, y + 2, x + w, y + 2 + _lineHeight),
+			r2,
 			name, hilite ? ThemeEngine::kStateHighlight : ThemeEngine::kStateEnabled,
-			Graphics::kTextAlignLeft, ThemeEngine::kTextInversionNone, _leftPadding
+			alignment, ThemeEngine::kTextInversionNone, pad
 		);
 	}
 }
@@ -406,7 +428,7 @@ void PopUpDialog::drawMenuEntry(int entry, bool hilite) {
 // PopUpWidget
 //
 
-PopUpWidget::PopUpWidget(GuiObject *boss, const String &name, const char *tooltip)
+PopUpWidget::PopUpWidget(GuiObject *boss, const String &name, const U32String &tooltip)
 	: Widget(boss, name, tooltip), CommandSender(boss) {
 	setFlags(WIDGET_ENABLED | WIDGET_CLEARBG | WIDGET_RETAIN_FOCUS | WIDGET_IGNORE_DRAG);
 	_type = kPopUpWidget;
@@ -415,7 +437,7 @@ PopUpWidget::PopUpWidget(GuiObject *boss, const String &name, const char *toolti
 	_leftPadding = _rightPadding = 0;
 }
 
-PopUpWidget::PopUpWidget(GuiObject *boss, int x, int y, int w, int h, const char *tooltip)
+PopUpWidget::PopUpWidget(GuiObject *boss, int x, int y, int w, int h, const U32String &tooltip)
 	: Widget(boss, x, y, w, h, tooltip), CommandSender(boss) {
 	setFlags(WIDGET_ENABLED | WIDGET_CLEARBG | WIDGET_RETAIN_FOCUS | WIDGET_IGNORE_DRAG);
 	_type = kPopUpWidget;
@@ -474,11 +496,15 @@ void PopUpWidget::reflowLayout() {
 	Widget::reflowLayout();
 }
 
-void PopUpWidget::appendEntry(const String &entry, uint32 tag) {
+void PopUpWidget::appendEntry(const U32String &entry, uint32 tag) {
 	Entry e;
 	e.name = entry;
 	e.tag = tag;
 	_entries.push_back(e);
+}
+
+void PopUpWidget::appendEntry(const String &entry, uint32 tag) {
+	appendEntry(U32String(entry), tag);
 }
 
 void PopUpWidget::clearEntries() {
@@ -507,10 +533,16 @@ void PopUpWidget::setSelectedTag(uint32 tag) {
 }
 
 void PopUpWidget::drawWidget() {
-	Common::String sel;
+	Common::U32String sel;
 	if (_selectedItem >= 0)
 		sel = _entries[_selectedItem].name;
-	g_gui.theme()->drawPopUpWidget(Common::Rect(_x, _y, _x + _w, _y + _h), sel, _leftPadding, _state);
+
+	int pad = _leftPadding;
+
+	if (g_gui.useRTL() && _useRTL)
+		pad = _rightPadding;
+
+	g_gui.theme()->drawPopUpWidget(Common::Rect(_x, _y, _x + _w, _y + _h), sel, pad, _state, (g_gui.useRTL() && _useRTL));
 }
 
 } // End of namespace GUI

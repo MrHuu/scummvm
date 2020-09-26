@@ -28,6 +28,8 @@
 
 #include "ultima/ultima8/usecode/intrinsics.h"
 #include "ultima/ultima8/misc/box.h"
+#include "ultima/ultima8/misc/point3.h"
+#include "ultima/ultima8/misc/direction.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -73,6 +75,9 @@ public:
 	//! CurrentMap and fastArea if necessary.
 	void move(int32 x, int32 y, int32 z);
 
+	//! Move, but with a point struct.
+	void move(const Point3 &pt);
+
 	//! Move an item. This moves an item to a container and  updates
 	//! CurrentMap and fastArea if necessary.
 	//! \param container The container this item should be placed in
@@ -95,6 +100,9 @@ public:
 	//! Get this Item's location. Note that this does not return
 	//! 'usable' coordinates if the Item is contained or equipped.
 	inline void getLocation(int32 &x, int32 &y, int32 &z) const;
+
+	//! Get the Item's location using a Point3 struct.
+	inline void getLocation(Point3 &pt) const;
 
 	//! Get this Item's Z coordinate.
 	int32 getZ() const;
@@ -226,17 +234,17 @@ public:
 		return _mapNum;
 	}
 
-	//! Set the 'NpcNum' of this Item. Note that this can represent various
+	//! Set the 'MapNum' of this Item. Note that this can represent various
 	//! things depending on the family of this Item.
 	void setMapNum(uint16 mapnum_) {
 		_mapNum = mapnum_;
 	}
 
 	//! Get the ShapeInfo object for this Item. (The pointer will be cached.)
-	inline ShapeInfo *getShapeInfo() const;
+	inline const ShapeInfo *getShapeInfo() const;
 
 	//! Get the ShapeInfo object for this Item from the game instance.
-	ShapeInfo *getShapeInfoFromGameInstance() const;
+	const ShapeInfo *getShapeInfoFromGameInstance() const;
 
 	//! Get the Shape object for this Item. (The pointer will be cached.)
 	Shape *getShapeObject() const;
@@ -263,24 +271,39 @@ public:
 	virtual void destroy(bool delnow = false);
 
 	//! Check if this item overlaps another item in 3D world-space
-	bool overlaps(Item &item2) const;
+	bool overlaps(const Item &item2) const;
 
 	//! Check if this item overlaps another item in the xy dims in 3D space
-	bool overlapsxy(Item &item2) const;
+	bool overlapsxy(const Item &item2) const;
 
-	//! Check if this item is on top another item
-	bool isOn(Item &item2) const;
+	//! Check if this item is on top of another item
+	bool isOn(const Item &item2) const;
+
+	//! Check if this item is on completely on top of another item
+	bool isCompletelyOn(const Item &item2) const;
+
+	//! Check if the centre of this item is on top of another item
+	bool isCentreOn(const Item &item2) const;
+
+	//! Check if the item is currently visible on screen
+	bool isOnScreen() const;
 
 	//! Check if this item can exist at the given coordinates
 	bool canExistAt(int32 x_, int32 y_, int32 z_, bool needsupport = false) const;
 
 	//! Get direction from centre to another item's centre.
 	//! Undefined if either item is contained or equipped.
-	int getDirToItemCentre(const Item &item2) const;
+	Direction getDirToItemCentre(const Item &item2) const;
+
+	//! Same as above, but from a fixed point.
+	Direction getDirToItemCentre(const Point3 &pt) const;
 
 	//! get 'distance' to other item. This is the maximum of the differences
 	//! between the x, y (and possibly z) coordinates of the items.
 	int getRange(const Item &item2, bool checkz = false) const;
+
+	//! get 'distance' to other item if it's visible (ie, there's nothing blocking the path)
+	int getRangeIfVisible(const Item &item2) const;
 
 	//! Check if this item can reach another item. (This includes LoS.)
 	//! \param other item to be reached
@@ -303,7 +326,7 @@ public:
 	//!          0 = didn't move
 	//!          0x4000 = reached destination
 	//! \note This can destroy the object
-	int32 collideMove(int32 x, int32 y, int32 z, bool teleport, bool force,
+	virtual int32 collideMove(int32 x, int32 y, int32 z, bool teleport, bool force,
 	                  ObjId *hititem = 0, uint8 *dirs = 0);
 
 	//! Make the item move up (delta>0) or down (delta<0),
@@ -350,8 +373,9 @@ public:
 	//! Get the volume this item takes up in a container
 	virtual uint32 getVolume() const;
 
-	//! explode
-	void explode();
+	//! explode with explosion type (0,1,2), whether to destroy the item,
+	//! and whether to cause splash damage.
+	void explode(int explosion_type, bool destroy_item, bool cause_damage = true);
 
 	//! get the damage type this object does when hitting something
 	virtual uint16 getDamageType() const;
@@ -361,7 +385,20 @@ public:
 	//! \param dir The direction the hit is coming from (or inverse? CHECKME!)
 	//! \param damage The force of the hit. Zero for default
 	//! \param type The type of damage done. Zero for default
-	virtual void receiveHit(ObjId other, int dir, int damage, uint16 type);
+	virtual void receiveHit(ObjId other, Direction dir, int damage, uint16 type);
+
+	//! fire the given weapon type in the given direction from location x, y, z.
+	uint16 fireWeapon(int32 x, int32 y, int32 z, Direction dir, int firetype, char someflag);
+
+	//! get damage points, used in Crusader for item damage.
+	uint8 getDamagePoints() const {
+		return _damagePoints;
+	}
+
+	//! set damage points, used in Crusader for item damage.
+	void setDamagePoints(uint8 points) {
+		_damagePoints = points;
+	}
 
 	//! count nearby objects of a given shape
 	unsigned int countNearby(uint32 shape_, uint16 range);
@@ -388,13 +425,18 @@ public:
 	uint32 callUsecodeEvent_hatch();                            // event 7
 	uint32 callUsecodeEvent_schedule(uint32 time);              // event 8
 	uint32 callUsecodeEvent_release();                          // event 9
+	uint32 callUsecodeEvent_equip();                            // event A
+	uint32 callUsecodeEvent_equipWithParam(ObjId param);        // event A
+	uint32 callUsecodeEvent_unequip();                          // event B
 	uint32 callUsecodeEvent_combine();                          // event C
+	uint32 callUsecodeEvent_calledFromAnim();                   // event E
 	uint32 callUsecodeEvent_enterFastArea();                    // event F
 	uint32 callUsecodeEvent_leaveFastArea();                    // event 10
 	uint32 callUsecodeEvent_cast(uint16 unk);                   // event 11
 	uint32 callUsecodeEvent_justMoved();                        // event 12
 	uint32 callUsecodeEvent_AvatarStoleSomething(uint16 unk);   // event 14
-	uint32 callUsecodeEvent_guardianBark(int16 unk);            // event 15
+	uint32 callUsecodeEvent_guardianBark(int16 unk);            // event 15 (Ultima)
+	uint32 callUsecodeEvent_unhatch();							// event 15 (Crusader)
 
 	uint32 use();
 
@@ -448,6 +490,7 @@ public:
 	void dumpInfo() const override;
 
 	bool loadData(Common::ReadStream *rs, uint32 version);
+	void saveData(Common::WriteStream *ws) override;
 
 	// Intrinsics
 	INTRINSIC(I_touch);
@@ -475,6 +518,7 @@ public:
 	INTRINSIC(I_setQLo);
 	INTRINSIC(I_setQuality);
 	INTRINSIC(I_setQuantity);
+	INTRINSIC(I_setQAndCombine);
 	INTRINSIC(I_getFamily);
 	INTRINSIC(I_getTypeFlag);
 	INTRINSIC(I_getStatus);
@@ -484,6 +528,9 @@ public:
 	INTRINSIC(I_overlaps);
 	INTRINSIC(I_overlapsXY);
 	INTRINSIC(I_isOn);
+	INTRINSIC(I_isCompletelyOn);
+	INTRINSIC(I_isCentreOn);
+	INTRINSIC(I_isInNpc);
 	INTRINSIC(I_ascend);
 	INTRINSIC(I_getWeight);
 	INTRINSIC(I_getWeightIncludingContents);
@@ -492,14 +539,18 @@ public:
 	INTRINSIC(I_getMapArray);
 	INTRINSIC(I_setMapArray);
 	INTRINSIC(I_getNpcNum);
+	INTRINSIC(I_setNpcNum);
 	INTRINSIC(I_getDirToCoords);
 	INTRINSIC(I_getDirFromCoords);
 	INTRINSIC(I_getDirToItem);
 	INTRINSIC(I_getDirFromItem);
+	INTRINSIC(I_getDirFromTo16);
+	INTRINSIC(I_getClosestDirectionInRange);
 	INTRINSIC(I_look);
 	INTRINSIC(I_use);
 	INTRINSIC(I_gotHit);
 	INTRINSIC(I_enterFastArea);
+	INTRINSIC(I_cast);
 	INTRINSIC(I_ask);
 	INTRINSIC(I_getSliderInput);
 	INTRINSIC(I_openGump);
@@ -531,7 +582,15 @@ public:
 	INTRINSIC(I_explode);
 	INTRINSIC(I_canReach);
 	INTRINSIC(I_getRange);
+	INTRINSIC(I_getRangeIfVisible);
 	INTRINSIC(I_isCrusTypeNPC);
+	INTRINSIC(I_setBroken);
+	INTRINSIC(I_inFastArea);
+	INTRINSIC(I_equip);
+	INTRINSIC(I_unequip);
+	INTRINSIC(I_avatarStoleSomething);
+	INTRINSIC(I_isOnScreen);
+	INTRINSIC(I_fireWeapon);
 
 private:
 	uint32 _shape;   // DO NOT modify this directly! Always use setShape()!
@@ -550,7 +609,7 @@ protected:
 	ObjId _parent; // objid container this item is in (or 0 for top-level items)
 
 	mutable Shape *_cachedShape;
-	mutable ShapeInfo *_cachedShapeInfo;
+	mutable const ShapeInfo *_cachedShapeInfo;
 
 	// This is stuff that is used for displaying and interpolation
 	struct Lerped {
@@ -566,8 +625,14 @@ protected:
 	ObjId _gump;             // Item's gump
 	ProcId _gravityPid;      // Item's GravityTracker (or 0)
 
-	//! save the actual Item data
-	void saveData(Common::WriteStream *ws) override;
+	uint8 _damagePoints;	// Damage points, used for item damage in Crusader
+
+	//! True if this is a Robot shape (in a fixed list)
+	bool isRobotCru() const;
+
+	//! Scale a received damage value based on the current difficulty level
+	//! and the type of object this is.
+	int scaleReceivedDamageCru(int damage, uint16 type) const;
 
 private:
 
@@ -579,6 +644,12 @@ private:
 
 	//! Animate the item (called by setupLerp)
 	void animateItem();
+
+	//! The U8 version of receiveHit
+	void receiveHitU8(ObjId other, Direction dir, int damage, uint16 type);
+
+	//! The Crusader version of receiveHit
+	void receiveHitCru(ObjId other, Direction dir, int damage, uint16 type);
 
 public:
 	enum statusflags {
@@ -592,10 +663,11 @@ public:
 		FLG_GUMP_OPEN    = 0x0100,  //!< Item has a gump open
 		FLG_EQUIPPED     = 0x0200,  //!< Item is equipped
 		FLG_BOUNCING     = 0x0400,  //!< Item has bounced
-		FLG_ETHEREAL     = 0x0800,  //!< Item is in the ethereal list
+		FLG_ETHEREAL     = 0x0800,  //!< Item is in the ethereal list - confirmed same meaning in crusader
 		FLG_HANGING      = 0x1000,  //!< Item is suspended in the air
 		FLG_FASTAREA     = 0x2000,  //!< Item is in the fast area
-		FLG_LOW_FRICTION = 0x4000   //!< Item has low friction
+		FLG_LOW_FRICTION = 0x4000,  //!< Item has low friction
+		FLG_BROKEN       = 0x8000   //!< Item is broken - Crusader only - broken items are not targetable.
 	};
 
 	enum extflags {
@@ -606,11 +678,13 @@ public:
 		EXT_CAMERA       = 0x0020,  //!< Item is being followed by the camera
 		EXT_SPRITE       = 0x0040,  //!< Item is a sprite
 		EXT_TRANSPARENT  = 0x0080,  //!< Item should be painted transparent
-		EXT_PERMANENT_NPC = 0x0100  //!< Item is a permanent NPC
+		EXT_PERMANENT_NPC = 0x0100, //!< Item is a permanent NPC
+		EXT_TARGET 		 = 0x0200,  //!< Item is the current reticle target in Crusader
+		EXT_FEMALE       = 0x8000	//!< Item is Crusader Female NPC (controls sfx)
 	};
 };
 
-inline ShapeInfo *Item::getShapeInfo() const {
+inline const ShapeInfo *Item::getShapeInfo() const {
 	if (!_cachedShapeInfo)
 		_cachedShapeInfo = getShapeInfoFromGameInstance();
 	return _cachedShapeInfo;
@@ -639,6 +713,12 @@ inline void Item::getLocation(int32 &X, int32 &Y, int32 &Z) const {
 	X = _x;
 	Y = _y;
 	Z = _z;
+}
+
+inline void Item::getLocation(Point3 &pt) const {
+	pt.x = _x;
+	pt.y = _y;
+	pt.z = _z;
 }
 
 } // End of namespace Ultima8

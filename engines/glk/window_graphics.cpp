@@ -96,7 +96,7 @@ void GraphicsWindow::redraw() {
 	}
 }
 
-bool GraphicsWindow::drawPicture(uint image, int xpos, int ypos, bool scale,
+bool GraphicsWindow::drawPicture(const Common::String &image, int xpos, int ypos, bool scale,
                                    uint imagewidth, uint imageheight) {
 	Picture *pic = g_vm->_pictures->load(image);
 	uint hyperlink = _attr.hyper;
@@ -174,6 +174,16 @@ void GraphicsWindow::fillRect(uint color, const Rect &box) {
 	g_vm->_selection->putHyperlink(0, hx0, hy0, hx1, hy1);
 
 	_surface->fillRect(Rect(x0, y0, x1, y1), color);
+	touch();
+}
+
+void GraphicsWindow::frameRect(uint color, const Rect &box) {
+	_surface->frameRect(box, color);
+	touch();
+}
+
+void GraphicsWindow::drawLine(uint color, const Point &from, const Point &to) {
+	_surface->drawLine(from.x, from.y, to.x, to.y, color);
 	touch();
 }
 

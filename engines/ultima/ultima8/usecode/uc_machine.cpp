@@ -31,14 +31,15 @@
 #include "ultima/ultima8/world/current_map.h"
 #include "ultima/ultima8/world/world.h"
 #include "ultima/ultima8/usecode/bit_set.h"
+#include "ultima/ultima8/usecode/byte_set.h"
 #include "ultima/ultima8/usecode/uc_list.h"
 #include "ultima/ultima8/misc/id_man.h"
 #include "ultima/ultima8/world/get_object.h"
 #include "ultima/ultima8/filesys/idata_source.h"
 
-#define INCLUDE_CONVERTUSECODEU8_WITHOUT_BRINGING_IN_FOLD
 #include "ultima/ultima8/convert/u8/convert_usecode_u8.h"
 #include "ultima/ultima8/convert/crusader/convert_usecode_crusader.h"
+#include "ultima/ultima8/convert/crusader/convert_usecode_regret.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
 
 namespace Ultima {
@@ -87,15 +88,21 @@ UCMachine::UCMachine(Intrinsic *iset, unsigned int icount) {
 	_ucMachine = this;
 
 	// zero _globals
-	_globals = new BitSet(0x1000);
 
 	if (GAME_IS_U8) {
+		_globals = new BitSet(0x1000);
 		_convUse = new ConvertUsecodeU8();
 	} else if (GAME_IS_REMORSE) {
+		_globals = new ByteSet(0x1000);
+		// slight hack: set global 003C to start as avatar number.
+		_globals->setEntries(0x3C, 2, 1);
 		_convUse = new ConvertUsecodeCrusader();
 	} else {
-		// TODO: Need a separate convertor for Regret
-		_convUse = new ConvertUsecodeCrusader();
+		_globals = new ByteSet(0x1000);
+		// slight hack: set global 003C to start as avatar number.
+		// TODO: is this the same offset in regret?
+		_globals->setEntries(0x3C, 2, 1);
+		_convUse = new ConvertUsecodeRegret();
 	}
 
 	loadIntrinsics(iset, icount); //!...
@@ -125,6 +132,11 @@ void UCMachine::reset() {
 
 	// clear _globals
 	_globals->setSize(0x1000);
+
+	if (GAME_IS_CRUSADER) {
+		// slight hack: set global 003C to start as avatar number.
+		_globals->setEntries(0x3C, 2, 1);
+	}
 
 	// clear strings, lists
 	Std::map<uint16, UCList *>::iterator iter;
@@ -354,10 +366,9 @@ void UCMachine::execProcess(UCProcess *p) {
 			// (includes this pointer, if present)
 			// NB: do not actually pop these argument bytes
 		{
-			//! TODO
 			uint16 arg_bytes = cs.readByte();
 			uint16 func = cs.readUint16LE();
-			debug(10, "calli\t\t%04Xh (%02Xh arg bytes) %s ", func, arg_bytes, _convUse->intrinsics()[func]);
+			LOGPF(("calli\t\t%04Xh (%02Xh arg bytes) %s\n", func, arg_bytes, _convUse->intrinsics()[func]));
 
 			// !constants
 			if (func >= _intrinsicCount || _intrinsics[func] == 0) {
@@ -366,12 +377,14 @@ void UCMachine::execProcess(UCProcess *p) {
 
 				if (arg_bytes >= 4) {
 					// HACKHACKHACK to check what the argument is.
-					uint8 *args = new uint8[arg_bytes];
+					uint8 *argmem = new uint8[arg_bytes];
+					uint8 *args = argmem;
 					p->_stack.pop(args, 4);
 					p->_stack.addSP(-4); // don't really pop the args
 					ARG_UC_PTR(iptr);
 					uint16 testItemId = ptrToObject(iptr);
 					testItem = getItem(testItemId);
+					delete [] argmem;
 				}
 				perr << "Unhandled intrinsic << " << func << " \'" << _convUse->intrinsics()[func] << "\'? (";
 				if (testItem) {
@@ -407,7 +420,7 @@ void UCMachine::execProcess(UCProcess *p) {
 			// https://sourceforge.net/tracker/index.php?func=detail&aid=1018748&group_id=53819&atid=471709
 			if (GAME_IS_U8 && p->_classId == 0x48B && func == 0xD0) {
 				// 0xD0 = setAvatarInStasis
-				_globals->setBits(0, 1, 1);
+				_globals->setEntries(0, 1, 1);
 			}
 
 		}
@@ -1221,9 +1234,7 @@ void UCMachine::execProcess(UCProcess *p) {
 			// push global xxxx size yy bits
 			ui16a = cs.readUint16LE();
 			ui16b = cs.readByte();
-			// TODO: get flagname for output?
-
-			ui32a = _globals->getBits(ui16a, ui16b);
+			ui32a = _globals->getEntries(ui16a, ui16b);
 			p->_stack.push2(static_cast<uint16>(ui32a));
 			LOGPF(("push\t\tglobal [%04X %02X] = %02X\n", ui16a, ui16b, ui32a));
 			break;
@@ -1233,16 +1244,20 @@ void UCMachine::execProcess(UCProcess *p) {
 			// pop value into global xxxx size yy bits
 			ui16a = cs.readUint16LE();
 			ui16b = cs.readByte();
-			// TODO: get flagname for output?
 			ui32a = p->_stack.pop2();
-			_globals->setBits(ui16a, ui16b, ui32a);
+			_globals->setEntries(ui16a, ui16b, ui32a);
 
-			if (ui32a & ~(((1 << ui16b) - 1))) {
-				perr << "Warning: value popped into a bitflag it doesn't fit in" << Std::endl;
+			if ((GAME_IS_U8 && (ui32a & ~(((1 << ui16b) - 1)))) || ui16b > 2) {
+				perr << "Warning: value popped into a flag it doesn't fit in (" << Std::hex
+					 << ui16a << " " << ui16b << " " << ui32a << ")" << Std::endl;
 			}
 
 			// paranoid :-)
-			assert(_globals->getBits(ui16a, ui16b) == (ui32a & ((1 << ui16b) - 1)));
+			if (GAME_IS_U8) {
+				assert(_globals->getEntries(ui16a, ui16b) == (ui32a & ((1 << ui16b) - 1)));
+			} else {
+				assert(_globals->getEntries(ui16a, ui16b) == ui32a);
+		    }
 
 			LOGPF(("pop\t\tglobal [%04X %02X] = %02X\n", ui16a, ui16b, ui32a));
 			break;
@@ -1252,7 +1267,6 @@ void UCMachine::execProcess(UCProcess *p) {
 			// return from function
 
 			if (p->ret()) { // returning from process
-				// TODO
 				LOGPF(("ret\t\tfrom process\n"));
 				p->terminateDeferred();
 
@@ -1733,7 +1747,7 @@ void UCMachine::execProcess(UCProcess *p) {
 					                                   ui16b, recurse);
 				} else {
 					// return error or return empty list?
-					perr << "Warning: invalid item passed to area search"
+					perr << "Warning: invalid item " << ui16a << " passed to area search"
 					     << Std::endl;
 				}
 				break;
@@ -1761,7 +1775,7 @@ void UCMachine::execProcess(UCProcess *p) {
 					                           scriptsize, recurse);
 				} else {
 					// return error or return empty list?
-					perr << "Warning: invalid container passed to "
+					perr << "Warning: invalid container "<< ui16b << " passed to "
 					     << "container search" << Std::endl;
 				}
 				break;
@@ -1973,7 +1987,7 @@ void UCMachine::execProcess(UCProcess *p) {
 			// assigns item number and ProcessType
 			p->setItemNum(p->_stack.pop2());
 			p->setType(p->_stack.pop2());
-			LOGPF(("set info\n"));
+			LOGPF(("set info itemno: %d type: %d\n", p->getItemNum(), p->getType()));
 			break;
 
 		case 0x78:
@@ -1995,24 +2009,30 @@ void UCMachine::execProcess(UCProcess *p) {
 				LOGPF(("\n"));
 			}
 
-
 			break;
 
-
 		case 0x79:
+			// 79
+			// push address of global (Crusader only)
+			ui16a = cs.readUint16LE(); // global address
+			ui32a = globalToPtr(ui16a);
+			p->_stack.push4(ui32a);
+			LOGPF(("push global 0x%x (value: %x)\n", ui16a, ui32a));
+			break;
+
 		case 0x7A:
 			// 7A
 			// end of function
 			// shouldn't happen
-			//! 0x79 is U8 only. Should be removed
 			LOGPF(("end\n"));
-			perr.Print("end of function opcode reached!\n");
+			perr.Print("end of function opcode %02X reached!\n", opcode);
 			error = true;
 			break;
 
 		case 0x5B: {
 			ui16a = cs.readUint16LE(); // source line number
 			debug(10, "ignore debug opcode %02X: line offset %d", opcode, ui16a);
+			LOGPF(("line number %d\n", ui16a));
 			break;
 		}
 		case 0x5C: {
@@ -2022,6 +2042,7 @@ void UCMachine::execProcess(UCProcess *p) {
 				// skip over class name and null terminator
 				name[x] = cs.readByte();
 			}
+			LOGPF(("line number %s %d\n", name, ui16a));
 			debug(10, "ignore debug opcode %02X: %s line offset %d", opcode, name, ui16a);
 			break;
 		}
@@ -2040,8 +2061,8 @@ void UCMachine::execProcess(UCProcess *p) {
 	} // while(!cede && !error && !p->terminated && !p->terminate_deferred)
 
 	if (error) {
-		perr.Print("Process %d caused an error at %04X:%04X. Killing process.\n",
-		            p->_pid, p->_classId, p->_ip);
+		perr.Print("Process %d caused an error at %04X:%04X (item %d). Killing process.\n",
+		            p->_pid, p->_classId, p->_ip, p->_itemNum);
 		p->terminateDeferred();
 	}
 }
@@ -2191,7 +2212,17 @@ bool UCMachine::assignPointer(uint32 ptr, const uint8 *data, uint32 size) {
 			proc->_stack.assign(offset, data, size);
 		}
 	} else if (segment == SEG_GLOBAL) {
-		CANT_HAPPEN_MSG("pointers to _globals not implemented yet");
+		if (!GAME_IS_CRUSADER)
+			CANT_HAPPEN_MSG("Global pointers not supported in U8");
+
+		if (size == 1) {
+			_globals->setEntries(offset, data[0], 1);
+		} else if (size == 2) {
+			uint16 val = ((data[0] << 8) | data[1]);
+			_globals->setEntries(offset, val, 2);
+		} else {
+			CANT_HAPPEN_MSG("Global pointers must be size 1 or 2");
+		}
 	} else {
 		perr << "Trying to access segment " << Std::hex
 		     << segment << Std::dec << Std::endl;
@@ -2238,7 +2269,18 @@ bool UCMachine::dereferencePointer(uint32 ptr, uint8 *data, uint32 size) {
 			data[1] = static_cast<uint8>(offset >> 8);
 		}
 	} else if (segment == SEG_GLOBAL) {
-		CANT_HAPPEN_MSG("pointers to _globals not implemented yet");
+		if (!GAME_IS_CRUSADER)
+			CANT_HAPPEN_MSG("Global pointers not supported in U8");
+
+		if (size == 1) {
+			data[0] = static_cast<uint8>(_globals->getEntries(offset, 1));
+		} else if (size == 2) {
+			uint16 val = _globals->getEntries(offset, 2);
+			data[0] = static_cast<uint8>(val);
+			data[1] = static_cast<uint8>(val >> 8);
+		} else {
+			CANT_HAPPEN_MSG("Global pointers must be size 1 or 2");
+		}
 	} else {
 		perr << "Trying to access segment " << Std::hex
 		     << segment << Std::dec << Std::endl;
@@ -2263,14 +2305,18 @@ uint16 UCMachine::ptrToObject(uint32 ptr) {
 			perr << "Trying to access stack of non-existent "
 			     << "process (pid: " << segment << ")" << Std::endl;
 			return 0;
+		} else if (proc->_stack.getSize() < (uint32)offset + 2) {
+			perr << "Trying to access past end of stack offset " << offset
+			     << " (size: " << proc->_stack.getSize()
+				 << ") process (pid: " << segment << ")" << Std::endl;
+			return 0;
 		} else {
 			return proc->_stack.access2(offset);
 		}
 	} else if (segment == SEG_OBJ || segment == SEG_STRING) {
 		return offset;
 	} else if (segment == SEG_GLOBAL) {
-		CANT_HAPPEN_MSG("pointers to _globals not implemented yet");
-		return 0;
+		return get_instance()->_globals->getEntries(offset, 2);
 	} else {
 		perr << "Trying to access segment " << Std::hex
 		     << segment << Std::dec << Std::endl;
@@ -2417,8 +2463,8 @@ uint32 UCMachine::I_rndRange(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_SINT16(hi);
 
 	// return random integer between lo (incl.) to hi (incl.)
-
-	if (hi <= lo) return lo;
+	if (hi <= lo)
+		return lo;
 
 	return (lo + (getRandom() % (hi - lo + 1)));
 }

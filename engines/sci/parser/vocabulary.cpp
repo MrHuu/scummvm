@@ -116,7 +116,8 @@ bool Vocabulary::loadParserWords() {
 		}
 		// If all of them were empty, we are definitely seeing SCI01 vocab in disguise (e.g. pq2 japanese)
 		if (alphabetNr == 26) {
-			warning("SCI0: Found SCI01 vocabulary in disguise");
+			if (g_sci->getLanguage() != Common::HE_ISR)
+				warning("SCI0: Found SCI01 vocabulary in disguise");
 			resourceType = kVocabularySCI1;
 		}
 	}
@@ -253,6 +254,7 @@ bool Vocabulary::loadSuffixes() {
 
 	return true;
 }
+
 
 void Vocabulary::freeSuffixes() {
 	Resource* resource = _resMan->findResource(ResourceId(kResourceTypeVocab, _resourceIdSuffixes), false);
@@ -482,6 +484,99 @@ void Vocabulary::lookupWord(ResultWordList& retval, const char *word, int word_l
 	}
 }
 
+void Vocabulary::lookupWordPrefix(ResultWordListList &parent_retval, ResultWordList &retval, const char *word, int word_len) {
+	// currently, this is needed only for Hebrew translation
+	if (g_sci->getLanguage() != Common::HE_ISR)
+		return;
+
+	if (word_len <= 1)
+		return;
+
+	// check "Otiyot Shimush" for nouns and prepositions - Hebrew prefixes that are like English words
+	PrefixMeaning prefixes[] = {
+		{0xe1, "1hebrew1prefix1bet"},           // "Bet"
+		{0xe4, "the"},                          // "He Hayedia"
+		{0xec, "1hebrew1prefix1lamed"},         // "Lamed"
+		{0xee, "1hebrew1prefix1mem"}            // "Mem"
+	};
+
+	for (int i = 0; i < ARRAYSIZE(prefixes); i++)
+		if (lookupSpecificPrefixWithMeaning(parent_retval, retval, word, word_len - 1, prefixes[i].prefix, prefixes[i].meaning))
+			return;
+
+	// check verbs - the user might type the verb in some other form, try to match it against its basic form
+
+	// e.g., 'open' : 'Taf Pe Taf Het' try to match 'Pe Taf Het'
+	if (lookupVerbPrefix(parent_retval, retval, word, word_len, "\xfa"))
+		return;
+
+	// e.g., 'take' : 'Taf Yud Kaf Het' try to match 'Kaf Het'
+	if (word_len == 4 && lookupVerbPrefix(parent_retval, retval, word, word_len, "\xfa\xe9"))
+		return;
+
+	// e.g. 'look' : 'Taf Sameh Taf Kaf Lamed' try to match 'He Sameh Taf Kaf Lamed'
+	if (word[0] == '\xfa') {                                 		// first letter is Taf
+		Common::String modified_word = word;
+		modified_word.setChar('\xe4', 0);							// replace the initial Taf with He
+
+		if (lookupVerbPrefix(parent_retval, retval, modified_word, modified_word.size(), ""))
+			return;
+	}
+
+	// e.g. 'put' : 'Taf Nun Yud Het' try to match 'He Nun Het'
+	if (word[0] == '\xfa' && word[word_len - 2] == '\xe9') {		// first letter is Taf, one before the last is Yud
+		Common::String modified_word = word;
+		modified_word.setChar('\xe4', 0);							// replace the initial Taf with He
+		modified_word.deleteChar(word_len - 2);						// delete the Yud
+
+		if (lookupVerbPrefix(parent_retval, retval, modified_word, modified_word.size(), ""))
+			return;
+	}
+
+	// e.g. 'enter' : 'He  Yud Kaf Nun Sameh' try to match 'He  Kaf Nun Sameh'
+	// e.g. 'enter' : 'Taf Yud Kaf Nun Sameh' try to match 'Taf Kaf Nun Sameh'
+	if ((word[0] == '\xe4' || word[0] == '\xfa') && word[1] == '\xe9') {       // first letters are 'He Yud' or 'Taf Yud'
+		Common::String modified_word = word;
+		modified_word.setChar('\xe4', 0);							// replace the initial Taf with He; or keep the initial He
+		modified_word.deleteChar(1);								// delete the second letter (=Yud)
+
+		if (lookupVerbPrefix(parent_retval, retval, modified_word, modified_word.size(), ""))
+			return;
+	}
+}
+
+bool Vocabulary::lookupSpecificPrefixWithMeaning(ResultWordListList &parent_retval, ResultWordList &retval, const char *word, int word_len, unsigned char prefix, const char *meaning) {
+	if (!_parserWords.contains(meaning)) {
+		warning("Vocabulary::lookupSpecificPrefix: _parserWords doesn't contains '%s'", meaning);
+		return false;
+	}
+	if ((unsigned char)word[0] == prefix) {
+		ResultWordList word_list;
+		lookupWord(word_list, word + 1, word_len);
+		if (!word_list.empty())
+			if (word_list.front()._class & (VOCAB_CLASS_NOUN << 4) || word_list.front()._class & (VOCAB_CLASS_PREPOSITION << 4)) {
+				parent_retval.push_back(_parserWords[meaning]);
+				retval = word_list;
+				return true;
+			}
+	}
+	return false;
+}
+
+bool Vocabulary::lookupVerbPrefix(ResultWordListList &parent_retval, ResultWordList &retval, Common::String word, int word_len, Common::String prefix) {
+	if (word.hasPrefix(prefix)) {
+		ResultWordList word_list;
+		lookupWord(word_list, word.c_str() +  prefix.size(), word_len);
+		if (!word_list.empty())
+			if (word_list.front()._class & (VOCAB_CLASS_IMPERATIVE_VERB << 4)) {
+				retval = word_list;
+				return true;
+			}
+	}
+	return false;
+}
+
+
 void Vocabulary::debugDecipherSaidBlock(const SciSpan<const byte> &data) {
 	bool first = true;
 	uint16 nextItem;
@@ -585,10 +680,14 @@ bool Vocabulary::tokenizeString(ResultWordListList &retval, const char *sentence
 				lookupWord(lookup_result, currentWord, wordLen);
 
 				if (lookup_result.empty()) { // Not found?
-					*error = (char *)calloc(wordLen + 1, 1);
-					strncpy(*error, currentWord, wordLen); // Set the offending word
-					retval.clear();
-					return false; // And return with error
+					lookupWordPrefix(retval, lookup_result, currentWord, wordLen);
+
+					if (lookup_result.empty()) { // Still not found?
+						*error = (char *)calloc(wordLen + 1, 1);
+						strncpy(*error, currentWord, wordLen); // Set the offending word
+						retval.clear();
+						return false; // And return with error
+					}
 				}
 
 				// Copy into list

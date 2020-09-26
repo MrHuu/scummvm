@@ -57,6 +57,9 @@ public:
 	// Init the gump, call after construction
 	void        InitGump(Gump *newparent, bool take_focus = true) override;
 
+	/// Get the font that should be used from dialog from this actor
+	static int dialogFontForActor(uint16 actor);
+
 protected:
 	//! show next text.
 	//! returns false if no more text available
@@ -66,7 +69,6 @@ protected:
 
 public:
 	bool loadData(Common::ReadStream *rs, uint32 version);
-protected:
 	void saveData(Common::WriteStream *ws) override;
 };
 

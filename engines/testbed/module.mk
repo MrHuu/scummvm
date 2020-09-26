@@ -9,11 +9,13 @@ MODULE_OBJS := \
 	graphics.o \
 	midi.o \
 	misc.o \
+	networking.o \
 	savegame.o \
 	sound.o \
 	encoding.o \
 	testbed.o \
-	testsuite.o
+	testsuite.o \
+	video.o
 
 ifdef USE_CLOUD
 ifdef USE_LIBCURL

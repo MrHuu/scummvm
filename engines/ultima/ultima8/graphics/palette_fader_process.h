@@ -31,6 +31,7 @@
 namespace Ultima {
 namespace Ultima8 {
 
+/** A process to fade the palette from one transform matrix to another */
 class PaletteFaderProcess : public Process {
 	int                         _priority;
 	int32                       _counter;
@@ -45,7 +46,7 @@ public:
 	PaletteFaderProcess();
 	PaletteFaderProcess(PalTransforms trans, int priority, int frames);
 	PaletteFaderProcess(uint32 rgba, bool from, int priority, int frames, bool current);
-	PaletteFaderProcess(int16 from[12], int16 to[12], int priority, int frames);
+	PaletteFaderProcess(const int16 from[12], const int16 to[12], int priority, int frames);
 	~PaletteFaderProcess(void) override;
 
 	void run() override;
@@ -56,9 +57,15 @@ public:
 	INTRINSIC(I_fadeToWhite);
 	INTRINSIC(I_fadeFromBlack);
 	INTRINSIC(I_lightningBolt);
+	INTRINSIC(I_fadeToGreyScale);
+	INTRINSIC(I_fadeToGivenColor);
+	INTRINSIC(I_jumpToGreyScale);
+	INTRINSIC(I_jumpToAllBlack);
+	INTRINSIC(I_jumpToAllGrey);
+	INTRINSIC(I_jumpToAllGivenColor);
+	INTRINSIC(I_jumpToNormalPalette);
 
 	bool loadData(Common::ReadStream *rs, uint32 version);
-protected:
 	void saveData(Common::WriteStream *ws) override;
 };
 

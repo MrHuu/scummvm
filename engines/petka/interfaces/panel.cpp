@@ -20,9 +20,6 @@
  *
  */
 
-#ifndef PETKA_STARTUP_H
-#define PETKA_STARTUP_H
-
 #include "common/config-manager.h"
 #include "common/system.h"
 
@@ -96,45 +93,36 @@ InterfacePanel::InterfacePanel() {
 void InterfacePanel::start(int id) {
 	readSettings();
 
-	QObjectBG *bg = (QObjectBG *)g_vm->getQSystem()->findObject(kPanelObjName);
+	QSystem *sys = g_vm->getQSystem();
+	QObjectBG *bg = (QObjectBG *)sys->findObject(kPanelObjName);
 	_objs.push_back(bg);
-	g_vm->getQSystem()->update();
-	const Common::Array<BGInfo> &infos = g_vm->getQSystem()->_mainInterface->_bgs;
 
-	for (uint i = 0; i < infos.size(); ++i) {
-		if (infos[i].objId != bg->_id) {
-			continue;
-		}
-		for (uint j = 0; j < infos[i].attachedObjIds.size(); ++j) {
-			QMessageObject *obj = g_vm->getQSystem()->findObject(infos[i].attachedObjIds[j]);
-			FlicDecoder *flc = g_vm->resMgr()->loadFlic(obj->_resourceId);
-			flc->setFrame(1);
-			obj->_z = 1;
-			obj->_x = _objectPoints[j].x;
-			obj->_y = _objectPoints[j].y;
-			obj->_field24 = 1;
-			obj->_field20 = 1;
-			obj->_field28 = 1;
-			obj->_animate = 0;
-			obj->_isShown = 1;
-			_objs.push_back(obj);
-		}
-		break;
+	const BGInfo *info = sys->_mainInterface->findBGInfo(bg->_id);
+	for (uint i = 0; i < info->attachedObjIds.size(); ++i) {
+		QMessageObject *obj = sys->findObject(info->attachedObjIds[i]);
+		FlicDecoder *flc = g_vm->resMgr()->loadFlic(obj->_resourceId);
+		flc->setFrame(1);
+		obj->_z = 1;
+		obj->_x = _objectPoints[i].x;
+		obj->_y = _objectPoints[i].y;
+		obj->_frame = 1;
+		obj->_animate = false;
+		obj->_isShown = true;
+		_objs.push_back(obj);
 	}
 
-	initCursor(4901, 1, 1);
+	SubInterface::start(id);
 
 	updateSliders();
 	updateSubtitles();
 
-	g_vm->getQSystem()->_currInterface = this;
-	g_vm->videoSystem()->makeAllDirty();
+	sys->getCursor()->_animate = true;
 }
 
-void InterfacePanel::onLeftButtonDown(const Common::Point p) {
+void InterfacePanel::onLeftButtonDown(Common::Point p) {
 	int i = 0;
 	for (i = _objs.size() - 1; i > 0; --i) {
-		if (_objs[i]->isInPoint(p.x, p.y)) {
+		if (_objs[i]->isInPoint(p)) {
 			break;
 		}
 	}
@@ -143,7 +131,7 @@ void InterfacePanel::onLeftButtonDown(const Common::Point p) {
 		g_vm->loadPart(1);
 		break;
 	case kLoadButtonIndex:
-		g_vm->getQSystem()->_saveLoadInterface->startSaveLoad(0);
+		g_vm->getQSystem()->_saveLoadInterface->start(kLoadMode);
 		break;
 	case kContinueButtonIndex:
 		stop();
@@ -152,7 +140,7 @@ void InterfacePanel::onLeftButtonDown(const Common::Point p) {
 		g_system->quit();
 		break;
 	case kSaveButtonIndex:
-		g_vm->getQSystem()->_saveLoadInterface->startSaveLoad(1);
+		g_vm->getQSystem()->_saveLoadInterface->start(kSaveMode);
 		break;
 	case kSubtitleButtonIndex:
 		_subtitles = !_subtitles;
@@ -195,21 +183,20 @@ void InterfacePanel::onLeftButtonDown(const Common::Point p) {
 	}
 }
 
-void InterfacePanel::onMouseMove(const Common::Point p) {
+void InterfacePanel::onMouseMove(Common::Point p) {
 	bool found = false;
 	for (uint i = _objs.size() - 1; i > 0; --i) {
 		QMessageObject *obj = (QMessageObject *)_objs[i];
-		int frame = 1;
-		if (!found && obj->isInPoint(p.x, p.y)) {
+		byte frame = 1;
+		if (!found && obj->isInPoint(p)) {
 			found = true;
 			if ((i >= kNewGameButtonIndex && i <= kSaveButtonIndex) || (i >= kDecSpeechButtonIndex && i <= kIncSpeedButtonIndex)) {
 				frame = 2;
 			}
 		}
-		if (obj->_field20 == frame)
+		if (obj->_frame == frame)
 			continue;
-		obj->_field20 = frame;
-		obj->_field24 = frame;
+		obj->_frame = frame;
 
 		int pointIndex;
 		switch (i) {
@@ -241,9 +228,9 @@ void InterfacePanel::onMouseMove(const Common::Point p) {
 		flc->setFrame(frame);
 		g_vm->videoSystem()->addDirtyRect(_objectPoints[pointIndex], *flc);
 	}
-	QObjectCursor *cursor = g_vm->getQSystem()->_cursor.get();
-	cursor->_isShown = 1;
-	cursor->setCursorPos(p.x, p.y, 0);
+	QObjectCursor *cursor = g_vm->getQSystem()->getCursor();
+	cursor->_isShown = true;
+	cursor->setPos(p, false);
 }
 
 void InterfacePanel::updateSliders() {
@@ -300,6 +287,8 @@ void InterfacePanel::applySettings() {
 	g_vm->syncSoundSettings();
 }
 
-} // End of namespace Petka
+void InterfacePanel::onRightButtonDown(Common::Point p) {
+	stop();
+}
 
-#endif
+} // End of namespace Petka

@@ -24,6 +24,7 @@
 
 #include "audio/midiplayer.h"
 #include "vabsound.h"
+#include "bigfile.h"
 
 namespace Dragons {
 
@@ -32,7 +33,7 @@ private:
 	VabSound *_musicVab;
 	uint32 _midiDataSize;
 public:
-	MidiMusicPlayer(VabSound *musicVab);
+	MidiMusicPlayer(BigfileArchive *bigFileArchive, VabSound *musicVab);
 	~MidiMusicPlayer();
 
 	void setVolume(int volume) override;
@@ -42,8 +43,11 @@ public:
 	// The original sets the "sequence timing" to 109 Hz, whatever that
 	// means. The default is 120.
 	uint32 getBaseTempo()	{ return _driver ? (109 * _driver->getBaseTempo()) / 120 : 0; }
+
+	void sendToChannel(byte channel, uint32 b) override;
 private:
 	byte *resizeMidiBuffer(uint32 desiredSize);
+	Common::SeekableReadStream *loadSoundFont(BigfileArchive *bigFileArchive);
 };
 
 } // End of namespace Dragons

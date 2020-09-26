@@ -24,6 +24,7 @@
 #define ULTIMA8_GUMPS_MOVIEGUMP_H
 
 #include "ultima/ultima8/gumps/modal_gump.h"
+#include "ultima/ultima8/usecode/intrinsics.h"
 #include "ultima/ultima8/misc/p_dynamic_cast.h"
 
 namespace Ultima {
@@ -37,7 +38,8 @@ public:
 	ENABLE_RUNTIME_CLASSTYPE()
 
 	MovieGump();
-	MovieGump(int width, int height, Common::SeekableReadStream *rs, bool introMusicHack = false,
+	MovieGump(int width, int height, Common::SeekableReadStream *rs,
+			  bool introMusicHack = false, const byte *overridePal = nullptr,
 	          uint32 flags = 0, int32 layer = LAYER_MODAL);
 	~MovieGump() override;
 
@@ -55,9 +57,11 @@ public:
 	static ProcId U8MovieViewer(Common::SeekableReadStream *rs, bool fade, bool introMusicHack = false);
 
 	bool loadData(Common::ReadStream *rs);
-protected:
 	void saveData(Common::WriteStream *ws) override;
 
+	INTRINSIC(I_playMovieOverlay);
+
+protected:
 	MoviePlayer *_player;
 };
 

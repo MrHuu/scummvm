@@ -109,6 +109,24 @@ static const byte lsl1RussianSound205[] = {
 	END
 };
 
+
+#pragma mark -
+#pragma mark Leisure Suit Larry 2 and 3
+
+// LSL2 and LSL3 Polish contain several corrupt fonts. In each of these, the
+//  offset for the final font entry (127) points beyond the end of the file.
+//  This would have been a problem for Sierra's intepreter except that it
+//  only parses characters when they're drawn and these games don't use
+//  character 127, which is blank in the Polish fonts that aren't corrupt.
+//  We parse and cache all characters up front so this is a problem for us.
+//  We fix it here by patching the character count in the header from 128 down
+//  to 127 so that the corrupt entries aren't processed. Bug #10509
+static const byte lsl2Lsl3PolishFont[] = {
+	SKIP(0x02),
+	REPLACE(1, 0x7F),
+	END
+};
+
 #pragma mark -
 #pragma mark Phantasmagoria
 
@@ -397,12 +415,74 @@ static const byte pq4EnhancedAudioToggleView[] = {
 };
 
 #pragma mark -
+#pragma mark Quest For Glory 1 VGA
+
+// The QFG1VGA character stat sheet (pic 904) is drawn at night with unintended
+//  palette colors. The Mac version fixed this, but did so by reworking the
+//  day/night transitions. We fix this here by patching pic 904's alternate
+//  palette to use the same colors as those in the embedded palette. Pic 904
+//  is now drawn consistently and without interfering with any existing PalVary
+//  that might be occurring. Fixes bug #10295
+static const byte qfg1vgaPalette904[] = {
+	SKIP(254),                   // color 54
+	REPLACE_NUMBER(uint8, 0x8b), // r
+	REPLACE_NUMBER(uint8, 0x1f), // g
+	REPLACE_NUMBER(uint8, 0x0f), // b
+	SKIP(9),                     // color 57
+	REPLACE_NUMBER(uint8, 0xe3), // r
+	REPLACE_NUMBER(uint8, 0x7b), // g
+	REPLACE_NUMBER(uint8, 0x6b), // b
+	SKIP(1),                     // color 58
+	REPLACE_NUMBER(uint8, 0xfb), // r
+	REPLACE_NUMBER(uint8, 0xab), // g
+	REPLACE_NUMBER(uint8, 0x93), // b
+	SKIP(13),                    // color 62
+	REPLACE_NUMBER(uint8, 0xbb), // r
+	REPLACE_NUMBER(uint8, 0x6b), // g
+	REPLACE_NUMBER(uint8, 0x23), // b
+	SKIP(1),                     // color 63
+	REPLACE_NUMBER(uint8, 0xdb), // r
+	REPLACE_NUMBER(uint8, 0x7b), // g
+	REPLACE_NUMBER(uint8, 0x23), // b
+	SKIP(9),                     // color 66
+	REPLACE_NUMBER(uint8, 0x5b), // r
+	REPLACE_NUMBER(uint8, 0x33), // g
+	REPLACE_NUMBER(uint8, 0x0f), // b
+	SKIP(1),                     // color 67
+	REPLACE_NUMBER(uint8, 0x7b), // r
+	REPLACE_NUMBER(uint8, 0x53), // g
+	REPLACE_NUMBER(uint8, 0x2b), // b
+	SKIP(1),                     // color 68
+	REPLACE_NUMBER(uint8, 0x9b), // r
+	REPLACE_NUMBER(uint8, 0x6b), // g
+	REPLACE_NUMBER(uint8, 0x3b), // b
+	SKIP(1),                     // color 69
+	REPLACE_NUMBER(uint8, 0xbb), // r
+	REPLACE_NUMBER(uint8, 0x8b), // g
+	REPLACE_NUMBER(uint8, 0x5b), // b
+	SKIP(1),                     // color 70
+	REPLACE_NUMBER(uint8, 0xdb), // r
+	REPLACE_NUMBER(uint8, 0xb3), // g
+	REPLACE_NUMBER(uint8, 0x7b), // b
+	SKIP(1),                     // color 71
+	REPLACE_NUMBER(uint8, 0xfb), // r
+	REPLACE_NUMBER(uint8, 0xdb), // g
+	REPLACE_NUMBER(uint8, 0xa3), // b
+	END
+};
+
+#pragma mark -
 #pragma mark Patch table
 
 static const GameResourcePatch resourcePatches[] = {
 	{ GID_LSL1,           Common::RU_RUS,   ResourceId(kResourceTypeSound,   205), lsl1RussianSound205,        false },
+	{ GID_LSL2,           Common::PL_POL,   ResourceId(kResourceTypeFont,      1), lsl2Lsl3PolishFont,         false },
+	{ GID_LSL2,           Common::PL_POL,   ResourceId(kResourceTypeFont,      7), lsl2Lsl3PolishFont,         false },
+	{ GID_LSL3,           Common::PL_POL,   ResourceId(kResourceTypeFont,      1), lsl2Lsl3PolishFont,         false },
+	{ GID_LSL3,           Common::PL_POL,   ResourceId(kResourceTypeFont,      9), lsl2Lsl3PolishFont,         false },
 	{ GID_PHANTASMAGORIA, Common::UNK_LANG, ResourceId(kResourceTypeView,  64001), phant1View64001Palette,     false },
-	{ GID_PQ4,            Common::EN_ANY,   ResourceId(kResourceTypeView,  10988), pq4EnhancedAudioToggleView, true }
+	{ GID_PQ4,            Common::EN_ANY,   ResourceId(kResourceTypeView,  10988), pq4EnhancedAudioToggleView, true  },
+	{ GID_QFG1VGA,        Common::UNK_LANG, ResourceId(kResourceTypePalette, 904), qfg1vgaPalette904,          false }
 };
 
 #pragma mark -

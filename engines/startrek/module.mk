@@ -13,8 +13,8 @@ MODULE_OBJS = \
 	intro.o \
 	iwfile.o \
 	lzss.o \
-	math.o \
 	menu.o \
+	resource.o \
 	room.o \
 	saveload.o \
 	sound.o \

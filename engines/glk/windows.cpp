@@ -108,17 +108,10 @@ Window *Windows::windowOpen(Window *splitwin, uint method, uint size,
 			return nullptr;
 		}
 
-		if (splitwin->_type == wintype_Pair) {
-			if ((method & winmethod_DirMask) != winmethod_Arbitrary) {
-				warning("window_open: Can only add windows to a Pair window in arbitrary mode");
-				return nullptr;
-			}
-		} else {
-			oldparent = splitwin->_parent;
-			if (oldparent && oldparent->_type != wintype_Pair) {
-				warning("window_open: parent window is not Pair");
-				return nullptr;
-			}
+		oldparent = splitwin->_parent;
+		if (oldparent && oldparent->_type != wintype_Pair) {
+			warning("window_open: parent window is not Pair");
+			return nullptr;
 		}
 	}
 
@@ -520,8 +513,9 @@ Window *Windows::iterateTreeOrder(Window *win) {
 
 Window::Window(Windows *windows, uint rock) : _windows(windows), _rock(rock),
 	_type(0), _parent(nullptr), _next(nullptr), _prev(nullptr), _yAdj(0),
-	_lineRequest(0), _lineRequestUni(0), _charRequest(0), _charRequestUni(0),
-	_mouseRequest(0), _hyperRequest(0), _moreRequest(0), _scrollRequest(0), _imageLoaded(0),
+	_lineRequest(false), _lineRequestUni(false), _charRequest(false),
+	_charRequestUni(false), _mouseRequest(false), _hyperRequest(false),
+	_moreRequest(false), _scrollRequest(false), _imageLoaded(false),
 	_echoLineInputBase(true), _lineTerminatorsBase(nullptr), _termCt(0), _echoStream(nullptr) {
 	_attr.fgset = false;
 	_attr.bgset = false;
@@ -714,6 +708,11 @@ bool Window::checkTerminators(uint32 ch) {
 }
 
 bool Window::imageDraw(uint image, uint align, int val1, int val2) {
+	return imageDraw(Common::String::format("%u", image),
+		align, val1, val2);
+}
+
+bool Window::imageDraw(const Common::String & image, uint align, int val1, int val2) {
 	if (!g_conf->_graphics)
 		return false;
 

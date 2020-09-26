@@ -47,10 +47,10 @@ static Item *getItemForFamily(uint32 family) {
 	case ShapeInfo::SF_QUANTITY:
 	case ShapeInfo::SF_BREAKABLE:
 	case ShapeInfo::SF_REAGENT: // reagents need special handling too
-	case ShapeInfo::SF_10: // TODO: What's this? used in crusader levels
-	case ShapeInfo::SF_11: // TODO: What's this? used in crusader levels
-	case ShapeInfo::SF_12: // TODO: What's this? used in crusader levels
-	case ShapeInfo::SF_13: // TODO: What's this? used in crusader levels
+	case ShapeInfo::SF_CRUWEAPON:
+	case ShapeInfo::SF_CRUAMMO:
+	case ShapeInfo::SF_CRUBOMB:
+	case ShapeInfo::SF_CRUINVITEM:
 	case ShapeInfo::SF_15: // what's this?
 		// 'simple' item
 		return new Item();
@@ -65,6 +65,9 @@ static Item *getItemForFamily(uint32 family) {
 		return new Egg();
 
 	case ShapeInfo::SF_MONSTEREGG:
+		// FIXME: For crusader, item family 7 is also treated like a container
+		// (it can have contents, and the contents can be destroyed.
+		// Is it not the same as monster egg?
 		return new MonsterEgg();
 
 	case ShapeInfo::SF_TELEPORTEGG:
@@ -76,9 +79,9 @@ static Item *getItemForFamily(uint32 family) {
 
 Item *ItemFactory::createItem(uint32 shape, uint32 frame, uint16 quality,
                               uint16 flags, uint16 npcnum, uint16 mapnum,
-                              uint32 extendedflags, bool _objId) {
+                              uint32 extendedflags, bool objId) {
 	// check what class to create
-	ShapeInfo *info = GameData::get_instance()->getMainShapes()->
+	const ShapeInfo *info = GameData::get_instance()->getMainShapes()->
 	                  getShapeInfo(shape);
 	if (info == nullptr)
 		return nullptr;
@@ -98,8 +101,13 @@ Item *ItemFactory::createItem(uint32 shape, uint32 frame, uint16 quality,
 		item->_npcNum = npcnum;
 		item->_mapNum = mapnum;
 		item->_extendedFlags = extendedflags;
-		if (_objId)
+		if (objId)
 			item->assignObjId();
+		if (GAME_IS_CRUSADER) {
+			if (info->_damageInfo && info->_damageInfo->takesDamage()) {
+				item->setDamagePoints(info->_damageInfo->damagePoints());
+			}
+		}
 	}
 
 	return item;
@@ -115,7 +123,7 @@ static Actor *getActorForNpcNum(uint32 npcnum) {
 
 Actor *ItemFactory::createActor(uint32 shape, uint32 frame, uint16 quality,
                                 uint16 flags, uint16 npcnum, uint16 mapnum,
-                                uint32 extendedflags, bool _objId) {
+                                uint32 extendedflags, bool objId) {
 	/*
 	    // This makes it rather hard to create new NPCs...
 	    if (npcnum == 0) // or do monsters have npcnum 0? we'll see...
@@ -134,7 +142,7 @@ Actor *ItemFactory::createActor(uint32 shape, uint32 frame, uint16 quality,
 	actor->_mapNum = mapnum;
 	if (npcnum != 0) {
 		actor->_objId = static_cast<uint16>(npcnum);
-	} else if (_objId) {
+	} else if (objId) {
 		actor->assignObjId();
 	}
 	actor->_extendedFlags = extendedflags;

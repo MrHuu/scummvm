@@ -66,6 +66,7 @@ KyraEngine_v1::KyraEngine_v1(OSystem *system, const GameFlags &flags)
 	_isSaveAllowed = false;
 
 	_mouseX = _mouseY = 0;
+	_transOffsY = 0;
 	_asciiCodeEvents = _kbEventSkip = false;
 
 	// sets up all engine specific debug levels
@@ -116,22 +117,22 @@ Common::Error KyraEngine_v1::init() {
 			// Users who want PC speaker sound always have to select this individually for all
 			// Kyra games.
 			MidiDriver::DeviceHandle dev = MidiDriver::detectDevice(MDT_PCSPK | MDT_MIDI | MDT_ADLIB | ((_flags.gameID == GI_KYRA2 || _flags.gameID == GI_LOL) ? MDT_PREFER_GM : MDT_PREFER_MT32));
-			if (MidiDriver::getMusicType(dev) == MT_ADLIB) {
+			const MusicType musicType = MidiDriver::getMusicType(dev);
+			if (musicType == MT_ADLIB) {
 				_sound = new SoundPC_v1(this, _mixer, Sound::kAdLib);
 			} else {
 				Sound::kType type;
-				const MusicType midiType = MidiDriver::getMusicType(dev);
 
-				if (midiType == MT_PCSPK || midiType == MT_NULL)
+				if (musicType == MT_PCSPK || musicType == MT_NULL)
 					type = Sound::kPCSpkr;
-				else if (midiType == MT_MT32 || ConfMan.getBool("native_mt32"))
+				else if (musicType == MT_MT32 || ConfMan.getBool("native_mt32"))
 					type = Sound::kMidiMT32;
 				else
 					type = Sound::kMidiGM;
 
 				MidiDriver *driver = 0;
 
-				if (MidiDriver::getMusicType(dev) == MT_PCSPK) {
+				if (musicType == MT_PCSPK) {
 					driver = new MidiDriver_PCSpeaker(_mixer);
 				} else {
 					driver = MidiDriver::createMidi(dev);
@@ -213,6 +214,7 @@ KyraEngine_v1::~KyraEngine_v1() {
 
 Common::Point KyraEngine_v1::getMousePos() {
 	Common::Point mouse = _eventMan->getMousePos();
+	mouse.y -= -_transOffsY;
 
 	if (_flags.useHiRes) {
 		mouse.x >>= 1;
@@ -285,7 +287,7 @@ int KyraEngine_v1::checkInput(Button *buttonList, bool mainLoop, int eventFlag) 
 						keys |= 0x100;
 				} else {
 					keys = 0;
-				}				
+				}
 
 				// When we got an keypress, which we might need to handle,
 				// break the event loop and pass it to GUI code.
@@ -297,7 +299,7 @@ int KyraEngine_v1::checkInput(Button *buttonList, bool mainLoop, int eventFlag) 
 		case Common::EVENT_LBUTTONDOWN:
 		case Common::EVENT_LBUTTONUP: {
 			_mouseX = event.mouse.x;
-			_mouseY = event.mouse.y;
+			_mouseY = event.mouse.y - _transOffsY;
 			if (_flags.useHiRes) {
 				_mouseX >>= 1;
 				_mouseY >>= 1;
@@ -309,7 +311,7 @@ int KyraEngine_v1::checkInput(Button *buttonList, bool mainLoop, int eventFlag) 
 		case Common::EVENT_RBUTTONDOWN:
 		case Common::EVENT_RBUTTONUP: {
 			_mouseX = event.mouse.x;
-			_mouseY = event.mouse.y;
+			_mouseY = event.mouse.y - _transOffsY;
 			if (_flags.useHiRes) {
 				_mouseX >>= 1;
 				_mouseY >>= 1;
@@ -435,7 +437,7 @@ void KyraEngine_v1::setupKeyMap() {
 	// If we have an engine that wants ASCII codes instead of key codes, we can skip the setup of the key map.
 	// In that case we simply return the ASCII codes from the event manager. At least until I know better I
 	// trust that the ASCII codes we get from our event manager are the same identical codes. If that assumption
-	// turns out to be wrong I can still implement the original conversion method... 
+	// turns out to be wrong I can still implement the original conversion method...
 	if (_asciiCodeEvents)
 		return;
 
@@ -491,6 +493,11 @@ void KyraEngine_v1::updateInput() {
 void KyraEngine_v1::removeInputTop() {
 	if (!_eventList.empty())
 		_eventList.erase(_eventList.begin());
+}
+
+void KyraEngine_v1::transposeScreenOutputY(int yAdd) {
+	_transOffsY = yAdd;
+	screen()->transposeScreenOutputY(yAdd);
 }
 
 bool KyraEngine_v1::skipFlag() const {

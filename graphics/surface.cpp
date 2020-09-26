@@ -368,6 +368,21 @@ void Surface::flipVertical(const Common::Rect &r) {
 	delete[] temp;
 }
 
+Graphics::Surface *Surface::scale(uint16 newWidth, uint16 newHeight, bool filtering) const {
+
+	Graphics::Surface *target = new Graphics::Surface();
+
+	target->create(newWidth, newHeight, format);
+
+	if (filtering) {
+		scaleBlitBilinear((byte *)target->getPixels(), (const byte *)getPixels(), target->pitch, pitch, target->w, target->h, w, h, format);
+	} else {
+		scaleBlit((byte *)target->getPixels(), (const byte *)getPixels(), target->pitch, pitch, target->w, target->h, w, h, format);
+	}
+
+	return target;
+}
+
 void Surface::convertToInPlace(const PixelFormat &dstFormat, const byte *palette) {
 	// Do not convert to the same format and ignore empty surfaces.
 	if (format == dstFormat || pixels == 0) {
@@ -528,7 +543,7 @@ FloodFill::FloodFill(Graphics::Surface *surface, uint32 oldColor, uint32 fillCol
 
 	if (_maskMode) {
 		_mask = new Graphics::Surface();
-		_mask->create(_w, _h, Graphics::PixelFormat::createFormatCLUT8()); // Uses calloc()
+		_mask->create(_w, _h, surface->format); // Uses calloc()
 	}
 
 	_visited = (byte *)calloc(_w * _h, 1);
@@ -573,7 +588,7 @@ void FloodFill::addSeed(int x, int y) {
 					if (!_maskMode)
 						WRITE_UINT16(src, _fillColor);
 					else
-						*((byte *)dst) = 255;
+						*((uint16 *)dst) = 0xffff;
 
 					changed = true;
 				}
@@ -582,7 +597,7 @@ void FloodFill::addSeed(int x, int y) {
 					if (!_maskMode)
 						WRITE_UINT32(src, _fillColor);
 					else
-						*((byte *)dst) = 255;
+						*((uint32 *)dst) = 0xffffffff;
 
 					changed = true;
 				}
@@ -617,7 +632,7 @@ void FloodFill::fillMask() {
 
 	if (!_mask) {
 		_mask = new Graphics::Surface();
-		_mask->create(_w, _h, Graphics::PixelFormat::createFormatCLUT8()); // Uses calloc()
+		_mask->create(_w, _h, _surface->format); // Uses calloc()
 	}
 
 	fill();

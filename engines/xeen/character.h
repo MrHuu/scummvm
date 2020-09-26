@@ -92,8 +92,8 @@ class XeenEngine;
 
 class AttributePair {
 public:
-	uint _permanent;
-	uint _temporary;
+	int _permanent;
+	int _temporary;
 public:
 	AttributePair();
 	void synchronize(Common::Serializer &s);
@@ -262,6 +262,11 @@ public:
 	 * Returns true if a character has a given award
 	 */
 	bool hasAward(int awardId) const;
+
+	/**
+	 * Returns the number of times a character has received a given award
+	 */
+	int getAwardCount(int awardId) const;
 
 	/**
 	 * Returns the character's armor class

@@ -10,7 +10,7 @@ static const char *const kEoB2ChargenStrings1FMTownsJapanese[9] = {
 	"\x83""L""\x83\x83\x83\x89\x83""N""\x83""^""\x81""[""\x82\xF0\x8D\xEC\x82\xE9\x82\xBD\x82\xDF\x82\xCC""\r""\x83""{""\x83""b""\x83""N""\x83""X""\x82\xF0\x8E""w""\x92\xE8\x82\xB5\x82\xC4\x82\xAD\x82\xBE\x82\xB3\x82\xA2\x81""B"
 };
 
-static const StringListProvider kEoB2ChargenStrings1FMTownsJapaneseProvider = { ARRAYSIZE(kEoB2ChargenStrings1FMTownsJapanese), kEoB2ChargenStrings1FMTownsJapanese }; 
+static const StringListProvider kEoB2ChargenStrings1FMTownsJapaneseProvider = { ARRAYSIZE(kEoB2ChargenStrings1FMTownsJapanese), kEoB2ChargenStrings1FMTownsJapanese };
 
 static const char *const kEoB2ChargenStrings2FMTownsJapanese[12] = {
 	"%s",
@@ -923,7 +923,7 @@ static const char *const kEoB2Config2431StringsFMTowns[2] = {
 
 static const StringListProvider kEoB2Config2431StringsFMTownsProvider = { ARRAYSIZE(kEoB2Config2431StringsFMTowns), kEoB2Config2431StringsFMTowns };
 
-static const char *const kEoB2KatakanaLinesFMTowns[12] = {
+static const char *const kEoB2TextInputCharacterLinesFMTowns[12] = {
 	"\x83""A""\x83""C""\x83""E""\x83""G""\x83""I""\x81""@""\x83""J""\x83""L""\x83""N""\x83""P""\x83""R""\x81""@""\x83""T""\x83""V""\x83""X""\x83""Z""\x83""\\",
 	"\x83""^""\x83""`""\x83""c""\x83""e""\x83""g""\x81""@""\x83""i""\x83""j""\x83""k""\x83""l""\x83""m""\x81""@""\x83""n""\x83""q""\x83""t""\x83""w""\x83""z",
 	"\x83""}""\x83""~""\x83\x80\x83\x81\x83\x82\x81""@""\x83\x84\x81""@""\x83\x86\x81""@""\x83\x88\x81""@""\x83\x89\x83\x8a\x83\x8b\x83\x8c\x83\x8d",
@@ -938,12 +938,12 @@ static const char *const kEoB2KatakanaLinesFMTowns[12] = {
 	"\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@""\x81""@"
 };
 
-static const StringListProvider kEoB2KatakanaLinesFMTownsProvider = { ARRAYSIZE(kEoB2KatakanaLinesFMTowns), kEoB2KatakanaLinesFMTowns };
+static const StringListProvider kEoB2TextInputCharacterLinesFMTownsProvider = { ARRAYSIZE(kEoB2TextInputCharacterLinesFMTowns), kEoB2TextInputCharacterLinesFMTowns };
 
-static const char *const kEoB2KanaSelectStringsFMTowns[3] = {
+static const char *const kEoB2TextInputSelectStringsFMTowns[3] = {
 	"NEXT",
 	"END",
 	"DEL"
 };
 
-static const StringListProvider kEoB2KanaSelectStringsFMTownsProvider = { ARRAYSIZE(kEoB2KanaSelectStringsFMTowns), kEoB2KanaSelectStringsFMTowns };
+static const StringListProvider kEoB2TextInputSelectStringsFMTownsProvider = { ARRAYSIZE(kEoB2TextInputSelectStringsFMTowns), kEoB2TextInputSelectStringsFMTowns };

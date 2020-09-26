@@ -684,7 +684,7 @@ void ItemSorter::AddItem(int32 x, int32 y, int32 z, uint32 shapeNum, uint32 fram
 	si->_sy2 = si->_sy + _frame->_height;   // Bottom
 
 	// Do Clipping here
-	si->_clipped = _surf->CheckClipped(Rect(si->_sx, si->_sy, _frame->_width, _frame->_height));
+	si->_clipped = _surf->CheckClipped(Rect(si->_sx, si->_sy, si->_sx + _frame->_width, si->_sy + _frame->_height));
 	if (si->_clipped < 0)
 		// Clipped away entirely - don't add to the list.
 		return;
@@ -827,8 +827,8 @@ bool ItemSorter::PaintSortItem(SortItem *si) {
 	SortItem::DependsList::iterator end = si->_depends.end();
 	while (it != end) {
 		if ((*it)->_order == -2) {
-			warning("cycle in paint dependency graph %d -> %d -> ... -> %d",
-					si->_shapeNum, (*it)->_shapeNum, si->_shapeNum);
+			//warning("cycle in paint dependency graph %d -> %d -> ... -> %d",
+			//		si->_shapeNum, (*it)->_shapeNum, si->_shapeNum);
 			break;
 		}
 		else if ((*it)->_order == -1) {

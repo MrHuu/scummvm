@@ -39,13 +39,19 @@ SdlWindow::SdlWindow()
 #endif
 	{
 
-#if !SDL_VERSION_ATLEAST(2, 0, 0)
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+#elif SDL_VERSION_ATLEAST(1, 2, 10)
 	// Query the desktop resolution. We simply hope nothing tried to change
 	// the resolution so far.
 	const SDL_VideoInfo *videoInfo = SDL_GetVideoInfo();
 	if (videoInfo && videoInfo->current_w > 0 && videoInfo->current_h > 0) {
 		_desktopRes = Common::Rect(videoInfo->current_w, videoInfo->current_h);
 	}
+#elif defined(MAEMO)
+	// All supported Maemo devices have a display resolution of 800x480
+	_desktopRes = Common::Rect(800, 480);
+#else
+#error Unable to detect screen resolution
 #endif
 }
 
@@ -56,6 +62,7 @@ SdlWindow::~SdlWindow() {
 }
 
 void SdlWindow::setupIcon() {
+#ifndef __MORPHOS__
 	int x, y, w, h, ncols, nbytes, i;
 	unsigned int rgba[256];
 	unsigned int *icon;
@@ -124,6 +131,7 @@ void SdlWindow::setupIcon() {
 
 	SDL_FreeSurface(sdl_surf);
 	free(icon);
+#endif
 }
 
 void SdlWindow::setWindowCaption(const Common::String &caption) {
@@ -196,8 +204,10 @@ bool SdlWindow::getSDLWMInformation(SDL_SysWMinfo *info) const {
 	SDL_VERSION(&info->version);
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 	return _window ? (SDL_GetWindowWMInfo(_window, info) == SDL_TRUE) : false;
-#else
+#elif !defined(__MORPHOS__)
 	return SDL_GetWMInfo(info);
+#else
+	return false;
 #endif
 }
 

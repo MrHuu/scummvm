@@ -60,14 +60,13 @@ public:
 	};
 
 private:
-	void saveData(Common::WriteStream *ws) override;
-
 	//! Play a music track
 	//! \param track The track number to play. Pass 0 to stop music
 	void playMusic_internal(int track) override;
 
 	MidiPlayer *_midiPlayer;
 	PlaybackStates _state;
+	//! The branch (starting point) to use for each music track
 	int _songBranches[128];
 
 	int _currentTrack;      //! Currently playing track (don't save)
@@ -117,6 +116,7 @@ public:
 	void run() override;
 
 	bool loadData(Common::ReadStream *rs, uint32 version);
+	void saveData(Common::WriteStream *ws) override;
 };
 
 } // End of namespace Ultima8

@@ -31,7 +31,7 @@
 #include "lure/events.h"
 #include "lure/lure.h"
 
-#if defined(__SYMBIAN32__) || defined(WEBOS) || defined(__ANDROID__) || defined(__WII__)
+#if defined(__SYMBIAN32__) || defined(__ANDROID__) || defined(__WII__)
 #define LURE_CLICKABLE_MENUS
 #endif
 
@@ -599,9 +599,10 @@ uint16 PopupMenu::Show(int numEntries, const char *actions[]) {
 
 				if (r.contains(x, y)) {
 					selectedIndex = (y - r.top) / FONT_HEIGHT;
-					if (e.type() == Common::EVENT_LBUTTONDOWN)
+					if (e.type() == Common::EVENT_LBUTTONDOWN) {
 						bailOut = true;
 						break;
+					}
 				}
 #else
 			} else if ((e.type() == Common::EVENT_LBUTTONDOWN) ||

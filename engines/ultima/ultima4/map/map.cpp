@@ -765,14 +765,12 @@ bool Map::fillMonsterTable() {
 }
 
 MapTile Map::translateFromRawTileIndex(int raw) const {
-	ASSERT(_tileMap != nullptr, "tilemap hasn't been set");
+	assertMsg(_tileMap != nullptr, "tilemap hasn't been set");
 
 	return _tileMap->translate(raw);
 }
 
 uint Map::translateToRawTileIndex(MapTile &tile) const {
-	g_tileSets;
-
 	return _tileMap->untranslate(tile);
 }
 

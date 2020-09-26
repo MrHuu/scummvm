@@ -49,7 +49,18 @@ template<typename T> inline T ABS(T x)		{ return (x >= 0) ? x : -x; }
 template<typename T> inline T MIN(T a, T b)	{ return (a < b) ? a : b; }
 template<typename T> inline T MAX(T a, T b)	{ return (a > b) ? a : b; }
 template<typename T> inline T CLIP(T v, T amin, T amax)
-		{ if (v < amin) return amin; else if (v > amax) return amax; else return v; }
+	{
+#if !defined(RELEASE_BUILD)
+		// debug builds use this assert to pinpoint
+		// any problematic cases, where amin and amax
+		// are incorrectly ordered
+		// and thus CLIP() would return an invalid result
+		assert(amin <= amax);
+#endif
+		if (v < amin) return amin;
+		else if (v > amax) return amax;
+		return v;
+	}
 
 /**
  * Template method which swaps the values of its two parameters.
@@ -70,6 +81,15 @@ template<typename T> inline void SWAP(T &a, T &b) { T tmp = a; a = b; b = tmp; }
  */
 #define ARRAYEND(x) ((x) + ARRAYSIZE((x)))
 
+/*
+ * Clear array using default or provided value
+ */
+template<typename T, size_t N> inline void ARRAYCLEAR(T (&array) [N], const T &value = T()) {
+	T * ptr = array;
+	size_t n = N;
+	while(n--)
+		*ptr++ = value;
+}
 
 /**
  * @def SCUMMVM_CURRENT_FUNCTION

@@ -37,6 +37,23 @@ protected:
 	StringList _enableLanguageExtensions;
 	StringList _disableEditAndContinue;
 
+	std::list<MSVC_Architecture> _archs;
+	std::map<MSVC_Architecture, StringList> _arch_disabled_features;	
+	
+	/**
+	 * MSVC properties for a library required by a feature
+	*/
+	struct MSVCLibrary {
+		const char *feature; ///< Feature ID.
+		const char *release; ///< Filename of the Release build of the library.
+		const char *debug;   ///< Filename of the Debug build of the library.
+		const char *depends; ///< Win32 libs this library must be linked against.
+		const char *legacy;  ///< Legacy name for old precompiled libraries (deprecated).
+	};
+
+	std::string getLibraryFromFeature(const char *feature, const BuildSetup &setup, bool isRelease) const;
+	std::string outputLibraryDependencies(const BuildSetup &setup, bool isRelease) const;
+
 	void createWorkspace(const BuildSetup &setup);
 
 	void createOtherBuildFiles(const BuildSetup &setup);
@@ -64,17 +81,17 @@ protected:
 	 * @param prefix File prefix, used to add additional include paths.
 	 * @param runBuildEvents true if generating a revision number, false otherwise
 	 */
-	virtual void outputGlobalPropFile(const BuildSetup &setup, std::ofstream &properties, int bits, const StringList &defines, const std::string &prefix, bool runBuildEvents) = 0;
+	virtual void outputGlobalPropFile(const BuildSetup &setup, std::ofstream &properties, MSVC_Architecture arch, const StringList &defines, const std::string &prefix, bool runBuildEvents) = 0;
 
 	/**
 	 * Generates the project properties for debug and release settings.
 	 *
 	 * @param setup Description of the desired build setup.
 	 * @param isRelease       Type of property file
-	 * @param isWin32         Bitness of property file
+	 * @param arch            Target architecture
 	 * @param configuration   Name of property file
 	 */
-	virtual void createBuildProp(const BuildSetup &setup, bool isRelease, bool isWin32, std::string configuration) = 0;
+	virtual void createBuildProp(const BuildSetup &setup, bool isRelease, MSVC_Architecture arch, const std::string &configuration) = 0;
 
 	/**
 	 * Get the file extension for property files
@@ -96,14 +113,14 @@ protected:
 	/**
 	 * Get the command line for copying data files to the build directory.
 	 *
-	 * @param	isWin32	Bitness of property file.
+	 * @param	arch	Target architecture
 	 * @param	setup	Description of the desired build setup.
 	 *
 	 * @return	The post build event.
 	 */
-	std::string getPostBuildEvent(bool isWin32, const BuildSetup &setup) const;
+	std::string getPostBuildEvent(MSVC_Architecture arch, const BuildSetup &setup) const;
 };
 
-} // End of CreateProjectTool namespace
+} // namespace CreateProjectTool
 
 #endif // TOOLS_CREATE_PROJECT_MSVC_H

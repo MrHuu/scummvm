@@ -23,6 +23,7 @@
 #include "common/config-manager.h"
 #include "common/savefile.h"
 #include "common/system.h"
+#include "common/translation.h"
 
 #include "sci/sci.h"
 #include "sci/debug.h"
@@ -95,6 +96,25 @@ reg_t kGameIsRestarting(EngineState *s, int argc, reg_t *argv) {
 			neededSleep = 60;
 		}
 		break;
+	case GID_KQ6: {
+		// KQ6 has talking inventory items that animate in the inventory window.
+		//  This is done with unthrottled inner loops which we replace with
+		//  calls to kGameIsRestarting so that the screen updates and responds
+		//  to input. Since this can happen in any room, we detect if the caller
+		//  is inventory script 907. See kq6PatchTalkingInventory.
+		if (s->_executionStack.size() >= 2) {
+			Common::List<ExecStack>::const_iterator iter = s->_executionStack.reverse_begin();
+			--iter; // skip this kernel call
+			if (iter->type == EXEC_STACK_TYPE_CALL) {
+				int callerScriptNumber = s->_segMan->getScript(iter->addr.pc.getSegment())->getScriptNumber();
+				if (callerScriptNumber == 907) {
+					s->_throttleTrigger = true;
+					neededSleep = 90; // talk animation interval
+				}
+			}
+		}
+		break;
+	}
 	case GID_LSL3:
 		// LSL3 calculates a machinespeed variable during game startup
 		// (right after the filthy questions). This one would go through w/o
@@ -776,7 +796,7 @@ reg_t kPlatform(EngineState *s, int argc, reg_t *argv) {
 	return NULL_REG;
 }
 
-extern int showScummVMDialog(const Common::String& message, const char* altButton = nullptr, bool alignCenter = true);
+extern int showScummVMDialog(const Common::U32String &message, const Common::U32String &altButton = Common::U32String(""), bool alignCenter = true);
 
 #ifdef ENABLE_SCI32
 reg_t kPlatform32(EngineState *s, int argc, reg_t *argv) {
@@ -851,7 +871,7 @@ reg_t kWinDLL(EngineState *s, int argc, reg_t *argv) {
 	switch (operation) {
 	case 0:	// load DLL
 		if (dllName == "PENGIN16.DLL")
-			showScummVMDialog("The Poker logic is hardcoded in an external DLL, and is not implemented yet. There exists some dummy logic for now, where opponent actions are chosen randomly");
+			showScummVMDialog(_("The Poker logic is hardcoded in an external DLL, and is not implemented yet. There exists some dummy logic for now, where opponent actions are chosen randomly"));
 
 		// This is originally a call to LoadLibrary() and to the Watcom function GetIndirectFunctionHandle
 		return make_reg(0, 1000);	// fake ID for loaded DLL, normally returned from Windows LoadLibrary()

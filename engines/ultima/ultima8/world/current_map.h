@@ -25,6 +25,7 @@
 
 #include "ultima/shared/std/containers.h"
 #include "ultima/ultima8/usecode/intrinsics.h"
+#include "ultima/ultima8/misc/direction.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -36,6 +37,7 @@ class TeleportEgg;
 class EggHatcherProcess;
 
 #define MAP_NUM_CHUNKS  64
+#define MAP_NUM_TARGET_ITEMS 200
 
 class CurrentMap {
 	friend class World;
@@ -69,6 +71,13 @@ public:
 	void removeItemFromList(Item *item, int32 oldx, int32 oldy);
 	void removeItem(Item *item);
 
+	//! Add an item to the list of possible targets (in Crusader)
+	void addTargetItem(const Item *item);
+	//! Remove an item from the list of possible targets (in Crusader)
+	void removeTargetItem(const Item *item);
+	//! Find the best target item in the given direction
+	Item *findBestTargetItem(int32 x, int32 y, Direction dir, DirectionMode dirmode);
+
 	//! Update the fast area for the cameras position
 	void updateFastArea(int32 from_x, int32 from_y, int32 from_z, int32 to_x, int32 to_y, int32 to_z);
 
@@ -99,34 +108,37 @@ public:
 
 	// Collision detection. Returns true if the box [x,y,z]-[x-xd,y-yd,z+zd]
 	// does not collide with any solid items.
-	// Additionally, if support is not NULL, *support is set to the item
-	// supporting the given box, or 0 if it isn't supported.
-	// If under_roof is not NULL, *roof is set to the roof item with the lowest
-	// z coordinate that's over the box, or 0 if there is no roof above box.
+	// Additionally:
+	// * If support is not NULL, *support is set to the item supporting
+	//   the given box, or 0 if it isn't supported.
+	// * If roof is not NULL, *roof is set to the roof item with the lowest
+	//   z coordinate that's over the box, or 0 if there is no roof above box.
+	// * If blocker is not NULL, *blocker will be set to an item blocking
+	//   the whole box if there is one, or 0 if there is no such item.
 	// Ignores collisions which were already occurring at the start position.
 	// NB: isValidPosition doesn't consider item 'item'.
 	bool isValidPosition(int32 x, int32 y, int32 z,
 	                     int32 startx, int32 starty, int32 startz,
 	                     int xd, int yd, int zd, uint32 shapeflags,
-	                     ObjId item,
-	                     const Item **support = 0, ObjId *roof = 0) const;
+	                     ObjId item, const Item **support = 0,
+	                     ObjId *roof = 0, const Item **blocker = 0) const;
 
 	// Note that this version of isValidPosition does not look for start
 	// position collisions.
 	bool isValidPosition(int32 x, int32 y, int32 z,
 	                     int xd, int yd, int zd, uint32 shapeflags,
-	                     ObjId item,
-	                     const Item **support = 0, ObjId *roof = 0) const;
+	                     ObjId item, const Item **support = 0,
+						 ObjId *roof = 0, const Item **blocker = 0) const;
 
 	// Note that this version of isValidPosition can not take 'flipped'
 	// into account!
 	bool isValidPosition(int32 x, int32 y, int32 z, uint32 shape,
 	                     ObjId item, const Item **support = 0,
-                         ObjId *roof = 0) const;
+                         ObjId *roof = 0, const Item **blocker = 0) const;
 
 	//! Scan for a valid position for item in directions orthogonal to movedir
 	bool scanForValidPosition(int32 x, int32 y, int32 z, const Item *item,
-	                          int movedir, bool wantsupport,
+	                          Direction movedir, bool wantsupport,
 	                          int32 &tx, int32 &ty, int32 &tz);
 
 	struct SweepItem {
@@ -202,6 +214,7 @@ public:
 	bool load(Common::ReadStream *rs, uint32 version);
 
 	INTRINSIC(I_canExistAt);
+	INTRINSIC(I_canExistAtPoint);
 
 private:
 	void loadItems(Std::list<Item *> itemlist, bool callCacheIn);
@@ -223,6 +236,10 @@ private:
 	int32 _fastXMin, _fastYMin, _fastXMax, _fastYMax;
 
 	int _mapChunkSize;
+
+	//! Items that are "targetable" in Crusader. It might be faster to store
+	//! this in a more fancy data structure, but this works fine.
+	ObjId _targets[200];
 
 	void setChunkFast(int32 cx, int32 cy);
 	void unsetChunkFast(int32 cx, int32 cy);

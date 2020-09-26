@@ -25,10 +25,10 @@
 
 namespace Director {
 
-class BitmapCast;
-class ButtonCast;
-class ShapeCast;
-class TextCast;
+class Frame;
+class BitmapCastMember;
+class ShapeCastMember;
+class TextCastMember;
 
 enum SpritePosition {
 	kSpritePositionUnk1 = 0,
@@ -59,13 +59,27 @@ enum MainChannelsPosition {
 
 class Sprite {
 public:
-	Sprite();
+	Sprite(Frame *frame);
 	~Sprite();
+
+	Frame *getFrame() const { return _frame; }
+	Score *getScore() const { return _score; }
+
+	void updateCast();
+
+	bool respondsToMouse();
+	bool isActive();
+	bool shouldHilite();
 
 	uint16 getPattern();
 	void setPattern(uint16 pattern);
 
 	void setCast(uint16 castid);
+	bool isQDShape();
+
+	Frame *_frame;
+	Score *_score;
+	Movie *_movie;
 
 	uint16 _scriptId;
 	uint16 _scriptCastIndex;
@@ -74,45 +88,31 @@ public:
 	uint32 _unk3;
 
 	bool _enabled;
-	uint16 _castId;
 	uint16 _castIndex;
 	SpriteType _spriteType;
-	CastType _castType;
 	byte _inkData;
 	InkType _ink;
 	uint16 _trails;
 
-	Cast *_cast;
+	uint16 _castId;
+	uint16 _pattern;
+	CastMember *_cast;
 
 	byte _thickness;
 	Common::Point _startPoint;
-	Common::Point _currentPoint;
-	Common::Rect _startBbox;
-	Common::Rect _currentBbox;
-	Common::Rect _dirtyBbox;
-	uint16 _width;
-	uint16 _height;
-	// TODO: default constraint = 0, if turned on, sprite is constrainted to the bounding rect
-	// As i know, constrainted != 0 only if sprite moveable
-	byte _constraint;
+	int16 _width;
+	int16 _height;
 	bool _moveable;
 	bool _editable;
 	bool _puppet;
-	byte _backColor;
-	byte _foreColor;
+	bool _immediate;
+	uint32 _backColor;
+	uint32 _foreColor;
 
 	byte _blend;
-	bool _visible;
-	// Using in digital movie sprites
-	byte _movieRate;
-	uint16 _movieTime;
-	uint16 _startTime;
-	uint16 _stopTime;
+
 	byte _volume;
 	byte _stretch;
-
-	// Using in text sprites
-	Common::String _editableText;
 };
 
 } // End of namespace Director

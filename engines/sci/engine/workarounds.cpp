@@ -437,6 +437,7 @@ const SciWorkaroundEntry uninitializedReadWorkarounds[] = {
 	{ GID_KQ6,           210,   210,  0,              "rm210", "scriptCheck",                     NULL,     0,     0, { WORKAROUND_FAKE,   1 } }, // using inventory in that room - bug #4953
 	{ GID_KQ6,           500,   500,  0,              "rm500", "init",                            NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // going to island of the beast
 	{ GID_KQ6,           520,   520,  0,              "rm520", "init",                            NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // going to boiling water trap on beast isle
+	{ GID_KQ6,           720,   720,  0,              "rm720", "warnUser",                        NULL,     1,     1, { WORKAROUND_FAKE,   0 } }, // when guard opens guard-room door after waiting too long during wedding music
 	{ GID_KQ6,            -1,   903,  0,         "controlWin", "open",                            NULL,     4,     4, { WORKAROUND_FAKE,   0 } }, // when opening the controls window (save, load etc)
 	{ GID_KQ6,            -1,   907,  0,             "tomato", "doVerb",                          NULL,     2,     2, { WORKAROUND_FAKE,   0 } }, // when looking at the rotten tomato in the inventory - bug #5331
 	{ GID_KQ6,            -1,   921, -1,              "Print", "addEdit",                         NULL,     1,     1, { WORKAROUND_FAKE,   0 } }, // when displaying the game debugger's teleport dialog
@@ -543,6 +544,7 @@ const SciWorkaroundEntry uninitializedReadWorkarounds[] = {
 	{ GID_SQ1,           103,   103,  0,               "hand", "internalEvent",                   NULL,    -1,    -1, { WORKAROUND_FAKE,   0 } }, // Spanish (and maybe early versions?) only: when moving cursor over input pad, temps 1 and 2
 	{ GID_SQ1,            -1,   703,  0,                   "", "export 1",                        NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // sub that's called from several objects while on sarien battle cruiser
 	{ GID_SQ1,            -1,   703,  0,         "firePulsar", "changeState",     sig_uninitread_sq1_1,     0,     0, { WORKAROUND_FAKE,   0 } }, // export 1, but called locally (when shooting at aliens)
+	{ GID_SQ1,            -1,   703,  0,      "DeltaurRegion", "init",            sig_uninitread_sq1_1,     0,     0, { WORKAROUND_FAKE,   0 } }, // export 1, but called locally (when teleporting to a deltaur room)
 	{ GID_SQ4,            -1,   398,  0,            "showBox", "changeState",                     NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // CD: called when rummaging in Software Excess bargain bin
 	{ GID_SQ4,            -1,   928, -1,           "Narrator", "startText",                       NULL,  1000,  1000, { WORKAROUND_FAKE,   1 } }, // CD: happens in the options dialog and in-game when speech and subtitles are used simultaneously
 	{ GID_SQ4,           395,   395, -1,    "fromStoreScript", "changeState",                     NULL,     0,     0, { WORKAROUND_FAKE,   0 } }, // CD: happens when shoplifting in Galaxy Galleria - bug #10229
@@ -702,6 +704,7 @@ const SciWorkaroundEntry kDisplay_workarounds[] = {
 	{ GID_PQ2,            23,    23,  0,         "rm23Script", "elements",     sig_kDisplay_pq2_1,     0,     0, { WORKAROUND_IGNORE,    0 } }, // when looking at the 2nd page of files in jail - 0x75 as id - bug #5223
 	{ GID_PQ2,            23,    23,  0,         "rm23Script", "handleEvent",  sig_kDisplay_pq2_1,     0,     0, { WORKAROUND_IGNORE,    0 } }, // when looking at the 2nd page of file in jail - 0x75 as id - bug #9670
 	{ GID_QFG1,           11,    11,  0,             "battle", "init",                       NULL,     0,     0, { WORKAROUND_IGNORE,    0 } }, // DEMO: When entering battle, 0x75 as id
+	{ GID_SQ3,             1,     1,  0,              "rm001", "handleEvent",                NULL,     0,     0, { WORKAROUND_IGNORE,    0 } }, // MAC: during intro when pressing enter - a parameter is an object
 	{ GID_SQ4,           397,     0,  0,                   "", "export 12",                  NULL,     0,     0, { WORKAROUND_IGNORE,    0 } }, // FLOPPY: when going into the computer store - bug #5227
 	{ GID_SQ4,           391,   391,  0,          "doCatalog", "changeState",  sig_kDisplay_sq4_1,     0,     0, { WORKAROUND_IGNORE,    0 } }, // CD: clicking on catalog in roboter sale - a parameter is an object
 	{ GID_SQ4,           391,   391,  0,         "choosePlug", "changeState",                NULL,     0,     0, { WORKAROUND_IGNORE,    0 } }, // CD: ordering connector in roboter sale - a parameter is an object
@@ -885,12 +888,30 @@ static const uint16 sig_kGraphRedrawBox_sq4_1[] = {
 	SIG_END
 };
 
+// same as above but for NRS SQ4 Update, which has a different first instruction
+static const uint16 sig_kGraphRedrawBox_sq4_2[] = {
+	0x3e, SIG_UINT16(0x0007),        // link 0007
+	0x39, SIG_ADDTOOFFSET(+1),       // pushi 2Ah for PC floppy, pushi 27h for PC CD
+	0x76,                            // push0
+	0x72,                            // lofsa laserSound
+	SIG_END
+};
+
 //                Game: Space Quest 4
 //      Calling method: shootEgoScript::changeState
 //   Subroutine offset: English/German/French/Russian PC floppy, Japanese PC-9801: 0x0f8c, English PC CD: 0x0c4d (script 703)
 // Applies to at least: English/German/French/Russian PC floppy, English PC CD, Japanese PC-9801
-static const uint16 sig_kGraphRedrawBox_sq4_2[] = {
+static const uint16 sig_kGraphRedrawBox_sq4_3[] = {
 	0x3f, 0x03,                      // link 03
+	0x39, SIG_ADDTOOFFSET(+1),       // pushi [ number ]
+	0x78,                            // push1
+	0x39, 0x69,                      // pushi 69h
+	SIG_END
+};
+
+// same as above but for NRS SQ4 Update, which has a different first instruction
+static const uint16 sig_kGraphRedrawBox_sq4_4[] = {
+	0x3e, SIG_UINT16(0x0003),        // link 0003
 	0x39, SIG_ADDTOOFFSET(+1),       // pushi [ number ]
 	0x78,                            // push1
 	0x39, 0x69,                      // pushi 69h
@@ -911,8 +932,10 @@ const SciWorkaroundEntry kGraphRedrawBox_workarounds[] = {
 	{ GID_SQ4,            -1,   411,  0,                   "", "changeState",                      NULL,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // skateOrama when "swimming" in the air... Russian version - bug #5573
 	{ GID_SQ4,           150,   150,  0,        "laserScript", "changeState", sig_kGraphRedrawBox_sq4_1,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // when visiting the pedestral where Roger Jr. is trapped, before trashing the brain icon in the programming chapter, accidental additional parameter specified - bug #5479, German - bug #5527
 	{ GID_SQ4,           150,   150,  0,                   "", "changeState", sig_kGraphRedrawBox_sq4_1,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // same as above, for the Russian version - bug #5573
-	{ GID_SQ4,            -1,   703,  0,     "shootEgoScript", "changeState", sig_kGraphRedrawBox_sq4_2,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // estros when getting shot by the police - accidental additional parameter specified
-	{ GID_SQ4,            -1,   703,  0,                   "", "changeState", sig_kGraphRedrawBox_sq4_2,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // same as above, for the Russian version
+	{ GID_SQ4,           150,   150,  0,        "laserScript", "changeState", sig_kGraphRedrawBox_sq4_2,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // same as above, for NRS SQ4 Update
+	{ GID_SQ4,            -1,   703,  0,     "shootEgoScript", "changeState", sig_kGraphRedrawBox_sq4_3,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // estros when getting shot by the police - accidental additional parameter specified
+	{ GID_SQ4,            -1,   703,  0,                   "", "changeState", sig_kGraphRedrawBox_sq4_3,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // same as above, for the Russian version
+	{ GID_SQ4,            -1,   703,  0,     "shootEgoScript", "changeState", sig_kGraphRedrawBox_sq4_4,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // same as above, for NRS SQ4 Update
 	{ GID_SQ4,            -1,   704,  0,           "shootEgo", "changeState",                      NULL,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // When shot by Droid in Super Computer Maze (Rooms 500, 505, 510...) - accidental additional parameter specified
 	{ GID_KQ5,            -1,   981,  0,           "myWindow",     "dispose",                      NULL,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // Happens in the floppy version, when closing any dialog box, accidental additional parameter specified - bug #5031
 	{ GID_KQ5,            -1,   995,  0,               "invW",        "doit",                      NULL,     0,     0, { WORKAROUND_STILLCALL, 0 } }, // Happens in the floppy version, when closing the inventory window, accidental additional parameter specified
@@ -1273,6 +1296,9 @@ static const SciMessageWorkaroundEntry messageWorkarounds[] = {
 	{ GID_GK2,           SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  120,  18,  64,   0,  1, { MSG_WORKAROUND_REMAP,    120,  18,  44,   0,  1,  0,   0,   0, NULL } },
 	// Clicking any item other than the dagger on theater vent in room 11853
 	{ GID_GK2,           SCI_MEDIA_ALL,    K_LANG_NONE,     -1, 1185,   4,   0,   0,  1, { MSG_WORKAROUND_REMAP,   1185,   4,  62,   0,  1,  0,   0,   0, NULL } },
+	// Clicking the drink-me potion on ego in the castle basement hallways while guards are around
+	{ GID_KQ6,           SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  840,   3,  14,   1,  1, { MSG_WORKAROUND_REMAP,    899,   0,   0, 198,  1, 99,   0,   0, NULL } },
+	{ GID_KQ6,           SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  899,   1,  14,   1,  1, { MSG_WORKAROUND_REMAP,    899,   0,   0, 198,  1, 99,   0,   0, NULL } },
 	// Asking Yvette about Tut in act 2 party in floppy version - bug #10723
 	//  The last two sequences in this five part message reveal a murder that hasn't occurred yet.
 	//  We skip these as to not spoil the plot, but only in the act 2 rooms, as the message is used
@@ -1324,6 +1350,11 @@ static const SciMessageWorkaroundEntry messageWorkarounds[] = {
 	{ GID_QFG4,          SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  322,  10, 149,   1,  1, { MSG_WORKAROUND_EXTRACT,  322,  10, 149,   1,  1, 13,   0,   0, NULL } },
 	{ GID_QFG4,          SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  322,  10, 149,   1,  2, { MSG_WORKAROUND_EXTRACT,  322,  10, 149,   1,  2, 13,   0,   0, NULL } },
 	{ GID_QFG4,          SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  322,  10, 149,   1,  3, { MSG_WORKAROUND_EXTRACT,  322,  10, 149,   1,  3, 13,   0,   0, NULL } },
+	// Wrong verb when clicking lock pick or toolkit on gnome's door in room 320
+	//  while not having enough lock picking skill.
+	{ GID_QFG4,          SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  320,   9,   9,   7,  1, { MSG_WORKAROUND_REMAP,    320,   9,  42,   7,  1, 99,   0,   0, NULL } },
+	// Wrong modNum (missing parameter) when clicking your only dagger in room 625
+	{ GID_QFG4,          SCI_MEDIA_ALL,    K_LANG_NONE,     -1,  625,   4,   6,  34,  1, { MSG_WORKAROUND_REMAP,    620,   4,   6,  34,  1, 99,   0,   0, NULL } },
 	// This fixes the error message shown when speech and subtitles are
 	// enabled simultaneously in SQ4 - the (very) long dialog when Roger
 	// is talking with the aliens is missing - bug #6067.

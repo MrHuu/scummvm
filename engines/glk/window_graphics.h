@@ -52,7 +52,7 @@ public:
 	 */
 	~GraphicsWindow() override;
 
-	bool drawPicture(uint image, int xpos, int ypos, bool scale,
+	bool drawPicture(const Common::String &image, int xpos, int ypos, bool scale,
 	                   uint imagewidth, uint imageheight);
 	void drawPicture(const Graphics::Surface &image, uint transColor, int x0, int y0,
 		int width, int height, uint linkval = 0);
@@ -103,7 +103,20 @@ public:
 
 	void eraseRect(bool whole, const Rect &box) override;
 
+	/**
+	 * Fill an area of the window
+	 */
 	void fillRect(uint color, const Rect &box) override;
+
+	/**
+	 * Draw a rectangle in the given area
+	 */
+	void frameRect(uint color, const Rect &box);
+
+	/**
+	 * Draws a line between two points
+	 */
+	void drawLine(uint color, const Point &from, const Point &to);
 
 	void getSize(uint *width, uint *height) const override;
 

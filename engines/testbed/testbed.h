@@ -50,11 +50,19 @@ public:
 	/**
 	 * Invokes configured testsuites.
 	 */
+	static void pushTestsuites(Common::Array<Testsuite *> &testsuiteList);
+
+	/**
+	 * Invokes configured testsuites.
+	 */
 	void invokeTestsuites(TestbedConfigManager &cfMan);
 
 	bool hasFeature(EngineFeature f) const override;
 
 private:
+	void checkForAllAchievements();
+	void videoTest();
+
 	Common::Array<Testsuite *> _testsuiteList;
 };
 

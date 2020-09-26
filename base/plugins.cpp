@@ -22,7 +22,6 @@
 
 #include "base/plugins.h"
 
-#include "common/translation.h"
 #include "common/func.h"
 #include "common/debug.h"
 #include "common/config-manager.h"
@@ -137,6 +136,7 @@ public:
 		LINK_PLUGIN(APPLEIIGS)
 		LINK_PLUGIN(TOWNS)
 		LINK_PLUGIN(PC98)
+		LINK_PLUGIN(SEGACD)
 		#if defined(USE_TIMIDITY)
 		LINK_PLUGIN(TIMIDITY)
 		#endif
@@ -159,7 +159,9 @@ PluginList FilePluginProvider::getPlugins() {
 	Common::FSList pluginDirs;
 
 	// Add the default directories
+	#ifndef WIN32
 	pluginDirs.push_back(Common::FSNode("."));
+	#endif
 	pluginDirs.push_back(Common::FSNode("plugins"));
 
 	// Add the provider's custom directories
@@ -361,7 +363,7 @@ void PluginManagerUncached::loadFirstPlugin() {
 bool PluginManagerUncached::loadNextPlugin() {
 	unloadPluginsExcept(PLUGIN_TYPE_ENGINE, NULL, false);
 
-	if (!_currentPlugin)
+	if (!_currentPlugin || _currentPlugin == _allEnginePlugins.end())
 		return false;
 
 	for (++_currentPlugin; _currentPlugin != _allEnginePlugins.end(); ++_currentPlugin) {

@@ -214,7 +214,7 @@ void EoBCoreEngine::advanceTimers(uint32 millis) {
 			} else if (_scriptTimers[i].next) {
                 _scriptTimers[i].next = 1;
 				debugC(3, kDebugLevelTimer, "EoBCoreEngine::advanceTimers()      - CTIME: %08d   SCRIPT TIMER[%02d].NEXT: %08d", ct, i, _scriptTimers[i].next);
-            }			
+            }
 		}
 	}
 
@@ -305,7 +305,7 @@ void EoBCoreEngine::timerSpecialCharacterUpdate(int timerNum) {
 		}
 
 		int od = _screen->curDimIndex();
-		Screen::FontId of = _screen->setFont(_flags.use16ColorMode ? Screen::FID_SJIS_FNT : Screen::FID_6_FNT);
+		Screen::FontId of = _screen->setFont(_conFont);
 		_screen->setScreenDim(7);
 
 		switch (evt) {

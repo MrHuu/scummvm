@@ -23,6 +23,7 @@
 
 #include "ultima/ultima8/misc/pent_include.h"
 #include "ultima/ultima8/gumps/ask_gump.h"
+#include "ultima/ultima8/gumps/bark_gump.h"
 #include "ultima/ultima8/gumps/widgets/button_widget.h"
 #include "ultima/ultima8/usecode/uc_list.h"
 #include "ultima/ultima8/usecode/uc_machine.h"
@@ -50,22 +51,7 @@ AskGump::~AskGump() {
 // Init the gump, call after construction
 void AskGump::InitGump(Gump *newparent, bool take_focus) {
 	// OK, this is a bit of a hack, but it's how it has to be
-	int fontnum;
-	if (_owner == 1) fontnum = 6;
-	else if (_owner > 256) fontnum = 8;
-	else switch (_owner % 3) {
-		case 1:
-			fontnum = 5;
-			break;
-
-		case 2:
-			fontnum = 7;
-			break;
-
-		default:
-			fontnum = 0;
-			break;
-		}
+	int fontnum = BarkGump::dialogFontForActor(_owner);
 
 	int px = 0, py = 0;
 
@@ -84,18 +70,20 @@ void AskGump::InitGump(Gump *newparent, bool take_focus) {
 		Rect cd;
 		child->GetDims(cd);
 		if (i + 1 < _answers->getSize())
-			cd.h += child->getVlead();
+			cd.setHeight(cd.height() + child->getVlead());
 
-		if (px + cd.w > 160 && px != 0) {
-			py = _dims.h;
+		if (px + cd.width() > 160 && px != 0) {
+			py = _dims.height();
 			px = 0;
 			child->Move(px, py);
 		}
 
-		if (cd.w + px > _dims.w) _dims.w = cd.w + px;
-		if (cd.h + py > _dims.h) _dims.h = cd.h + py;
+		if (cd.width() + px > _dims.width())
+			_dims.setWidth(cd.width() + px);
+		if (cd.height() + py > _dims.height())
+			_dims.setHeight(cd.height() + py);
 
-		px += cd.w + 4;
+		px += cd.width() + 4;
 	}
 
 	// Wait with ItemRelativeGump initialization until we calculated our size.
@@ -130,8 +118,8 @@ bool AskGump::loadData(Common::ReadStream *rs, uint32 version) {
 	// HACK ALERT
 	int px = 0, py = 0;
 
-	_dims.w = 0;
-	_dims.h = 0;
+	_dims.setWidth(0);
+	_dims.setHeight(0);
 
 
 	for (unsigned int i = 0; i < _answers->getSize(); ++i) {
@@ -150,16 +138,18 @@ bool AskGump::loadData(Common::ReadStream *rs, uint32 version) {
 		Rect cd;
 		child->GetDims(cd);
 
-		if (px + cd.w > 160 && px != 0) {
-			py = _dims.h;
+		if (px + cd.width() > 160 && px != 0) {
+			py = _dims.height();
 			px = 0;
 		}
 		child->Move(px, py);
 
-		if (cd.w + px > _dims.w) _dims.w = cd.w + px;
-		if (cd.h + py > _dims.h) _dims.h = cd.h + py;
+		if (cd.width() + px > _dims.width())
+			_dims.setWidth(cd.width() + px);
+		if (cd.height() + py > _dims.height())
+			_dims.setHeight(cd.height() + py);
 
-		px += cd.w + 4;
+		px += cd.width() + 4;
 	}
 
 	return true;

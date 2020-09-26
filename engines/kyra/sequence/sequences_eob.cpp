@@ -24,7 +24,10 @@
 
 #include "kyra/engine/eob.h"
 #include "kyra/graphics/screen_eob.h"
+#include "kyra/graphics/screen_eob_segacd.h"
 #include "kyra/resource/resource.h"
+#include "kyra/resource/resource_segacd.h"
+#include "kyra/sequence/seqplayer_eob_segacd.h"
 #include "kyra/sound/sound.h"
 
 #include "common/system.h"
@@ -56,6 +59,7 @@ protected:
 private:
 	virtual void wait(uint32 ticks) { _vm->delay(ticks * _tickLength); }
 	Common::Array<Common::Rect> _textFields;
+	const Screen::FontId _textFont;
 	uint8 _textColor;
 };
 
@@ -131,7 +135,7 @@ private:
 	void congratulation();
 	void credits();
 	void bonus();
-	
+
 	template<int brStart, int brEnd, int inc> void pc98FadePalette(int palId, uint32 del);
 	void fadeToBlack(int palId, uint32 delay) { pc98FadePalette<0, -16, -1>(palId, delay); }
 	void fadeFromBlack(int palId, uint32 delay) { pc98FadePalette<-15, 1, 1>(palId, delay); }
@@ -157,7 +161,6 @@ private:
 	const uint8 _palCycleDelay;
 };
 
-
 class EoBAmigaFinalePlayer : public EoBSeqPlayerCommon {
 public:
 	EoBAmigaFinalePlayer(EoBEngine *vm, Screen_EoB *screen);
@@ -178,10 +181,10 @@ private:
 
 	uint8 *_councilAnimData1;
 	uint8 *_councilAnimData2;
-	
+
 	const uint8 *_councilAnimData3;
 	const uint8 *_councilAnimData4;
-	const uint8 *_eyesAnimData;	
+	const uint8 *_eyesAnimData;
 	const int16 *_handsAnimData;
 	const uint8 *_textFrameDuration;
 
@@ -190,7 +193,8 @@ private:
 
 EoBSeqPlayerCommon::EoBSeqPlayerCommon(EoBEngine *vm, Screen_EoB *screen) : _vm(vm), _screen(screen), _textColor(0xE1),
 	_fillColor1(vm->gameFlags().platform == Common::kPlatformAmiga ? 19 : (vm->gameFlags().platform == Common::kPlatformPC98 ? 0 : 12)),
-	_fillColor2(vm->gameFlags().platform == Common::kPlatformAmiga ? 10 : 157), _tickLength(16) {
+	_fillColor2(vm->gameFlags().platform == Common::kPlatformAmiga ? 10 : 157), _tickLength(16),
+	_textFont(vm->gameFlags().platform == Common::kPlatformPC98 ? Screen::FID_SJIS_TEXTMODE_FNT : Screen::FID_8_FNT) {
 	_shapes = new uint8*[64];
 	memset(_shapes, 0, 64 * sizeof(uint8*));
 }
@@ -273,17 +277,32 @@ void EoBSeqPlayerCommon::printSubtitle(const char *str, int textmodeX, int textm
 	if (!str)
 		return;
 
-	Screen::FontId of = _screen->setFont(Screen::FID_SJIS_TEXTMODE_FNT);
+	Screen::FontId of = _screen->setFont(_textFont);
 	int cp = _screen->setCurPage(0);
+	Common::String tmpStr(str);
+
+	if (_vm->_flags.lang == Common::ES_ESP) {
+		textmodeX = (20 - ((tmpStr.contains('\r') ? tmpStr.findFirstOf('\r') : tmpStr.size()) >> 1)) << 1;
+		textmodeY--;
+		if (_vm->_configRenderMode == Common::kRenderCGA)
+			col  = 3;
+		// No "typewriter" effect for Spanish
+		mode = 2;
+	}
 
 	int x1 = textmodeX << 2;
 	int y1 = textmodeY << 3;
 
 	for (int i = 0; str[i] &&!_vm->shouldQuit() && !_vm->skipFlag(); ) {
 		uint8 c = str[i++];
+		bool loop = true;
 		if (c == 13) {
 			curX = 0;
 			textmodeY++;
+			if (_vm->_flags.lang == Common::ES_ESP) {
+				tmpStr = &str[i];
+				textmodeX = (20 - ((tmpStr.contains('\r') ? tmpStr.findFirstOf('\r'): tmpStr.size()) >> 1)) << 1;
+			}
 		} else if (c == 10) {
 			_textColor = str[i++];
 		} else if (c == 7) {
@@ -293,7 +312,12 @@ void EoBSeqPlayerCommon::printSubtitle(const char *str, int textmodeX, int textm
 			_textFields.push_back(Common::Rect(x1, y1, x22, y22));
 			clearTextField();
 			curX = 0;
+		} else {
+			loop = false;
 		}
+
+		if (loop)
+			continue;
 
 		charStr[0] = c;
 		charStr[1] = (c >= 0x81 && (c <= 0x9F || (c >= 0xE0 && c <= 0xFC))) ? str[i++] : 0;
@@ -459,15 +483,15 @@ void EoBIntroPlayer::openingCredits() {
 		_vm->delay(50 * _vm->_tickLength);
 }
 
-#define printSub(stringArray, index, x, y, col, mode) if (stringArray) printSubtitle(stringArray[index], x, y, col, mode)
-#define displaySubtitle(gfxTitleSrcY, gfxTitleDstY, gfxTitleH, stringArray, index, x, y, col, mode) \
-	printSub(stringArray, index, x, y, col, mode); \
+#define printSub(stringArray, index, x, y, colJP, colES, mode) if (stringArray) printSubtitle(stringArray[index], x, y, _vm->_flags.lang == Common::ES_ESP ? colES : colJP, mode)
+#define displaySubtitle(gfxTitleSrcY, gfxTitleDstY, gfxTitleH, stringArray, index, x, y, colJP, colES, mode) \
+	printSub(stringArray, index, x, y, colJP, colES, mode); \
 	else _screen->copyRegion(0, gfxTitleSrcY, 0, gfxTitleDstY, 320, gfxTitleH, 6, 0, Screen::CR_NO_P_CHECK)
 
 void EoBIntroPlayer::tower() {
 	if (_vm->shouldQuit() || _vm->skipFlag())
-		return; 
- 
+		return;
+
 	_screen->loadBitmap(_filesTower[1], 5, 3, 0);
 
 	_screen->setCurPage(2);
@@ -493,8 +517,8 @@ void EoBIntroPlayer::tower() {
 
 	_screen->setCurPage(0);
 
-	displaySubtitle(0, 168, 32, _stringsTower, 0, 17, 22, 0xE1, 2);
-	printSub(_stringsTower, 1, 13, 24, 0xE1, 2);
+	displaySubtitle(0, 168, 32, _stringsTower, 0, 17, 22, 0xE1, 0x0F, 2);
+	printSub(_stringsTower, 1, 13, 24, 0xE1, 0x0F, 2);
 
 	for (int i = 0; i < 64 && !_vm->shouldQuit() && !_vm->skipFlag(); i += 2) {
 		uint32 end = _vm->_system->getMillis() + 2 * _vm->_tickLength;
@@ -541,7 +565,7 @@ void EoBIntroPlayer::tower() {
 	}
 
 	_screen->fillRect(0, 168, 319, 199, _fillColor1);
-	displaySubtitle(32, 168, 32, _stringsTower, 2, 20, 23, 0xE1, 0);
+	displaySubtitle(32, 168, 32, _stringsTower, 2, 20, 23, 0xE1, 0x0F, 0);
 	_screen->updateScreen();
 	_vm->delay(65 * _vm->_tickLength);
 }
@@ -587,17 +611,17 @@ void EoBIntroPlayer::orb() {
 			_vm->delayUntil(end);
 	}
 
-	displaySubtitle(64, 168, 16, _stringsOrb, 0, 32, 23, 0xE1, 0);
+	displaySubtitle(64, 168, 16, _stringsOrb, 0, 32, 23, 0xE1, 0x08, 0);
 	_screen->updateScreen();
 
 	if (_vm->gameFlags().platform == Common::kPlatformAmiga) {
 		_vm->delay(80 * _vm->_tickLength);
 		_screen->fadePalette(_screen->getPalette(2), 48);
 		_screen->clearCurPage();
-	} else {		
+	} else {
 		_vm->delay(40 * _vm->_tickLength);
 		_vm->snd_playSoundEffect(6);
-	}	
+	}
 
 	startFrame = (_vm->gameFlags().platform == Common::kPlatformAmiga) ? -1 : 3;
 	for (int i = startFrame; i > -2 && !_vm->shouldQuit() && !_vm->skipFlag(); i--) {
@@ -649,7 +673,7 @@ void EoBIntroPlayer::waterdeepEntry() {
 		_vm->delayUntil(end);
 	}
 
-	displaySubtitle(80, 168, 16, _stringsWdEntry, 0, 21, 23, 0xE1, 0);
+	displaySubtitle(80, 168, 16, _stringsWdEntry, 0, 21, 23, 0xE1, 0x08, 0);
 
 	_screen->updateScreen();
 	_vm->delay(50 * _vm->_tickLength);
@@ -796,7 +820,7 @@ void EoBIntroPlayer::king() {
 		_vm->delayUntil(end);
 	}
 
-	displaySubtitle(96, 160, 32, _stringsKing, 0, 10, 24, 0xE1, 0);
+	displaySubtitle(96, 160, 32, _stringsKing, 0, 10, 24, 0xE1, 0x03, 0);
 	_screen->updateScreen();
 	_vm->delay(70 * _vm->_tickLength);
 
@@ -827,7 +851,7 @@ void EoBIntroPlayer::hands() {
 	_screen->drawShape(2, _shapes[1], 151, 4, 0);
 	boxMorphTransition(25, 8, 18, 4, 3, 0, 21, 8, 6, 0, 28, 23);
 
-	displaySubtitle(128, 176, 16, _stringsHands, 0, 24, 23, 0xE1, 0);
+	displaySubtitle(128, 176, 16, _stringsHands, 0, 24, 23, 0xE1, 0x0F, 0);
 
 	_screen->updateScreen();
 	_vm->delay(15 * _vm->_tickLength);
@@ -998,14 +1022,14 @@ void EoBIntroPlayer::waterdeepExit() {
 	_screen->fillRect(0, 168, 319, 199, _fillColor1, 0);
 	_screen->copyRegion(0, 136, 0, 0, 48, 36, 0, 4, Screen::CR_NO_P_CHECK);
 
-	int dstPage = (_vm->gameFlags().platform == Common::kPlatformAmiga) ? 4 : 5; 
+	int dstPage = (_vm->gameFlags().platform == Common::kPlatformAmiga) ? 4 : 5;
 	_screen->loadBitmap(_filesWdExit[2], 3, dstPage, 0);
 	_screen->convertPage(dstPage, 2, _vm->_cgaMappingAlt);
 	whirlTransition();
 	loadAndSetPalette(_filesWdExit[1], 0);
 	_vm->delay(6 * _vm->_tickLength);
 
-	displaySubtitle(144, 184, 16, _stringsWdExit, 0, 24, 23, 0xE1, 0);
+	displaySubtitle(144, 184, 16, _stringsWdExit, 0, 24, 23, 0xE1, 0x0F, 0);
 
 	cx = 0;
 	cy = 136;
@@ -1078,8 +1102,7 @@ void EoBIntroPlayer::tunnel() {
 		_vm->delayUntil(end);
 	}
 
-	// subtitle "We have them" - the PC-98 version does not have this string.
-	_screen->copyRegion(0, 160, 0, 184, 320, 16, 6, 0, Screen::CR_NO_P_CHECK);
+	displaySubtitle(160, 184, 16, _stringsTunnel, 0, 27, 23, 0xE1, 0x0F, 0);
 	_screen->updateScreen();
 
 	_vm->delay(18 * _vm->_tickLength);
@@ -1149,7 +1172,7 @@ void EoBIntroPlayer::tunnel() {
 	_screen->copyRegion(0, 120, 80, 30, 160, 64, 4, 0, Screen::CR_NO_P_CHECK);
 	_screen->copyRegion(160, 120, 80, 94, 160, 64, 4, 0, Screen::CR_NO_P_CHECK);
 
-	displaySubtitle(176, 184, 16, _stringsTunnel, 0, 27, 23, 0xE1, 0);
+	displaySubtitle(176, 184, 16, _stringsTunnel, 1, 27, 23, 0xE1, 0x08, 0);
 
 	_screen->setCurPage(0);
 	_screen->updateScreen();
@@ -1268,7 +1291,7 @@ EoBPC98FinalePlayer::EoBPC98FinalePlayer(EoBEngine *vm, Screen_EoB *screen) : Eo
 	_palCycleType1 = new Screen_EoB::PalCycleData[48];
 	_palCycleType2 = new Screen_EoB::PalCycleData[48];
 	_updatePalCycle = false;
-	
+
 	resetPaletteCycle();
 }
 
@@ -1357,7 +1380,7 @@ void EoBPC98FinalePlayer::king() {
 	uint32 xylen = 0;
 	uint8 *xydata = _vm->resource()->fileData("xytbl.dat", &xylen);
 	xylen >>= 1;
-	
+
 	_screen->loadBitmap("KING.BIN", 3, 5, 0);
 	_screen->convertPage(5, 2, 0);
 	_screen->copyRegion(0, 0, 0, 0, 320, 200, 2, 0, Screen::CR_NO_P_CHECK);
@@ -1365,7 +1388,7 @@ void EoBPC98FinalePlayer::king() {
 	_screen->loadBitmap("KG.BIN", 3, 4, 0);
 	_screen->setCurPage(4);
 
-	_shapes[0] = _screen->encodeShape(32, 0, 8, 128);	
+	_shapes[0] = _screen->encodeShape(32, 0, 8, 128);
 	for (int i = 0; i < 4; ++i) {
 		_shapes[2 + i] = _screen->encodeShape(i << 3, 0, 8, 80);
 		if (i < 3)
@@ -1476,9 +1499,9 @@ void EoBPC98FinalePlayer::inspection() {
 	_screen->drawShape(2, _shapes[0], 0, 0);
 	_screen->copyRegion(0, 0, 104, 30, 96, 120, 2, 0, Screen::CR_NO_P_CHECK);
 	fadeFromBlack(7, 1);
-	
+
 	wait(30);
-	
+
 	printSubtitle(_strings[12], 2, 22, 225);
 	printSubtitle(_strings[13], 18, 22, 225);
 	printSubtitle(_strings[14], 14, 22, 225);
@@ -1610,12 +1633,16 @@ void EoBPC98FinalePlayer::credits() {
 }
 
 void EoBPC98FinalePlayer::bonus() {
-	if (_vm->shouldQuit() || _vm->skipFlag())
+	if (_vm->shouldQuit())
 		return;
 
-	wait(300);
 	if (!_vm->checkScriptFlags(0x1FFE))
 		return;
+
+	if (_vm->skipFlag())
+		_vm->_eventList.clear();
+	else
+		wait(300);
 
 	fadeToBlack(9, 3);
 	_screen->setCurPage(0);
@@ -1661,7 +1688,7 @@ template<int brStart, int brEnd, int brInc> void EoBPC98FinalePlayer::pc98FadePa
 
 	for (int i = brStart; i != brEnd && !_vm->skipFlag() && !_vm->shouldQuit(); i += brInc) {
 		uint32 end = _vm->_system->getMillis() + del;
-		if (_updatePalCycle) {			
+		if (_updatePalCycle) {
 			for (uint32 cur = _vm->_system->getMillis(); end > cur; cur = _vm->_system->getMillis()) {
 				_screen->updatePC98PaletteCycle(i);
 				_screen->updateScreen();
@@ -1687,7 +1714,7 @@ void EoBPC98FinalePlayer::startPaletteCycle(int palId, int style) {
 		_screen->initPC98PaletteCycle(palId, _palCycleType1);
 	else if (style == 1)
 		_screen->initPC98PaletteCycle(palId, _palCycleType2);
-	
+
 	if (style == 0 || style == 1)
 		resetPaletteCycle();
 
@@ -1889,7 +1916,7 @@ void EoBAmigaFinalePlayer::inspection() {
 		_screen->copyRegion(112, 32, 112, 32, 96, 24, 2, 0, Screen::CR_NO_P_CHECK);
 		_screen->updateScreen();
 
-		_vm->delay(_vm->_tickLength);	
+		_vm->delay(_vm->_tickLength);
 	}
 }
 
@@ -1932,7 +1959,7 @@ void EoBAmigaFinalePlayer::congratulation() {
 	_shapes[40] = _screen->encodeShape(12, 24, 12, 64, true);
 	_shapes[41] = _screen->encodeShape(12, 88, 12, 72, true);
 	_shapes[42] = _screen->encodeShape(24, 136, 15, 64, true);
-	
+
 	_screen->clearPage(2);
 	_screen->fadeFromBlack(1);
 
@@ -2013,7 +2040,7 @@ void EoBAmigaFinalePlayer::animateCouncil1(int numFrames, int skipFrame) {
 	int frame = 5;
 	int subFrame = 0;
 	int subFrameAlt = 2;
-	
+
 	if (numFrames == 99) {
 		subFrame = _animCurFrame ? 6 : 0;
 		_animCurFrame ^= 1;
@@ -2038,7 +2065,7 @@ void EoBAmigaFinalePlayer::animateCouncil1(int numFrames, int skipFrame) {
 				_councilAnimData1[frame * 13 + 12]++;
 				subFrame = 0;
 			}
-	
+
 			const uint8 *crds = &_councilAnimData1[frame * 13 + subFrame];
 			_screen->copyRegion(crds[0] << 3, crds[1], crds[4] << 3, crds[5], crds[2] << 3, crds[3], 4, 0, Screen::CR_NO_P_CHECK);
 		}
@@ -2057,11 +2084,11 @@ void EoBAmigaFinalePlayer::animateCouncil2(int numFrames, int skipFrame, bool wi
 		for (int i = 0; i < 6 && !_vm->skipFlag() && !_vm->shouldQuit(); ++i) {
 			if (frames[i] == skipFrame)
 				continue;
-			
+
 			uint8 *crds = &_councilAnimData2[frames[i] * 13];
 			crds[12] = 0;
 			_screen->copyRegion(crds[0] << 3, crds[1], crds[4] << 3, crds[5], crds[2] << 3, crds[3], 4, 0, Screen::CR_NO_P_CHECK);
-			
+
 			if (withSpeechAnim)
 				animateCouncil1(2, -1);
 
@@ -2105,12 +2132,13 @@ void EoBAmigaFinalePlayer::playDialogue(int line, bool withAnim) {
 
 	} else {
 		_screen->drawShape(0, _shapes[line], 0, line == 9 ? 92 : 170);
-	}	
+	}
 }
 
 int EoBEngine::mainMenu() {
 	int menuChoice = _menuChoiceInit;
 	_menuChoiceInit = 0;
+	int resXtr = 0;
 	Screen::FontId of = _screen->_currentFont;
 
 	while (menuChoice >= 0 && !shouldQuit()) {
@@ -2118,7 +2146,7 @@ int EoBEngine::mainMenu() {
 		case 0: {
 			if (_ttlCfg->fade)
 				_screen->fadeToBlack(10);
-			
+
 			_screen->selectPC98Palette(_ttlCfg->pc98PaletteID, _screen->getPalette(0));
 			for (int i = 0; i < 3; ++i) {
 				if (_ttlCfg->palFiles[i].renderMode == -1)
@@ -2127,32 +2155,49 @@ int EoBEngine::mainMenu() {
 					_screen->loadPalette(_ttlCfg->palFiles[i].filename, _screen->getPalette(0));
 			}
 
-			_screen->loadEoBBitmap(_ttlCfg->bmpFile, _cgaMappingDefault, 5, 3, _ttlCfg->page);
+			if (_ttlCfg->bmpFile[0])
+				_screen->loadEoBBitmap(_ttlCfg->bmpFile, _cgaMappingDefault, 5, 3, _ttlCfg->page);
 
 			if (_ttlCfg->fade)
 				_screen->fadeFromBlack(10);
 			else
 				_screen->setScreenPalette(_screen->getPalette(0));
 
-			_screen->_curPage = 2;
-			of = _screen->setFont(Screen::FID_6_FNT);
 			Common::String versionString(Common::String::format("ScummVM %s", gScummVMVersion));
-			_screen->printText(versionString.c_str(), 280 - versionString.size() * 6, 153 + _ttlCfg->versionStrYOffs, _screen->getPagePixel(2, 0, 0), 0);
-			_screen->setFont(of);
-			_screen->fillRect(0, 159 + _ttlCfg->versionStrYOffs, 319, 199, _screen->getPagePixel(2, 0, 0));
 
-			gui_drawBox(_ttlCfg->menu1X, _ttlCfg->menu1Y, _ttlCfg->menu1W, _ttlCfg->menu1H, _ttlCfg->menu1col1, _ttlCfg->menu1col2, _ttlCfg->menu1col3);
-			gui_drawBox(_ttlCfg->menu2X, _ttlCfg->menu2Y, _ttlCfg->menu2W, _ttlCfg->menu2H, _ttlCfg->menu2col1, _ttlCfg->menu2col2, _ttlCfg->menu2col3);
+			if (_flags.platform == Common::kPlatformSegaCD) {
+				_txt->clearDim(3);
+				_screen->sega_drawTextBox(26, 5, 0, 0, 208, 40, 0x11, 0xDD);
+				_screen->sega_getRenderer()->fillRectWithTiles(0, 0, 19, 40, 8, 0);
+				_screen->sega_getRenderer()->fillRectWithTiles(1, 7, 20, 26, 5, 0x461, true);
+				_screen->sega_getRenderer()->fillRectWithTiles(1, 7, 25, 25, 1, 0x4E3, true);
+				_screen->sega_getRenderer()->fillRectWithTiles(1, 6, 21, 1, 5, 0);
+				_screen->setFontStyles(_screen->_currentFont, Font::kStyleNarrow1);
+				_txt->printShadedText(versionString.c_str(), 200 - versionString.size() * 8, _ttlCfg->versionStrYOffs, 0x88);
+				_screen->setFontStyles(_screen->_currentFont, _flags.lang == Common::JA_JPN ? Font::kStyleFixedWidth : Font::kStyleForceTwoByte | Font::kStyleFat);
+			} else {
+				_screen->_curPage = 2;
+				of = _screen->setFont(Screen::FID_6_FNT);
+				_screen->printText(versionString.c_str(), 280 - versionString.size() * 6, 153 + _ttlCfg->versionStrYOffs, _screen->getPagePixel(2, 0, 0), 0);
+				_screen->setFont(of);
+				_screen->fillRect(0, 159 + _ttlCfg->versionStrYOffs, 319, 199, _screen->getPagePixel(2, 0, 0));
 
-			_screen->_curPage = 0;
-			_screen->copyRegion(0, 0, 0, 0, 320, 200, 2, 0, Screen::CR_NO_P_CHECK);
-			_screen->updateScreen();
+				gui_drawBox(_ttlCfg->menu1X, _ttlCfg->menu1Y, _ttlCfg->menu1W, _ttlCfg->menu1H, _ttlCfg->menu1col1, _ttlCfg->menu1col2, _ttlCfg->menu1col3);
+				gui_drawBox(_ttlCfg->menu2X, _ttlCfg->menu2Y, _ttlCfg->menu2W, _ttlCfg->menu2H, _ttlCfg->menu2col1, _ttlCfg->menu2col2, _ttlCfg->menu2col3);
+
+				_screen->_curPage = 0;
+				_screen->copyRegion(0, 0, 0, 0, 320, 200, 2, 0, Screen::CR_NO_P_CHECK);
+				_screen->updateScreen();
+			}
 
 			_allowImport = true;
 			menuChoice = mainMenuLoop();
 			_allowImport = false;
-			}
 
+			if (_flags.platform == Common::kPlatformSegaCD && _flags.lang != Common::JA_JPN)
+				_screen->setFontStyles(_screen->_currentFont, Font::kStyleFat);
+
+			}
 			break;
 
 		case 1:
@@ -2162,11 +2207,11 @@ int EoBEngine::mainMenu() {
 
 		case 2:
 			// create new party
-			if (_flags.platform == Common::kPlatformPC98) {
+			if (_flags.platform == Common::kPlatformPC98 || _flags.platform == Common::kPlatformSegaCD) {
 				_sound->selectAudioResourceSet(kMusicIntro);
 				_sound->loadSoundFile(0);
 				_screen->hideMouse();
-				
+
 				seq_playIntro(kOnlyIntro);
 
 				_screen->showMouse();
@@ -2176,12 +2221,13 @@ int EoBEngine::mainMenu() {
 				_eventList.clear();
 			}
 
-			menuChoice = shouldQuit() ? -5 : -2;
+			menuChoice = shouldQuit() ? -5 : resXtr - 2;
 			break;
 
 		case 3:
-			// quit
-			menuChoice = -5;
+			// Create default party for SegaCD - Quit for all other platforms
+			menuChoice = (_flags.platform == Common::kPlatformSegaCD) ? 2 : -5;
+			resXtr = -2;
 			break;
 
 		case 4:
@@ -2190,7 +2236,7 @@ int EoBEngine::mainMenu() {
 			_sound->loadSoundFile(0);
 			_screen->hideMouse();
 
-			seq_playIntro(_flags.platform == Common::kPlatformPC98 ? kOnlyCredits : kCreditsAndIntro);
+			seq_playIntro(_flags.platform == Common::kPlatformPC98 || _flags.platform == Common::kPlatformSegaCD ? kOnlyCredits : kCreditsAndIntro);
 
 			_screen->showMouse();
 			_sound->selectAudioResourceSet(kMusicIngame);
@@ -2212,23 +2258,44 @@ int EoBEngine::mainMenuLoop() {
 	do {
 		_screen->setScreenDim(28);
 		_gui->simpleMenu_setup(8, 0, _mainMenuStrings, -1, 0, 0);
+		if (_flags.platform == Common::kPlatformSegaCD)
+			_screen->sega_getRenderer()->render(0);
+		_screen->updateScreen();
 
-		while (sel == -1 && !shouldQuit())
+		while (sel == -1 && !shouldQuit()) {
 			sel = _gui->simpleMenu_process(8, _mainMenuStrings, 0, -1, 0);
+			if (_flags.platform == Common::kPlatformSegaCD)
+				_screen->sega_getRenderer()->render(0, 6, 20, 26, 5);
+			_screen->updateScreen();
+		}
 	} while ((sel < 0 || sel > 5) && !shouldQuit());
 
 	return sel + 1;
 }
 
 void EoBEngine::seq_playIntro(int part) {
-	EoBIntroPlayer(this, _screen).start((EoBIntroPlayer::IntroPart)part);
+	if (_flags.platform == Common::kPlatformSegaCD) {
+		if (part == kOnlyCredits)
+			seq_segaOpeningCredits(false);
+		else
+			seq_segaPlaySequence(53, true);
+	} else {
+		EoBIntroPlayer(this, _screen).start((EoBIntroPlayer::IntroPart)part);
+	}
 }
 
 void EoBEngine::seq_playFinale() {
 	if (_flags.platform == Common::kPlatformPC98) {
 		EoBPC98FinalePlayer(this, _screen).start(_xdth);
 		return;
-	} 
+	} else if (_flags.platform == Common::kPlatformSegaCD) {
+		_screen->hideMouse();
+		seq_segaPlaySequence(_xdth ? 55 : 56, true);
+		seq_segaFinalCredits();
+		seq_segaShowStats();
+		snd_stopSound();
+		return;
+	}
 
 	Common::SeekableReadStream *s = _res->createReadStream("TEXT.DAT");
 	_screen->loadFileDataToPage(s, 5, 32000);
@@ -2272,44 +2339,76 @@ void EoBEngine::seq_playFinale() {
 }
 
 void EoBEngine::seq_xdeath() {
-	uint8 *shapes1[5];
+	uint8 *shapes1[4];
 	uint8 *shapes2;
+	memset(shapes1, 0, sizeof(shapes1));
 	_xdth = true;
+	_totalEnemiesKilled++;
 
-	_screen->loadShapeSetBitmap("XDEATH2", 5, 3);
-	for (int i = 0; i < 4; i++)
-		shapes1[i] = _screen->encodeShape(i / 2 * 14, i / 2 * 88, 14, 88, true, _cgaMappingDefault);
-	_screen->loadShapeSetBitmap("XDEATH3", 5, 3);
-	shapes2 = _screen->encodeShape(22, 0, 16, 95, true, _cgaMappingDefault);
-	_screen->loadEoBBitmap("XDEATH1", _cgaMappingDefault, 5, 3, -1);
-	_screen->convertPage(3, 2, _cgaMappingDefault);
-	_screen->setCurPage(0);
+	if (_flags.platform == Common::kPlatformSegaCD) {
+		_screen->sega_selectPalette(57, 2, true);
+		snd_stopSound();
+		uint8 *in = _res->fileData("XD", 0);
+		_sceneShakeCountdown = 1;
 
-	for (int i = 0; i < 10; i++) {
-		if (i == 2)
-			snd_playSoundEffect(72);
-		else if (i == 4 || i == 6)
-			snd_playSoundEffect(54);
-		else
-			snd_playSoundEffect(34);
-
-		if (i < 6) {
-			_screen->copyRegion((i % 3) * 104, i / 3 * 88, 32, 10, 104, 88, 2, 0, Screen::CR_NO_P_CHECK);
-		} else {
-			snd_playSoundEffect(42);
-			_screen->drawShape(0, shapes1[i - 6], 32, 10, 0);
+		snd_playSoundEffect(0x502d);
+		for (int i = 0; i < 10 && !shouldQuit(); i++) {
+			uint32 del = _system->getMillis() + 4 * _tickLength;
+			shapes2 = _screen->sega_convertShape(in + 6144 + i * 4928, 112, 88, 2);
+			_screen->copyBlockToPage(2, 0, 0, 176, 120, _sceneWindowBuffer);
+			drawDecorations(13);
+			_screen->copyRegion(0, 0, 0, 0, 176, 120, 2, 0, Screen::CR_NO_P_CHECK);
+			_screen->drawShape(0, shapes2, 32, 10, 0);
+			_screen->updateScreen();
+			updateAnimTimers();
+			delete[] shapes2;
+			for (uint32 cur = _system->getMillis(); cur < del; cur = _system->getMillis()) {
+				updateAnimTimers();
+				delay(MIN<uint32>(8, del - cur));
+			}
 		}
 
-		_screen->updateScreen();
-		delay(4 * _tickLength);
+		snd_playSoundEffect(0x500e);
+		shapes2 = _screen->sega_convertShape(in, 128, 96, 2);
+		delete[] in;
+
+	} else {
+		_screen->loadShapeSetBitmap("XDEATH2", 5, 3);
+		for (int i = 0; i < 4; i++)
+			shapes1[i] = _screen->encodeShape(i / 2 * 14, i / 2 * 88, 14, 88, true, _cgaMappingDefault);
+		_screen->loadShapeSetBitmap("XDEATH3", 5, 3);
+		shapes2 = _screen->encodeShape(22, 0, 16, 95, true, _cgaMappingDefault);
+		_screen->loadEoBBitmap("XDEATH1", _cgaMappingDefault, 5, 3, -1);
+		_screen->convertPage(3, 2, _cgaMappingDefault);
+		_screen->setCurPage(0);
+
+		for (int i = 0; i < 10 && !shouldQuit(); i++) {
+			if (i == 2)
+				snd_playSoundEffect(72);
+			else if (i == 4 || i == 6)
+				snd_playSoundEffect(54);
+			else
+				snd_playSoundEffect(34);
+
+			if (i < 6) {
+				_screen->copyRegion((i % 3) * 104, i / 3 * 88, 32, 10, 104, 88, 2, 0, Screen::CR_NO_P_CHECK);
+			} else {
+				snd_playSoundEffect(42);
+				_screen->drawShape(0, shapes1[i - 6], 32, 10, 0);
+			}
+
+			_screen->updateScreen();
+			delay(4 * _tickLength);
+		}
 	}
 
 	const ScreenDim *dm = _screen->getScreenDim(5);
 	_screen->modifyScreenDim(5, dm->sx, 8, dm->w, dm->h);
 	_screen->copyRegion(0, 0, 0, 0, 176, 120, 0, 5, Screen::CR_NO_P_CHECK);
 
-	for (int i = 0; i < 19; i++) {
-		snd_playSoundEffect(119);
+	for (int i = 0; i < 19 && !shouldQuit(); i++) {
+		if (_flags.platform != Common::kPlatformSegaCD)
+			snd_playSoundEffect(119);
 		_screen->copyRegion(0, 0, 0, 0, 176, 120, 5, 2, Screen::CR_NO_P_CHECK);
 		_screen->drawShape(2, shapes2, 24, i * 5 - 90, 5);
 		_screen->copyRegion(0, 0, 0, 0, 176, 120, 2, 0, Screen::CR_NO_P_CHECK);
@@ -2319,17 +2418,400 @@ void EoBEngine::seq_xdeath() {
 
 	_screen->modifyScreenDim(5, dm->sx, 0, dm->w, dm->h);
 
-	snd_playSoundEffect(5);
+	snd_playSoundEffect(_flags.platform == Common::kPlatformSegaCD ? 0x5002 : 5);
 	delay(60 * _tickLength);
 
 	for (int i = 0; i < 4; i++)
 		delete[] shapes1[i];
 	delete[] shapes2;
 
-	gui_drawPlayField(false);
+	if (_flags.platform == Common::kPlatformSegaCD)
+		_screen->sega_fadeToBlack(7);
+	else
+		gui_drawPlayField(false);
 	gui_drawAllCharPortraitsWithStats();
 }
 
+#define updateScrollState(scrollTable, step) \
+	for (int iii = 0; iii < 228; ++iii) \
+		((int16*)scrollTable)[iii << 1] = ((int16*)scrollTable)[(iii << 1) + 1] = (iii & 1) ? -step : step;
+
+void EoBEngine::seq_segaOpeningCredits(bool jumpToTitle) {
+	uint16 *scrollTable = new uint16[0x200];
+	memset(scrollTable, 0, 0x200 * sizeof(uint16));
+	SegaRenderer *r = _screen->sega_getRenderer();
+
+	r->setPitch(128);
+	r->setPlaneTableLocation(SegaRenderer::kPlaneA, 0xE000);
+	r->setupPlaneAB(1024, 256);
+	r->setHScrollMode(SegaRenderer::kHScroll1PixelRows);
+
+	r->fillRectWithTiles(0, 0, 0, 40, 28, 0);
+	r->fillRectWithTiles(1, 0, 0, 128, 28, 1);
+	r->fillRectWithTiles(1, 0, 0, 40, 28, 1, true);
+	_screen->sega_selectPalette(7, 3, false);
+
+	updateScrollState(scrollTable, 320);
+	r->loadToVRAM(scrollTable, 0x400, 0xD800);
+
+	_sres->loadContainer("CREDIT");
+	Common::SeekableReadStreamEndian *in = _sres->resStreamEndian(1);
+	r->loadStreamToVRAM(in, 32, true);
+	delete in;
+
+	_screen->sega_selectPalette(50, 0, 0);
+	r->render(0);
+
+	_allowSkip = true;
+	resetSkipFlag();
+
+	if (!jumpToTitle)
+		_screen->sega_fadeToNeutral(3);
+
+	for (int i = jumpToTitle ? 8 : 0; i < 8 && !(shouldQuit() || skipFlag()); ++i) {
+		updateScrollState(scrollTable, 320);
+		r->loadToVRAM(scrollTable, 0x400, 0xD800);
+		_screen->sega_selectPalette(i == 3 ? 59 : 50, 0, true);
+
+		in = _sres->resStreamEndian(i);
+		r->loadStreamToVRAM(in, 32, true);
+		delete in;
+
+		r->render(0);
+		_screen->updateScreen();
+
+		_screen->sega_paletteOps(6, 0, 0);
+
+		int mod = 141;
+		for (int ii = 9730; ii > 0 && !(shouldQuit() || skipFlag()); ii -= mod) {
+			uint32 end = _system->getMillis() + 16;
+			updateScrollState(scrollTable, ii / 30);
+			r->loadToVRAM(scrollTable, 0x400, 0xD800);
+			r->render(0);
+			_screen->updateScreen();
+			mod--;
+			delayUntil(end);
+		}
+
+		delay(3000);
+
+		if (i == 7)
+			r->fillRectWithTiles(1, 40, 0, 88, 28, 0, false);
+
+		mod = -1;
+		for (int ii = 0; ii <= 3240 && !(shouldQuit() || skipFlag()); ii += mod) {
+			uint32 end = _system->getMillis() + 16;
+			updateScrollState(scrollTable, ii / 10);
+			r->loadToVRAM(scrollTable, 0x400, 0xD800);
+			r->render(0);
+			_screen->updateScreen();
+			mod++;
+			delayUntil(end);
+		}
+
+		delay(500);
+	}
+
+	delete[] scrollTable;
+	_screen->sega_fadeToBlack(0);
+	r->setPlaneTableLocation(SegaRenderer::kPlaneA, 0xC000);
+	r->setupPlaneAB(512, 512);
+	r->setHScrollMode(SegaRenderer::kHScrollFullScreen);
+	r->memsetVRAM(0xD800, 0, 0x400);
+	r->setPitch(64);
+	_screen->sega_selectPalette(0, 0);
+
+	in = _sres->resStreamEndian(8);
+	r->loadStreamToVRAM(in, 32, true);
+	delete in;
+
+	r->memsetVRAM(0x8C20, 0xCC, 0x700);
+
+	for (int y = 0; y < 28; y += 4) {
+		for (int x = 0; x < 40; x += 4)
+			r->fillRectWithTiles(0, x, y, 8, 7, 0x461, true);
+	}
+	r->fillRectWithTiles(1, 0, 0, 40, 28, 1, true);
+	r->fillRectWithTiles(0, 0, 0, 40, 28, 0);
+	r->render(0);
+	if (!(jumpToTitle || shouldQuit() || skipFlag()))
+		_screen->sega_fadeToNeutral(3);
+
+	while (!(jumpToTitle || shouldQuit() || skipFlag()))
+		delay(20);
+
+	_allowSkip = false;
+	resetSkipFlag();
+
+	r->fillRectWithTiles(1, 0, 19, 40, 9, 1);
+	r->render(0);
+	_screen->sega_fadeToNeutral(3);
+}
+
+void EoBEngine::seq_segaFinalCredits() {
+	if (shouldQuit())
+		return;
+
+	int temp = 0;
+	const uint8 *grid = _staticres->loadRawData(kEoB1CreditsTileGrid, temp);
+	const char *const *strings = _staticres->loadStrings(kEoB1CreditsStrings2, temp);
+	SegaRenderer *r = _screen->sega_getRenderer();
+	_screen->sega_fadeToBlack(0);
+	_screen->sega_selectPalette(7, 3, true);
+	_txt->clearDim(4);
+
+	r->setupPlaneAB(512, 256);
+	r->fillRectWithTiles(0, 0, 0, 40, 28, 0);
+	r->fillRectWithTiles(1, 0, 0, 40, 32, 0);
+	r->fillRectWithTiles(1, 5, 0, 30, 32, 0x600A, true);
+	r->fillRectWithTiles(0, 0, 0, 40, 5, 0x6001);
+	r->fillRectWithTiles(0, 0, 5, 40, 1, 0x6002);
+	r->fillRectWithTiles(0, 0, 22, 40, 1, 0x6003);
+	r->fillRectWithTiles(0, 0, 23, 40, 5, 0x6001);
+	r->memsetVRAM(32, 0xCC, 32);
+	r->loadToVRAM(grid, 64, 64);
+	r->memsetVRAM(0x140, 0, 0x7800);
+	r->render(0);
+
+	delay(320);
+
+	_screen->sega_fadeToNeutral(1);
+	ScrollManager *scrMan = new ScrollManager(r);
+	scrMan->setVScrollTimers(0, 1, 0, 4730, 1, 2);
+
+	int skipLines = 0;
+	int curStr = 0;
+	int ln = 30;
+
+	_allowSkip = true;
+	resetSkipFlag();
+
+	for (bool loop = true; loop; loop = !(shouldQuit() || skipFlag())) {
+		for (int i = 0; i < 32; ++i) {
+			uint32 del = _system->getMillis() + 16;
+			scrMan->updateScrollTimers();
+			r->render(0);
+			_screen->updateScreen();
+			delayUntil(del);
+		}
+
+		_screen->sega_clearTextBuffer(0);
+
+		if (!skipLines) {
+			const char *pos = strings[curStr];
+			char c = *pos;
+			if (c == '/') {
+				if (*++pos == 'E')
+					break;
+				skipLines = (int)(*pos - '0');
+				curStr++;
+			} else {
+
+				int styles = _flags.lang == Common::JA_JPN ? Font::kStyleFixedWidth : Font::kStyleForceTwoByte | Font::kStyleFat;
+				//int extraSpacing = 6;
+
+				if (c == '<') {
+					styles |= Font::kStyleNarrow1;
+					//extraSpacing = 4;
+					pos++;
+				}
+				if (c == ';')
+					pos++;
+
+				_screen->setFontStyles(_screen->_currentFont, styles);
+				_txt->printShadedText(pos, 120 - (_screen->getTextWidth(pos) >> 1), 0, 0xFF, 0xCC, -1, -1, 0, false);
+				curStr++;
+			}
+		} else {
+			skipLines--;
+		}
+
+		_screen->sega_loadTextBufferToVRAM(0, (ln * 30 + 10) << 5, 1920);
+
+		ln += 2;
+		if (ln == 32)
+			ln = 0;
+	}
+
+	_screen->sega_fadeToBlack(1);
+
+	_screen->setFontStyles(_screen->_currentFont, _flags.lang == Common::JA_JPN ? Font::kStyleFixedWidth : Font::kStyleFat);
+	r->setupPlaneAB(512, 512);
+	scrMan->setVScrollTimers(0, 1, 0, 0, 1, 0);
+	scrMan->updateScrollTimers();
+	delete scrMan;
+
+	r->fillRectWithTiles(0, 0, 0, 40, 28, 0);
+	r->fillRectWithTiles(1, 0, 0, 40, 28, 0);
+	r->fillRectWithTiles(0, 14, 9, 12, 8, 0x45A0, true);
+	r->render(0);
+
+	_screen->sega_fadeToNeutral(3);
+
+	while (!(shouldQuit() || skipFlag()))
+		delay(20);
+
+	_allowSkip = false;
+	resetSkipFlag();
+
+	_screen->sega_fadeToBlack(3);
+}
+
+void EoBEngine::seq_segaShowStats() {
+	if (shouldQuit())
+		return;
+
+	SegaRenderer *r = _screen->sega_getRenderer();
+	_txt->clearDim(5);
+
+	int styles = _flags.lang == Common::JA_JPN ? Font::kStyleFixedWidth : Font::kStyleForceTwoByte | Font::kStyleFat;
+	int cs = _screen->setFontStyles(_screen->_currentFont, styles);
+
+	_txt->printShadedText(_finBonusStrings[2], 90, 8, 0xFF, 0x00, -1, -1, 0, false);
+
+	styles |= Font::kStyleNarrow2;
+	_screen->setFontStyles(_screen->_currentFont, styles);
+
+	_txt->printShadedText(_finBonusStrings[3], 48, 28, 0xFF, 0x00, -1, -1, 0, false);
+	_txt->printShadedText(_finBonusStrings[4], 48, 40, 0xFF, 0x00, -1, -1, 0, false);
+	_txt->printShadedText(_finBonusStrings[5], 48, 52, 0xFF, 0x00, -1, -1, 0, false);
+	_txt->printShadedText(_finBonusStrings[6], 48, 64, 0xFF, 0x00, -1, -1, 0, false);
+	_txt->printShadedText(_finBonusStrings[7], 48, 76, 0xFF, 0x00, -1, -1, 0, false);
+	_txt->printShadedText(_finBonusStrings[8], 48, 88, 0xFF, 0x00, -1, -1, 0, false);
+
+	styles &= ~(Font::kStyleNarrow2);
+	_screen->setFontStyles(_screen->_currentFont, styles);
+
+	uint32 partyArrows = countArrows();
+	uint32 numMaps = countMaps();
+	uint32 specialSearches = 0;
+	for (int i = 1; i <= 12; ++i) {
+		if (checkScriptFlags(1 << i))
+			++specialSearches;
+	}
+
+	_txt->printShadedText(Common::String::format("%u:%02u:%02u", _totalPlaySecs / 3600, (_totalPlaySecs % 3600) / 60, (_totalPlaySecs % 3600) % 60).c_str(), 148, 28, 0xFF, 0x00, -1, -1, 0, false);
+	_txt->printShadedText(Common::String::format("%u", _totalEnemiesKilled).c_str(), 148, 40, 0xFF, 0x00, -1, -1, 0, false);
+	_txt->printShadedText(Common::String::format("%u", _totalSteps).c_str(), 148, 52, 0xFF, 0x00, -1, -1, 0, false);
+	_txt->printShadedText(Common::String::format("%u(%u%%)", partyArrows, partyArrows * 100 / 26).c_str(), 148, 64, 0xFF, 0x00, -1, -1, 0, false);
+	_txt->printShadedText(Common::String::format("%u(%u%%)", numMaps, numMaps * 100 / 12).c_str(), 148, 76, 0xFF, 0x00, -1, -1, 0, false);
+	_txt->printShadedText(Common::String::format("%u(%u%%)", specialSearches, specialSearches * 100 / 12).c_str(), 148, 88, 0xFF, 0x00, -1, -1, 0, false);
+
+	if (checkScriptFlags(0x1FFE)) {
+		const char pwgen[] = "A15BZFQ3CDXYEKNM279GHIUSJLR84P6T";
+		const uint8 pwAdd[5] = { 0, 13, 3, 7, 0 };
+		char password[7] = "\0\0\0\0\0\0";
+
+		uint8 v = 0;
+		for (int i = 0; i < 5; i++) {
+			password[i] = pwgen[(_characters[i].hitPointsCur + pwAdd[i]) & 0x1F];
+			v = (v + (uint8)password[i]) & 0x1F;
+		}
+		password[5] = pwgen[v];
+
+		_txt->printShadedText(_finBonusStrings[0], 30, 108, 0x22, 0x00, -1, -1, 0, false);
+		_txt->printShadedText(_finBonusStrings[1], 30, 132, 0x22, 0x00, -1, -1, 0, false);
+		_txt->printShadedText(password, 140, 156, 0xFF, 0x00, -1, -1, 0, false);
+	}
+
+	_screen->sega_loadTextBufferToVRAM(0, 32, 28160);
+	r->fillRectWithTiles(0, 0, 0, 40, 28, 0);
+	r->fillRectWithTiles(1, 0, 0, 40, 28, 0);
+	r->fillRectWithTiles(0, 0, 3, 40, 22, 0x4001, true);
+	r->render(0);
+
+	// This is a custom palette that gets loaded at the beginning of the ending sequence.
+	// Aborting that sequence too early might lead to wrong colors here...
+	_screen->sega_selectPalette(36, 2);
+	_screen->sega_fadeToNeutral(3);
+
+	resetSkipFlag();
+	_allowSkip = true;
+
+	while (!(shouldQuit() || skipFlag()))
+		delay(20);
+
+	_allowSkip = false;
+	resetSkipFlag();
+
+	_screen->setFontStyles(_screen->_currentFont, cs);
+	_screen->sega_fadeToBlack(3);
+}
+
+void EoBEngine::seq_segaSetupSequence(int sequenceId) {
+	if (_flags.platform != Common::kPlatformSegaCD || sequenceId == -1)
+		return;
+
+	if (sequenceId != 53 && sequenceId != 54) {
+		gui_resetAnimations();
+		for (int i = 0; i < 6; i++) {
+			_characters[i].damageTaken = 0;
+			_characters[i].slotStatus[0] = _characters[i].slotStatus[1] = 0;
+			gui_drawCharPortraitWithStats(i);
+		}
+	}
+
+	_screen->sega_fadeToBlack(1);
+	_screen->clearPage(0);
+
+	// transposeScreenOutputY(0);
+	_screen->sega_getRenderer()->setupWindowPlane(0, (sequenceId == 53 || sequenceId == 54) ? 23 : 18, SegaRenderer::kWinToRight, SegaRenderer::kWinToBottom);
+	_screen->sega_getRenderer()->memsetVRAM(0xD840, 0xEE, 512);
+	_screen->sega_getAnimator()->clearSprites();
+	_screen->setScreenDim(2);
+}
+
+void EoBEngine::seq_segaRestoreAfterSequence() {
+	if (_flags.platform != Common::kPlatformSegaCD)
+		return;
+
+	SegaRenderer *r = _screen->sega_getRenderer();
+	_screen->sega_fadeToBlack(1);
+	_screen->sega_getAnimator()->clearSprites();
+	_screen->sega_getAnimator()->update();
+	r->setupWindowPlane(0, 0, SegaRenderer::kWinToLeft, SegaRenderer::kWinToTop);
+	r->fillRectWithTiles(0, 0, 0, 40, 28, 0x2000);
+	r->fillRectWithTiles(1, 0, 0, 40, 28, 0x2000);
+	r->writeUint16VSRAM(0, 0);
+	r->writeUint16VSRAM(2, 0);
+	r->writeUint16VRAM(0xD800, 0);
+	r->writeUint16VRAM(0xD802, 0);
+	_screen->clearPage(0);
+}
+
+bool EoBEngine::seq_segaPlaySequence(int sequenceId, bool setupScreen) {
+	if (_flags.platform != Common::kPlatformSegaCD)
+		return true;
+
+	uint32 startTime = _system->getMillis();
+	_allowSkip = true;
+	resetSkipFlag();
+
+	if (setupScreen)
+		seq_segaSetupSequence(sequenceId);
+
+	_allowSkip = false;
+	resetSkipFlag();
+
+	if (!_seqPlayer->play(sequenceId))
+		return false;
+
+	if (setupScreen)
+		seq_segaRestoreAfterSequence();
+
+	_totalPlaySecs += ((_system->getMillis() - startTime) / 1000);
+
+	return true;
+}
+
+void EoBEngine::seq_segaPausePlayer(bool pause) {
+	if (_flags.platform != Common::kPlatformSegaCD)
+		return;
+	if (_seqPlayer)
+		_seqPlayer->pause(pause);
+}
+
+#undef updateScrollState
 #undef displaySubtitle
 #undef printSub
 

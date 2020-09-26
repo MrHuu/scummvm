@@ -99,6 +99,7 @@ protected:
 
 	// Engine APIs
 	Common::Error run() override;
+	void pauseEngineIntern(bool pause) override;
 
 	bool hasFeature(EngineFeature f) const override;
 
@@ -110,6 +111,7 @@ protected:
 
 public:
 	void waitForInput();
+	bool isWaitingForInput() { return _waitingForInput; }
 
 	Graphics::PixelFormat _pixelFormat;
 	bool _spookyMode;

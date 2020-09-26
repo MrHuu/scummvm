@@ -53,6 +53,7 @@ const struct GameOpt {
 	{ GUIO_MIDIAPPLEIIGS,"midiAppleIIgs" },
 	{ GUIO_MIDITOWNS,    "midiTowns" },
 	{ GUIO_MIDIPC98,     "midiPC98" },
+	{ GUIO_MIDISEGACD,   "midiSegaCD" },
 	{ GUIO_MIDIMT32,     "midiMt32" },
 	{ GUIO_MIDIGM,       "midiGM" },
 
@@ -128,12 +129,7 @@ const String getGameGUIOptionsDescription(const String &options) {
 
 void updateGameGUIOptions(const String &options, const String &langOption) {
 	const String newOptionString = getGameGUIOptionsDescription(options) + " " + langOption;
-
-	if ((!options.empty() && !ConfMan.hasKey("guioptions")) ||
-	    (ConfMan.hasKey("guioptions") && ConfMan.get("guioptions") != newOptionString)) {
-		ConfMan.set("guioptions", newOptionString);
-		ConfMan.flushToDisk();
-	}
+	ConfMan.setAndFlush("guioptions", newOptionString);
 }
 
 

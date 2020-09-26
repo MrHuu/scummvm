@@ -34,16 +34,16 @@ class TargetedAnimProcess : public ActorAnimProcess {
 public:
 	TargetedAnimProcess();
 	//! note: this probably needs some more parameters
-	TargetedAnimProcess(Actor *actor, Animation::Sequence action, uint32 dir,
+	TargetedAnimProcess(Actor *actor, Animation::Sequence action, Direction dir,
 	                    int32 coords[3]);
 
 	// p_dynamic_cast stuff
 	ENABLE_RUNTIME_CLASSTYPE()
 
 	bool loadData(Common::ReadStream *rs, uint32 version);
-protected:
 	void saveData(Common::WriteStream *ws) override;
 
+protected:
 	bool init() override;
 
 	int32 _x, _y, _z;

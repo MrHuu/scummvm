@@ -36,14 +36,16 @@ public:
 	void walk(int x, int y);
 	void stopWalk();
 	void updateWalk();
-	void setReactionAfterWalk(uint index, QReaction **reaction, QMessageObject *sender, bool deleteReaction);
+	void setReactionAfterWalk(uint index, QReaction *reaction, QMessageObject *sender, bool deleteReaction);
 
 	void draw() override;
+	bool isInPoint(Common::Point p) override;
 	void update(int time) override;
-	void setPos(int x, int y) override;
+	void setPos(Common::Point p, bool ) override;
 
-	double calcSmth(int y);
+	double calcPerspective(int y);
 
+	void updateZ() override;
 
 public:
 	int _field7C;
@@ -51,9 +53,9 @@ public:
 	int _surfH;
 	int _x_;
 	int _y_;
-	int _surfId;
+	// int _surfId;
 	int _imageId;
-	double _field98;
+	double _k;
 	// walkObj
 	int _destX;
 	int _destY;

@@ -206,6 +206,9 @@ LoLEngine::LoLEngine(OSystem *system, const GameFlags &flags) : KyraRpgEngine(sy
 	_scriptCharacterCycle = 0;
 	_partyDamageFlags = -1;
 
+	_floatingCursorsEnabled = _autoSaveNamesEnabled = false;
+	_smoothScrollingEnabled = true;
+
 	memset(&_itemScript, 0, sizeof(_itemScript));
 }
 
@@ -461,92 +464,25 @@ Common::Error LoLEngine::init() {
 }
 
 Common::KeymapArray LoLEngine::initKeymaps() {
-	Common::Keymap *engineKeyMap = new Common::Keymap(Common::Keymap::kKeymapTypeGame, kKeymapName, "Lands of Lore");
+	Common::Keymap *keyMap = new Common::Keymap(Common::Keymap::kKeymapTypeGame, kKeymapName, "Lands of Lore");
 
-	Common::Action *act;
+	addKeymapAction(keyMap, "LCLK", _("Interact via Left Click"), &Common::Action::setLeftClickEvent, "MOUSE_LEFT", "JOY_A");
+	addKeymapAction(keyMap, "RCLK", _("Interact via Right Click"), &Common::Action::setRightClickEvent, "MOUSE_RIGHT", "JOY_B");
+	addKeymapAction(keyMap, "AT1", _("Attack 1"), Common::KeyState(Common::KEYCODE_F1, Common::ASCII_F1), "F1", "JOY_X");
+	addKeymapAction(keyMap, "AT2", _("Attack 2"), Common::KeyState(Common::KEYCODE_F2, Common::ASCII_F2), "F2", "JOY_Y");
+	addKeymapAction(keyMap, "AT3", _("Attack 3"), Common::KeyState(Common::KEYCODE_F3, Common::ASCII_F3), "F3", "JOY_LEFT_SHOULDER");
+	addKeymapAction(keyMap, "MAP", _("Show Map"), Common::KeyState(Common::KEYCODE_m, 'm'), "m", "");
+	addKeymapAction(keyMap, "MVF", _("Move Forward"), Common::KeyState(Common::KEYCODE_UP), "UP", "JOY_UP");
+	addKeymapAction(keyMap, "MVB", _("Move Back"), Common::KeyState(Common::KEYCODE_DOWN), "DOWN", "JOY_DOWN");
+	addKeymapAction(keyMap, "SLL", _("Slide Left"), Common::KeyState(Common::KEYCODE_LEFT), "LEFT", "JOY_LEFT_TRIGGER");
+	addKeymapAction(keyMap, "SLR", _("Slide Right"), Common::KeyState(Common::KEYCODE_RIGHT), "RIGHT", "JOY_RIGHT_TRIGGER");
+	addKeymapAction(keyMap, "TL", _("Turn Left"), Common::KeyState(Common::KEYCODE_HOME), "HOME", "JOY_LEFT");
+	addKeymapAction(keyMap, "TR", _("Turn Right"), Common::KeyState(Common::KEYCODE_PAGEUP), "PAGEUP", "JOY_RIGHT");
+	addKeymapAction(keyMap, "RST", _("Rest"), Common::KeyState(Common::KEYCODE_r, 'r'), "r", "");
+	addKeymapAction(keyMap, "OPT", _("Options"), Common::KeyState(Common::KEYCODE_o, 'o'), "o", "");
+	addKeymapAction(keyMap, "SPL", _("Choose Spell"), Common::KeyState(Common::KEYCODE_SLASH, '/'), "SLASH", "");
 
-	act = new Common::Action("LCLK", _("Interact via Left Click"));
-	act->setLeftClickEvent();
-	act->addDefaultInputMapping("MOUSE_LEFT");
-	act->addDefaultInputMapping("JOY_A");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("RCLK", _("Interact via Right Click"));
-	act->setRightClickEvent();
-	act->addDefaultInputMapping("MOUSE_RIGHT");
-	act->addDefaultInputMapping("JOY_B");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("AT1", _("Attack 1"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_F1, Common::ASCII_F1));
-	act->addDefaultInputMapping("F1");
-	act->addDefaultInputMapping("JOY_X");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("AT2", _("Attack 2"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_F2, Common::ASCII_F2));
-	act->addDefaultInputMapping("F2");
-	act->addDefaultInputMapping("JOY_Y");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("AT3", _("Attack 3"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_F3, Common::ASCII_F3));
-	act->addDefaultInputMapping("F3");
-	act->addDefaultInputMapping("JOY_LEFT_SHOULDER");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("MVF", _("Move Forward"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_UP));
-	act->addDefaultInputMapping("UP");
-	act->addDefaultInputMapping("JOY_UP");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("MVB", _("Move Back"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_DOWN));
-	act->addDefaultInputMapping("DOWN");
-	act->addDefaultInputMapping("JOY_DOWN");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("SLL", _("Slide Left"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_LEFT));
-	act->addDefaultInputMapping("LEFT");
-	act->addDefaultInputMapping("JOY_LEFT_TRIGGER");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("SLR", _("Slide Right"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_RIGHT));
-	act->addDefaultInputMapping("RIGHT");
-	act->addDefaultInputMapping("JOY_RIGHT_TRIGGER");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("TL", _("Turn Left"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_HOME));
-	act->addDefaultInputMapping("HOME");
-	act->addDefaultInputMapping("JOY_LEFT");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("TR", _("Turn Right"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_PAGEUP));
-	act->addDefaultInputMapping("PAGEUP");
-	act->addDefaultInputMapping("JOY_RIGHT");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("RST", _("Rest"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_r, 'r'));
-	act->addDefaultInputMapping("r");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("OPT", _("Options"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_o, 'o'));
-	act->addDefaultInputMapping("o");
-	engineKeyMap->addAction(act);
-
-	act = new Common::Action("SPL", _("Choose Spell"));
-	act->setKeyEvent(Common::KeyState(Common::KEYCODE_SLASH, '/'));
-	act->addDefaultInputMapping("SLASH");
-	engineKeyMap->addAction(act);
-
-	return Common::Keymap::arrayOf(engineKeyMap);
+	return Common::Keymap::arrayOf(keyMap);
 }
 
 void LoLEngine::pauseEngineIntern(bool pause) {
@@ -946,7 +882,7 @@ void LoLEngine::runLoop() {
 		if (_sceneUpdateRequired)
 			gui_drawScene(0);
 		else
-			updateEnvironmentalSfx(0);
+			snd_updateEnvironmentalSfx(0);
 
 		if (_partyDamageFlags != -1) {
 			checkForPartyDeath();
@@ -965,12 +901,14 @@ void LoLEngine::registerDefaultSettings() {
 	ConfMan.registerDefault("floating_cursors", false);
 	ConfMan.registerDefault("smooth_scrolling", true);
 	ConfMan.registerDefault("monster_difficulty", 1);
+	ConfMan.registerDefault("auto_savenames", false);
 }
 
 void LoLEngine::writeSettings() {
 	ConfMan.setInt("monster_difficulty", _monsterDifficulty);
 	ConfMan.setBool("floating_cursors", _floatingCursorsEnabled);
 	ConfMan.setBool("smooth_scrolling", _smoothScrollingEnabled);
+	ConfMan.setBool("auto_savenames", _autoSaveNamesEnabled);
 
 	switch (_lang) {
 	case 1:
@@ -1005,6 +943,7 @@ void LoLEngine::readSettings() {
 	}
 	_smoothScrollingEnabled = ConfMan.getBool("smooth_scrolling");
 	_floatingCursorsEnabled = ConfMan.getBool("floating_cursors");
+	_autoSaveNamesEnabled = ConfMan.getBool("auto_savenames");
 
 	KyraEngine_v1::readSettings();
 }
@@ -1932,18 +1871,18 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
 
 	if (textEnabled()) {
 		if (mode == 0) {
-			_txt->printDialogueText(3, str, script, paramList, paramIndex);
+			_txt->printDialogueText2(3, str, script, paramList, paramIndex);
 
 		} else if (mode == 1) {
 			_txt->clearDim(4);
 			_screen->modifyScreenDim(4, 16, 123, 23, 47);
-			_txt->printDialogueText(4, str, script, paramList, paramIndex);
+			_txt->printDialogueText2(4, str, script, paramList, paramIndex);
 			_screen->modifyScreenDim(4, 11, 123, 28, 47);
 
 		} else if (mode == 2) {
 			_txt->clearDim(4);
 			_screen->modifyScreenDim(4, 9, 133, 30, 60);
-			_txt->printDialogueText(4, str, script, paramList, 3);
+			_txt->printDialogueText2(4, str, script, paramList, 3);
 			_screen->modifyScreenDim(4, 1, 133, 37, 60);
 		}
 	}

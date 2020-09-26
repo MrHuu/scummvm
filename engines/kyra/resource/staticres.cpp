@@ -39,7 +39,7 @@
 
 namespace Kyra {
 
-#define RESFILE_VERSION 96
+#define RESFILE_VERSION 103
 
 namespace {
 bool checkKyraDat(Common::SeekableReadStream *file) {
@@ -106,6 +106,7 @@ const IndexTable iPlatformTable[] = {
 	{ Common::kPlatformAmiga, 1 },
 	{ Common::kPlatformFMTowns, 2 },
 	{ Common::kPlatformPC98, 3 },
+	{ Common::kPlatformSegaCD, 4 },
 	{ Common::kPlatformMacintosh, 0 }, // HACK: Should be type "4", but as long as we can't extract Macintosh data, we need to use DOS data.
 	{ -1, -1 }
 };
@@ -952,7 +953,7 @@ void KyraEngine_LoK::loadMainScreen(int page) {
 		_screen->loadBitmap("MAIN15.CPS", page, page, &_screen->getPalette(0));
 	else if (_flags.lang == Common::EN_ANY || _flags.lang == Common::JA_JPN || (_flags.isTalkie && _flags.lang == Common::IT_ITA))
 		_screen->loadBitmap("MAIN_ENG.CPS", page, page, 0);
-	else if (_flags.lang == Common::FR_FRA)
+	else if (_flags.lang == Common::FR_FRA || (_flags.lang == Common::ES_ESP && _flags.isTalkie)  /* Spanish fan made over French CD version */ )
 		_screen->loadBitmap("MAIN_FRE.CPS", page, page, 0);
 	else if (_flags.lang == Common::DE_DEU)
 		_screen->loadBitmap("MAIN_GER.CPS", page, page, 0);

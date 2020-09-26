@@ -158,6 +158,9 @@ void MidiParser_SCI::midiMixChannels() {
 		_track->channels[i].time = 0;
 		_track->channels[i].prev = 0;
 		_track->channels[i].curPos = 0;
+		// Ignore the digital channel data, if it exists - it's not MIDI data
+		if (i == _track->digitalChannelNr)
+			continue;
 		totalSize += _track->channels[i].data.size();
 	}
 
@@ -168,11 +171,12 @@ void MidiParser_SCI::midiMixChannels() {
 	byte midiCommand = 0, midiParam, globalPrev = 0;
 	long newDelta;
 	SoundResource::Channel *channel;
+	bool breakOut = false;
 
 	while ((channelNr = midiGetNextChannel(ticker)) != 0xFF) { // there is still an active channel
 		channel = &_track->channels[channelNr];
 		if (!validateNextRead(channel))
-			goto end;
+			break;
 		curDelta = channel->data[channel->curPos++];
 		channel->time += (curDelta == 0xF8 ? 240 : curDelta); // when the command is supposed to occur
 		if (curDelta == 0xF8)
@@ -180,8 +184,10 @@ void MidiParser_SCI::midiMixChannels() {
 		newDelta = channel->time - ticker;
 		ticker += newDelta;
 
+		if (channelNr == _track->digitalChannelNr)
+			continue;
 		if (!validateNextRead(channel))
-			goto end;
+			break;
 		midiCommand = channel->data[channel->curPos++];
 		if (midiCommand != kEndOfTrack) {
 			// Write delta
@@ -191,13 +197,16 @@ void MidiParser_SCI::midiMixChannels() {
 			}
 			*outData++ = (byte)newDelta;
 		}
+
 		// Write command
 		switch (midiCommand) {
 		case 0xF0: // sysEx
 			*outData++ = midiCommand;
 			do {
-				if (!validateNextRead(channel))
-					goto end;
+				if (!validateNextRead(channel)) {
+					breakOut = true;
+					break;
+				}
 				midiParam = channel->data[channel->curPos++];
 				*outData++ = midiParam;
 			} while (midiParam != 0xF7);
@@ -207,8 +216,10 @@ void MidiParser_SCI::midiMixChannels() {
 			break;
 		default: // MIDI command
 			if (midiCommand & 0x80) {
-				if (!validateNextRead(channel))
-					goto end;
+				if (!validateNextRead(channel)) {
+					breakOut = true;
+					break;
+				}
 				midiParam = channel->data[channel->curPos++];
 			} else {// running status
 				midiParam = midiCommand;
@@ -223,16 +234,20 @@ void MidiParser_SCI::midiMixChannels() {
 				*outData++ = midiCommand;
 			*outData++ = midiParam;
 			if (nMidiParams[(midiCommand >> 4) - 8] == 2) {
-				if (!validateNextRead(channel))
-					goto end;
+				if (!validateNextRead(channel)) {
+					breakOut = true;
+					break;
+				}
 				*outData++ = channel->data[channel->curPos++];
 			}
 			channel->prev = midiCommand;
 			globalPrev = midiCommand;
 		}
+
+		if (breakOut)
+			break;
 	}
 
-end:
 	// Insert stop event
 	*outData++ = 0;    // Delta
 	*outData++ = 0xFF; // Meta event
@@ -383,6 +398,16 @@ void MidiParser_SCI::resetStateTracking() {
 	}
 }
 
+void MidiParser_SCI::initTrack() {
+	if (_soundVersion > SCI_VERSION_0_LATE)
+		return;
+	// Send header data to SCI0 sound drivers. The driver function which parses the header (opcode 3)
+	// seems to be implemented at least in all SCI0_LATE drivers. The things that the individual drivers
+	// do in that init function varies.
+	if (_track->header.byteSize())
+		static_cast<MidiPlayer*>(_driver)->initTrack(_track->header);
+}
+
 void MidiParser_SCI::sendInitCommands() {
 	resetStateTracking();
 
@@ -390,20 +415,12 @@ void MidiParser_SCI::sendInitCommands() {
 	_volume = 127;
 
 	// Set initial voice count
-	if (_pSnd) {
-		if (_soundVersion <= SCI_VERSION_0_LATE) {
-			// Send header data to SCI0 sound drivers. The driver function which parses the header (opcode 3)
-			// seems to be implemented at least in all SCI0_LATE drivers. The things that the individual drivers
-			// do in that init function varies.
-			if (_track->header.byteSize())
-				static_cast<MidiPlayer *>(_driver)->initTrack(_track->header);
-		} else {
-			for (int i = 0; i < _track->channelCount; ++i) {
-				byte voiceCount = _track->channels[i].poly;
-				byte num = _track->channels[i].number;
-				// TODO: Should we skip the control channel?
-				sendToDriver(0xB0 | num, 0x4B, voiceCount);
-			}
+	if (_pSnd && _soundVersion > SCI_VERSION_0_LATE) {
+		for (int i = 0; i < _track->channelCount; ++i) {
+			byte voiceCount = _track->channels[i].poly;
+			byte num = _track->channels[i].number;
+			// TODO: Should we skip the control channel?
+			sendToDriver(0xB0 | num, 0x4B, voiceCount);
 		}
 	}
 

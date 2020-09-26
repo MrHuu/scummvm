@@ -28,7 +28,7 @@
 
 namespace GUI {
 
-EditTextWidget::EditTextWidget(GuiObject *boss, int x, int y, int w, int h, const String &text, const char *tooltip, uint32 cmd, uint32 finishCmd, ThemeEngine::FontStyle font)
+EditTextWidget::EditTextWidget(GuiObject *boss, int x, int y, int w, int h, const U32String &text, const U32String &tooltip, uint32 cmd, uint32 finishCmd, ThemeEngine::FontStyle font)
 	: EditableWidget(boss, x, y - 1, w, h + 2, tooltip, cmd) {
 	setFlags(WIDGET_ENABLED | WIDGET_CLEARBG | WIDGET_RETAIN_FOCUS | WIDGET_WANT_TICKLE);
 	_type = kEditTextWidget;
@@ -40,7 +40,7 @@ EditTextWidget::EditTextWidget(GuiObject *boss, int x, int y, int w, int h, cons
 	_leftPadding = _rightPadding = 0;
 }
 
-EditTextWidget::EditTextWidget(GuiObject *boss, const String &name, const String &text, const char *tooltip, uint32 cmd, uint32 finishCmd, ThemeEngine::FontStyle font)
+EditTextWidget::EditTextWidget(GuiObject *boss, const String &name, const U32String &text, const U32String &tooltip, uint32 cmd, uint32 finishCmd, ThemeEngine::FontStyle font)
 	: EditableWidget(boss, name, tooltip, cmd) {
 	setFlags(WIDGET_ENABLED | WIDGET_CLEARBG | WIDGET_RETAIN_FOCUS | WIDGET_WANT_TICKLE);
 	_type = kEditTextWidget;
@@ -52,7 +52,7 @@ EditTextWidget::EditTextWidget(GuiObject *boss, const String &name, const String
 	_leftPadding = _rightPadding = 0;
 }
 
-void EditTextWidget::setEditString(const String &str) {
+void EditTextWidget::setEditString(const U32String &str) {
 	EditableWidget::setEditString(str);
 	_backupString = str;
 }
@@ -72,21 +72,28 @@ void EditTextWidget::handleMouseDown(int x, int y, int button, int clickCount) {
 	if (_caretVisible)
 		drawCaret(true);
 
-	x += _editScrollOffset;
+	if (g_gui.useRTL()) {
+		x = _w - x;
+	}
 
+	x += _editScrollOffset;
 	int width = 0;
+	if (_drawAlign == Graphics::kTextAlignRight)
+		width = _editScrollOffset + getEditRect().width() - g_gui.getStringWidth(_editString, _font);
+
 	uint i;
 
 	uint last = 0;
 	for (i = 0; i < _editString.size(); ++i) {
 		const uint cur = _editString[i];
 		width += g_gui.getCharWidth(cur, _font) + g_gui.getKerningOffset(last, cur, _font);
-		if (width >= x)
+		if (width >= x && width > _editScrollOffset + _leftPadding)
 			break;
 		last = cur;
 	}
-	if (setCaretPos(i))
-		markAsDirty();
+
+	setCaretPos(i);
+	markAsDirty();
 }
 
 void EditTextWidget::drawWidget() {
@@ -101,7 +108,7 @@ void EditTextWidget::drawWidget() {
 
 	g_gui.theme()->drawText(
 			Common::Rect(_x + 2 + _leftPadding, _y + 1, _x + _leftPadding + getEditRect().width() + 2, _y + _h),
-			_editString, _state, Graphics::kTextAlignLeft, ThemeEngine::kTextInversionNone,
+			_editString, _state, _drawAlign, ThemeEngine::kTextInversionNone,
 			-_editScrollOffset, false, _font, ThemeEngine::kFontColorNormal, true, _textDrawableArea);
 }
 

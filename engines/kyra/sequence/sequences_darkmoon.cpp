@@ -71,7 +71,7 @@ private:
 	OSystem *_system;
 	DarkMoonEngine *_vm;
 	Screen_EoB *_screen;
-	
+
 	struct Config {
 		Config(const char *const *str, const char *const *cpsfiles, const uint8 **cpsdata, const char *const *pal, const DarkMoonShapeDef **shp, const DarkMoonAnimCommand **anim, bool loadScenePalette, bool paletteFading, bool animCmdRestorePalette, bool shapeBackgroundFading, int animPalOffset, int animType1ShapeDim, bool animCmd5SetPalette, int animCmd5ExtraPage) : strings(str), cpsFiles(cpsfiles), cpsData(cpsdata), palFiles(pal), shapeDefs(shp), animData(anim), loadScenePal(loadScenePalette), palFading(paletteFading), animCmdRestorePal(animCmdRestorePalette), shpBackgroundFading(shapeBackgroundFading), animPalOffs(animPalOffset), animCmd1ShapeFrame(animType1ShapeDim), animCmd5SetPal(animCmd5SetPalette), animCmd5AltPage(animCmd5ExtraPage) {}
 		const char *const *strings;
@@ -89,7 +89,7 @@ private:
 		bool animCmd5SetPal;
 		int animCmd5AltPage;
 	};
-	
+
 	const Config *_config;
 
 	Palette *_palettes[13];
@@ -207,9 +207,12 @@ int DarkMoonEngine::mainMenuLoop() {
 	do {
 		_screen->setScreenDim(6);
 		_gui->simpleMenu_setup(6, 0, _mainMenuStrings, -1, 0, 0);
+		_screen->updateScreen();
 
-		while (sel == -1 && !shouldQuit())
+		while (sel == -1 && !shouldQuit()) {
 			sel = _gui->simpleMenu_process(6, _mainMenuStrings, 0, -1, 0);
+			_screen->updateScreen();
+		}
 	} while ((sel < 0 || sel > 5) && !shouldQuit());
 
 	if (_flags.platform == Common::kPlatformFMTowns && sel == 2) {
@@ -225,8 +228,11 @@ void DarkMoonEngine::townsUtilitiesMenu() {
 	int sel = -1;
 	do {
 		_gui->simpleMenu_setup(8, 0, _utilMenuStrings, -1, 0, 0);
-		while (sel == -1 && !shouldQuit())
+		_screen->updateScreen();
+		while (sel == -1 && !shouldQuit()) {
 			sel = _gui->simpleMenu_process(8, _utilMenuStrings, 0, -1, 0);
+			_screen->updateScreen();
+		}
 		if (sel == 0) {
 			_config2431 ^= true;
 			sel = -1;
@@ -298,7 +304,7 @@ void DarkMoonEngine::seq_playIntro() {
 	_screen->setCurPage(2);
 	_screen->setClearScreenDim(17);
 	_screen->setCurPage(0);
-	
+
 	sq.animCommand(_flags.platform == Common::kPlatformAmiga ? 38 : (_configRenderMode == Common::kRenderEGA ? 41 : 40));
 	sq.animCommand(7, 18);
 
@@ -373,7 +379,7 @@ void DarkMoonEngine::seq_playIntro() {
 	sq.animCommand(_flags.platform == Common::kPlatformAmiga ? 12 : 13);
 	_screen->copyRegion(104, 16, 96, 8, 120, 100, 0, 2, Screen::CR_NO_P_CHECK);
 	sq.fadeText();
-	
+
 	if (_flags.platform == Common::kPlatformAmiga)
 		sq.animCommand(9);
 
@@ -839,7 +845,7 @@ void DarkMoonEngine::seq_playFinale() {
 	sq.delay(54);
 	sq.fadeText();
 	sq.loadScene(12, 2);
-	
+
 	sq.waitForSongNotifier(5);
 
 	if (!skipFlag() && !shouldQuit())
@@ -940,9 +946,9 @@ void DarkMoonEngine::seq_playFinale() {
 
 	int temp = 0;
 	const uint8 *creditsData = (_flags.platform != Common::kPlatformDOS) ? _res->fileData("CREDITS.TXT", 0) : _staticres->loadRawData(kEoB2CreditsData, temp);
-	
+
 	seq_playCredits(&sq, creditsData, 18, 2, 6, 2);
-	
+
 	if (_flags.platform != Common::kPlatformDOS)
 		delete[] creditsData;
 
@@ -1168,7 +1174,7 @@ void DarkmoonSequenceHelper::loadScene(int index, int pageNum, bool ignorePalett
 		file = _config->cpsFiles[index];
 		s = _vm->resource()->createReadStream(file);
 	}
-	
+
 	if (s) {
 		chunkID = s->readUint32LE();
 		s->seek(0);
@@ -1178,7 +1184,7 @@ void DarkmoonSequenceHelper::loadScene(int index, int pageNum, bool ignorePalett
 		// Tolerance for diffenrences up to 2 bytes is needed in some cases
 		if ((((int32)(chunkID & 0xFFFF) + 5) & ~3) != (((s->size()) + 3) & ~3))
 			isRawData = true;
-	} else if (file.firstChar() == 'X') {
+	} else if (file.firstChar() == 'X' && _vm->gameFlags().lang == Common::DE_DEU) {
 		isRawData = true;
 	}
 
@@ -1453,12 +1459,17 @@ void DarkmoonSequenceHelper::printText(int index, int color) {
 }
 
 void DarkmoonSequenceHelper::fadeText() {
-	int rate = _vm->skipFlag() || _vm->shouldQuit() ? 16 : 8;
-	if (_vm->gameFlags().platform == Common::kPlatformAmiga)
-		_screen->fadeTextColor(_palettes[0], 31, rate);
-	else if (_vm->_configRenderMode != Common::kRenderEGA)
-		_screen->fadeTextColor(_palettes[0], 255, rate);
-	
+	uint8 col = _vm->gameFlags().platform == Common::kPlatformAmiga ? 31 : 255;
+
+	if (_vm->skipFlag() || _vm->shouldQuit()) {
+		_screen->clearCurDim();
+		_screen->setPaletteIndex(col, 0, 0, 0);
+		return;
+	}
+
+	if (_vm->_configRenderMode != Common::kRenderEGA)
+		_screen->fadeTextColor(_palettes[0], col, 8);
+
 	memset(_textColor, 0, 3);
 	_screen->clearCurDim();
 }

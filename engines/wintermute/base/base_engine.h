@@ -66,6 +66,7 @@ enum WMETargetExecutable {
 	WME_1_7_1,  // DEAD:CODE 2007
 	WME_1_7_2,  // DEAD:CODE 2007
 	WME_1_7_3,  // DEAD:CODE 2007
+	WME_1_7_93, // DEAD:CODE 2007
 	WME_1_7_94, // DEAD:CODE 2007
 	WME_1_8_0,  // DEAD:CODE 2007
 	WME_1_8_1,  // DEAD:CODE 2007
@@ -174,6 +175,7 @@ public:
 	bool isFoxTail(WMETargetExecutable v1=FOXTAIL_OLDEST_VERSION, WMETargetExecutable v2=FOXTAIL_LATEST_VERSION) const {
 		return isFoxTailCheck(_targetExecutable, v1, v2);
 	}
+	void addFlags(uint32 flags) { _flags |= flags; }
 };
 
 } // End of namespace Wintermute

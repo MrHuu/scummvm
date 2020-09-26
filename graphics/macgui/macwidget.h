@@ -26,6 +26,7 @@
 #include "common/array.h"
 #include "common/events.h"
 #include "common/rect.h"
+#include "graphics/managed_surface.h"
 
 namespace Common {
 	struct Event;
@@ -34,12 +35,12 @@ namespace Common {
 namespace Graphics {
 
 class ManagedSurface;
+class MacWindowManager;
 
 class MacWidget {
-	friend class MacEditableText;
 
 public:
-	MacWidget(MacWidget *parent, int x, int y, int w, int h, bool focusable);
+	MacWidget(MacWidget *parent, int x, int y, int w, int h, MacWindowManager *wm, bool focusable, uint16 border = 0, uint16 gutter = 0, uint16 shadow = 0, uint fgcolor = 0, uint bgcolor= 0xff);
 	virtual ~MacWidget();
 
 	/**
@@ -47,8 +48,6 @@ public:
 	 * @return Dimensions of the widget relative to the parent's position.
 	 */
 	const Common::Rect &getDimensions() { return _dims; }
-
-	bool isFocusable() { return _focusable; }
 
 	/**
 	 * Method for indicating whether the widget is active or inactive.
@@ -63,11 +62,16 @@ public:
 	 */
 	void setDirty(bool dirty) { _contentIsDirty = dirty; }
 
-	virtual bool draw(ManagedSurface *g, bool forceRedraw = false) = 0;
-	virtual bool draw(bool forceRedraw = false) = 0;
-	virtual void blit(ManagedSurface *g, Common::Rect &dest) = 0;
-	virtual bool processEvent(Common::Event &event) = 0;
+	virtual bool needsRedraw() { return _contentIsDirty; }
+
+	virtual bool draw(ManagedSurface *g, bool forceRedraw = false);
+	virtual bool draw(bool forceRedraw = false);
+	virtual void blit(ManagedSurface *g, Common::Rect &dest);
+	virtual bool processEvent(Common::Event &event);
 	virtual bool hasAllFocus() { return _active; }
+	virtual bool isEditable() { return _editable; }
+
+	virtual void setColors(uint32 fg, uint32 bg);
 
 	virtual void setDimensions(const Common::Rect &r) {
 		_dims = r;
@@ -81,15 +85,25 @@ public:
 	Graphics::ManagedSurface *getSurface() { return _composeSurface; }
 
 protected:
-	bool _focusable;
-	bool _contentIsDirty;
-	bool _active;
+	uint16 _border;
+	uint16 _gutter;
+	uint16 _shadow;
 
-	Common::Rect _dims;
+	uint32 _fgcolor, _bgcolor;
 
 	Graphics::ManagedSurface *_composeSurface;
 
+	bool _contentIsDirty;
+
 public:
+	bool _focusable;
+	bool _active;
+	bool _editable;
+	uint _priority;
+
+	Common::Rect _dims;
+
+	MacWindowManager *_wm;
 	MacWidget *_parent;
 	Common::Array<MacWidget *> _children;
 };

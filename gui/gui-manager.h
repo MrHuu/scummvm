@@ -75,6 +75,11 @@ public:
 	// until no dialogs are active anymore.
 	void runLoop();
 
+	// If the GUI loop is running close all the dialogs causing the loop to finish.
+	// Typically you may want to use it after setting the ConfMan active domain to
+	// a game domain to cause the game to start.
+	void exitLoop();
+
 	void processEvent(const Common::Event &event, Dialog *const activeDialog);
 	Common::Keymap *getKeymap() const;
 	void scheduleTopDialogRedraw();
@@ -89,9 +94,16 @@ public:
 	int getWidth() const { return _width; }
 	int getHeight() const { return _height; }
 
+	bool useRTL() const { return _useRTL; }
+	void setLanguageRTL();
+
+	void setDialogPaddings(int l, int r);
+	int getOverlayOffset() { return _topDialogRightPadding - _topDialogLeftPadding; }
+
 	const Graphics::Font &getFont(ThemeEngine::FontStyle style = ThemeEngine::kFontStyleBold) const { return *(_theme->getFont(style)); }
 	int getFontHeight(ThemeEngine::FontStyle style = ThemeEngine::kFontStyleBold) const { return _theme->getFontHeight(style); }
 	int getStringWidth(const Common::String &str, ThemeEngine::FontStyle style = ThemeEngine::kFontStyleBold) const { return _theme->getStringWidth(str, style); }
+	int getStringWidth(const Common::U32String &str, ThemeEngine::FontStyle style = ThemeEngine::kFontStyleBold) const { return _theme->getStringWidth(str, style); }
 	int getCharWidth(byte c, ThemeEngine::FontStyle style = ThemeEngine::kFontStyleBold) const { return _theme->getCharWidth(c, style); }
 	int getKerningOffset(byte left, byte right, ThemeEngine::FontStyle font = ThemeEngine::kFontStyleBold) const { return _theme->getKerningOffset(left, right, font); }
 
@@ -137,6 +149,11 @@ protected:
 	bool		_stateIsSaved;
 
 	bool		_useStdCursor;
+
+	bool		_useRTL;
+
+	int			_topDialogLeftPadding;
+	int			_topDialogRightPadding;
 
 	// position and time of last mouse click (used to detect double clicks)
 	struct MousePos {

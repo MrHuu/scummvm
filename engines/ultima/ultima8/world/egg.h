@@ -55,6 +55,9 @@ public:
 	//! hatch the egg
 	virtual uint16 hatch();
 
+	//! unhatch the egg (for Crusader only)
+	virtual uint16 unhatch();
+
 	//! The item has left the fast area
 	void leaveFastArea() override;
 
@@ -66,6 +69,7 @@ public:
 	void dumpInfo() const override;
 
 	bool loadData(Common::ReadStream *rs, uint32 version);
+	void saveData(Common::WriteStream *ws) override;
 
 	INTRINSIC(I_getEggXRange);
 	INTRINSIC(I_getEggYRange);
@@ -75,8 +79,6 @@ public:
 	INTRINSIC(I_setEggId);
 
 protected:
-	void saveData(Common::WriteStream *ws) override;
-
 	bool _hatched;
 };
 

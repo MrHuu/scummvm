@@ -42,8 +42,7 @@ void SceneScriptMA02::InitializeScene() {
 	Scene_Exit_Add_2D_Exit(kMA02ExitMA06, 538, 84, 639, 327, 1);
 	Scene_Exit_Add_2D_Exit(kMA02ExitMA04,  56, 98, 150, 260, 0);
 
-	if (Global_Variable_Query(kVariableChapter) >= 4
-	 && Global_Variable_Query(kVariableChapter) == 5
+	if (Global_Variable_Query(kVariableChapter) == 5
 	 && Game_Flag_Query(kFlagMcCoyIsHelpingReplicants)
 	) {
 		Actor_Set_Goal_Number(kActorMaggie, kGoalMaggieDead);
@@ -243,7 +242,12 @@ void SceneScriptMA02::talkWithRajif() {
 	Actor_Says(kActorMcCoy, 2370, 13);
 	Actor_Says(kActorRajif, 10, 13);
 	Actor_Says(kActorMcCoy, 2375, 13);
-	Actor_Says(kActorRajif, 20, 13);
+	if (_vm->_cutContent) {
+		Actor_Says_With_Pause(kActorRajif, 20, 0.0f, 13);
+		Actor_Says(kActorRajif, 30, 13);
+	} else {
+		Actor_Says(kActorRajif, 20, 13);
+	}
 	Actor_Says(kActorMcCoy, 2380, 13);
 	Sound_Play(kSfxSHOTCOK1, 100, 0, 100, 50);
 	Actor_Says(kActorRajif, 40, 13);

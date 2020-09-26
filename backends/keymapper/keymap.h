@@ -72,8 +72,15 @@ public:
 		kKeymapTypeGame
 	};
 
+	enum KeymapMatch {
+		kKeymapMatchNone,
+		kKeymapMatchPartial,
+		kKeymapMatchExact
+	};
+
 	typedef Array<Action *> ActionArray;
 
+	Keymap(KeymapType type, const String &id, const U32String &description);
 	Keymap(KeymapType type, const String &id, const String &description);
 	~Keymap();
 	void setConfigDomain(ConfigManager::Domain *configDomain);
@@ -109,9 +116,10 @@ public:
 	/**
 	 * Find the Actions that a hardware input is mapped to
 	 * @param hardwareInput	the input that is mapped to the required Action
-	 * @return		an array containing pointers to the actions
+	 * @param actions an array containing pointers to the actions
+	 * @return	the matching status for the retieved actions
 	 */
-	ActionArray getMappedActions(const Event &event) const;
+	KeymapMatch getMappedActions(const Event &event, ActionArray &actions) const;
 
 	/**
 	 * Adds a new Action to this Map
@@ -148,7 +156,7 @@ public:
 	void saveMappings();
 
 	const String &getId() const { return _id; }
-	const String &getDescription() const { return _description; }
+	const U32String &getDescription() const { return _description; }
 	KeymapType getType() const { return _type; }
 
 	/**
@@ -173,7 +181,7 @@ private:
 
 	KeymapType _type;
 	String _id;
-	String _description;
+	U32String _description;
 
 	bool _enabled;
 

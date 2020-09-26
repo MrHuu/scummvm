@@ -28,7 +28,6 @@
 #include "common/savefile.h"
 #include "common/system.h"
 #include "common/textconsole.h"
-#include "common/translation.h"
 
 #include "cryomni3d/cryomni3d.h"
 
@@ -92,7 +91,7 @@ public:
 
 	ADDetectedGame fallbackDetect(const FileMap &allFiles,
 								  const Common::FSList &fslist) const override {
-		return detectGameFilebased(allFiles, fslist, fileBased);
+		return detectGameFilebased(allFiles, fileBased);
 	}
 
 	const char *getEngineId() const override {

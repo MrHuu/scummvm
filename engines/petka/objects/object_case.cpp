@@ -24,6 +24,7 @@
 
 #include "petka/interfaces/main.h"
 #include "petka/objects/object_case.h"
+#include "petka/objects/object_cursor.h"
 #include "petka/flc.h"
 #include "petka/petka.h"
 #include "petka/q_manager.h"
@@ -71,12 +72,12 @@ QObjectCase::QObjectCase() {
 	_isShown = false;
 	_updateZ = false;
 
-	_itemsLocation[kChapayevButton] = Common::Point(120, 145);
-	_itemsLocation[kPanelButton] = Common::Point(240, 145);
-	_itemsLocation[kMapButton] = Common::Point(360, 145);
-	_itemsLocation[kCloseButton] = Common::Point(100, 220);
-	_itemsLocation[kNextPageButton] = Common::Point(240, 220);
-	_itemsLocation[kPrevPageButton] = Common::Point(380, 220);
+	_itemsLocation[0] = Common::Point(120, 145);
+	_itemsLocation[1] = Common::Point(240, 145);
+	_itemsLocation[2] = Common::Point(360, 145);
+	_itemsLocation[3] = Common::Point(100, 220);
+	_itemsLocation[4] = Common::Point(240, 220);
+	_itemsLocation[5] = Common::Point(380, 220);
 }
 
 void QObjectCase::update(int time) {
@@ -85,10 +86,10 @@ void QObjectCase::update(int time) {
 	_time += time;
 	FlicDecoder *flc = g_vm->resMgr()->loadFlic(kFirstButtonResourceId + _clickedObjIndex);
 	if (flc) {
-		while (_time >= flc->getDelay()) {
+		while (_time >= (int32)flc->getDelay()) {
 			flc->setFrame(-1);
 			_time -= flc->getDelay();
-			g_vm->videoSystem()->addDirtyRectFromMsk(Common::Point(0, 0), *flc);
+			g_vm->videoSystem()->addDirtyMskRects(*flc);
 		}
 	}
 }
@@ -106,9 +107,10 @@ void QObjectCase::draw() {
 
 		for (Common::List<Common::Rect>::const_iterator it = dirty.begin(); it != dirty.end(); ++it) {
 			for (uint i = 0; i < mskRects.size(); ++i) {
-				Common::Rect rect = mskRects[i].findIntersectingRect(*it);
-				debug("%d %d", rect.width(), rect.height());
-				g_vm->videoSystem()->screen().transBlitFrom(*s, rect, rect, flc->getTransColor(s->format));
+				Common::Rect destRect = mskRects[i].findIntersectingRect(*it);
+				Common::Rect srcRect = destRect;
+				srcRect.translate(-flc->getPos().x - _x, -flc->getPos().y - _y);
+				g_vm->videoSystem()->transBlitFrom(*s, srcRect, destRect, flc->getTransColor(s->format));
 			}
 		}
 
@@ -134,24 +136,24 @@ void QObjectCase::show(bool v) {
 	}
 }
 
-bool QObjectCase::isInPoint(int x, int y) {
+bool QObjectCase::isInPoint(Common::Point p) {
 	return _isShown;
 }
 
-void QObjectCase::onMouseMove(int x, int y) {
+void QObjectCase::onMouseMove(Common::Point p) {
 	FlicDecoder *flc = g_vm->resMgr()->loadFlic(kExitCaseResourceId);
-	if (*(const byte *)flc->getCurrentFrame()->getBasePtr(x - _x, y - _y) != 0) {
+	if (*(const byte *)flc->getCurrentFrame()->getBasePtr(p.x - _x, p.y - _y) != 0) {
 		if (_clickedObjIndex != kCloseButton && _clickedObjIndex != kInvalidButton) {
 			flc = g_vm->resMgr()->loadFlic(kFirstButtonResourceId + _clickedObjIndex);
 			flc->setFrame(1);
-			g_vm->videoSystem()->addDirtyRectFromMsk(Common::Point(0, 0), *flc);
+			g_vm->videoSystem()->addDirtyMskRects(*flc);
 		}
 		_clickedObjIndex = kCloseButton;
 	} else {
 		uint i;
 		for (i = 0; i < kButtonsCount; ++i) {
 			flc = g_vm->resMgr()->loadFlic(kFirstButtonResourceId + i);
-			if (flc->getMskRects()[0].contains(Common::Point(x - _x, y))) {
+			if (flc->getMskRects()[0].contains(Common::Point(p.x - _x, p.y))) {
 				break;
 			}
 		}
@@ -159,15 +161,15 @@ void QObjectCase::onMouseMove(int x, int y) {
 		if (_clickedObjIndex != i && _clickedObjIndex != kInvalidButton) {
 			flc = g_vm->resMgr()->loadFlic(kFirstButtonResourceId + _clickedObjIndex);
 			flc->setFrame(1);
-			g_vm->videoSystem()->addDirtyRectFromMsk(Common::Point(0, 0), *flc);
+			g_vm->videoSystem()->addDirtyMskRects(*flc);
 		}
 
 		if (i == kButtonsCount && _clickedObjIndex != kInvalidButton) {
 			_clickedObjIndex = kInvalidButton;
 		} else if (i != _clickedObjIndex) {
-			if ((i != kChapayevButton || g_vm->getQSystem()->_chapayev->_isShown) && (i != kMapButton || g_vm->getQSystem()->_room->_showMap)) {
+			if ((i != kChapayevButton || g_vm->getQSystem()->getChapay()->_isShown) && (i != kMapButton || g_vm->getQSystem()->_room->_showMap)) {
 				flc = g_vm->resMgr()->loadFlic(kFirstButtonResourceId + i);
-				g_vm->videoSystem()->addDirtyRectFromMsk(Common::Point(0, 0), *flc);
+				g_vm->videoSystem()->addDirtyMskRects(*flc);
 				_clickedObjIndex = i;
 			} else {
 				_clickedObjIndex = kInvalidButton;
@@ -176,10 +178,10 @@ void QObjectCase::onMouseMove(int x, int y) {
 	}
 }
 
-void QObjectCase::onClick(int x, int y) {
+void QObjectCase::onClick(Common::Point p) {
 	switch (_clickedObjIndex) {
 		case kChapayevButton:
-			g_vm->getQSystem()->setChapayev();
+			g_vm->getQSystem()->setCursorAction(kActionObjUseChapayev);
 			break;
 		case kPanelButton:
 			g_vm->getQSystem()->togglePanelInterface();
@@ -214,11 +216,11 @@ void QObjectCase::addItemObjects() {
 	const uint size = (_itemIndex + kItemsOnPage >= _items.size()) ? _items.size() : (_itemIndex + kItemsOnPage);
 	for (uint i = _itemIndex; i < size; ++i) {
 		QMessageObject *obj = g_vm->getQSystem()->findObject(_items[i]);
+		obj->_x = _itemsLocation[i - _itemIndex].x;
+		obj->_y = _itemsLocation[i - _itemIndex].y;
 		obj->_z = kItemZ;
-		objs.push_back(obj);
 		g_vm->resMgr()->loadFlic(obj->_resourceId);
-		_x = _itemsLocation[i - _itemIndex].x;
-		_y = _itemsLocation[i - _itemIndex].y;
+		objs.push_back(obj);
 	}
 }
 

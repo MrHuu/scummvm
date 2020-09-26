@@ -104,7 +104,7 @@ enum GameMode {
 
 struct XeenGameDescription;
 
-#define XEEN_SAVEGAME_VERSION 1
+#define XEEN_SAVEGAME_VERSION 2
 
 class XeenEngine : public Engine {
 	/**
@@ -313,7 +313,7 @@ public:
 	/**
 	 * Show an error message in a GUI dialog
 	 */
-	void GUIError(const Common::String &msg);
+	void GUIError(const Common::U32String &msg);
 };
 
 extern XeenEngine *g_vm;

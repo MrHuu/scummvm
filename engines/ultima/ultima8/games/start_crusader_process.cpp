@@ -30,13 +30,17 @@
 #include "ultima/ultima8/world/current_map.h"
 #include "ultima/ultima8/world/egg.h"
 #include "ultima/ultima8/world/camera_process.h"
+#include "ultima/ultima8/world/actors/main_actor.h"
 #include "ultima/ultima8/world/world.h"
 #include "ultima/ultima8/ultima8.h"
 #include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/gumps/menu_gump.h"
 #include "ultima/ultima8/gumps/cru_status_gump.h"
+#include "ultima/ultima8/gumps/cru_pickup_area_gump.h"
 #include "ultima/ultima8/conf/setting_manager.h"
 #include "ultima/ultima8/world/get_object.h"
+#include "ultima/ultima8/world/item_factory.h"
+#include "ultima/ultima8/world/actors/teleport_to_egg_process.h"
 #include "ultima/ultima8/graphics/palette_fader_process.h"
 #include "ultima/ultima8/audio/music_process.h"
 
@@ -73,39 +77,49 @@ void StartCrusaderProcess::run() {
 	}
 
 	Gump *statusGump = new CruStatusGump();
-	statusGump->InitGump(nullptr);
+	statusGump->InitGump(nullptr, false);
+
+	Gump *cruPickupAreaGump = new CruPickupAreaGump();
+	cruPickupAreaGump->InitGump(nullptr, false);
 
 	// Try to load the save game, if succeeded this pointer will no longer be valid
-	if (_saveSlot >= 0 &&Ultima8Engine::get_instance()->loadGameState(_saveSlot).getCode() == Common::kNoError) {
+	if (_saveSlot >= 0 && Ultima8Engine::get_instance()->loadGameState(_saveSlot).getCode() == Common::kNoError) {
 		//PaletteFaderProcess::I_fadeFromBlack(0, 0);
 		return;
 	}
 
 	Ultima8Engine::get_instance()->setCheatMode(true);
 
-	//CurrentMap *currentmap = World::get_instance()->getCurrentMap();
-	//UCList uclist(2);
-
 	if (!_skipStart) {
-		// TODO: Find the first MISS1EGG egg like in U8 - should teleport in
-		/*
-		LOOPSCRIPT(script, LS_AND(LS_SHAPE_EQUAL1(73), LS_Q_EQUAL(36)));
-		currentmap->areaSearch(&uclist, script, sizeof(script),
-		                       0, 256, false, 16188, 7500);
-		if (uclist.getSize() < 1) {
-			perr << "Unable to find FIRST egg!" << Std::endl;
-			return;
+		if (GAME_IS_REMORSE) {
+			MainActor *avatar = getMainActor();
+			int mapnum = avatar->getMapNum();
+			// The game doesn't do the weapon this way, but it's the same for our purposes..
+			Item *weapon = ItemFactory::createItem(0x32E, 0, 0, 0, 0, mapnum, 0, true);
+			avatar->addItemCru(weapon, false);
+			Item *datalink = ItemFactory::createItem(0x4d4, 0, 0, 0, 0, mapnum, 0, true);
+			avatar->addItemCru(datalink, false);
+			Item *smiley = ItemFactory::createItem(0x598, 0, 0, 0, 0, mapnum, 0, true);
+			smiley->moveToContainer(avatar);
+
+			// TODO: How is this created in the game??
+			Egg *miss1egg = new Egg();
+			miss1egg->setShape(2317);
+			miss1egg->setMapNum(mapnum);
+			miss1egg->assignObjId();
+			miss1egg->callUsecodeEvent_hatch();
+
+			avatar->setDir(dir_east);
+		} else if (GAME_IS_REGRET) {
+			// TODO: Give the appropriate startup objects to the avatar
 		}
 
-		uint16 objid = uclist.getuint16(0);
-		Egg *egg = dynamic_cast<Egg *>(getObject(objid));
-		int32 ix, iy, iz;
-		egg->getLocation(ix, iy, iz);
-		// Center on egg
-		CameraProcess::SetCameraProcess(new CameraProcess(ix, iy, iz));
-		egg->hatch();
-		*/
+		// TODO: The game actually teleports to egg 0x1f (31) which has another
+		// egg to teleport to egg 99.  Is there any purpose to that?
+		Kernel::get_instance()->addProcess(new TeleportToEggProcess(1, 99));
 
+		Process *fader = new PaletteFaderProcess(0x003F3F3F, true, 0x7FFF, 60, false);
+		Kernel::get_instance()->addProcess(fader);
 	}
 
 	MusicProcess::get_instance()->playMusic(2);

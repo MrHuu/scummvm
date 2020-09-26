@@ -34,11 +34,14 @@
 #include "common/scummsys.h"
 #include "common/config-manager.h"
 #include "common/error.h"
+#include "common/stream.h"
 #include "common/system.h"
 #include "common/textconsole.h"
+#include "common/translation.h"
 #include "audio/musicplugin.h"
 #include "audio/mpu401.h"
 #include "audio/softsynth/emumidi.h"
+#include "gui/message.h"
 #if defined(IPHONE_IOS7) && defined(IPHONE_SANDBOXED)
 #include "backends/platform/ios7/ios7_common.h"
 #endif
@@ -50,6 +53,7 @@ private:
 	fluid_synth_t *_synth;
 	int _soundFont;
 	int _outputRate;
+	Common::SeekableReadStream *_engineSoundFontData;
 
 protected:
 	// Because GCC complains about casting from const to non-const...
@@ -69,6 +73,15 @@ public:
 	MidiChannel *allocateChannel() override;
 	MidiChannel *getPercussionChannel() override;
 
+	void setEngineSoundFont(Common::SeekableReadStream *soundFontData) override;
+	bool acceptsSoundFontData() override {
+#if defined(FLUIDSYNTH_VERSION_MAJOR) && FLUIDSYNTH_VERSION_MAJOR > 1
+		return true;
+#else
+		return false;
+#endif
+	}
+
 	// AudioStream API
 	bool isStereo() const override { return true; }
 	int getRate() const override { return _outputRate; }
@@ -77,7 +90,7 @@ public:
 // MidiDriver method implementations
 
 MidiDriver_FluidSynth::MidiDriver_FluidSynth(Audio::Mixer *mixer)
-	: MidiDriver_Emulated(mixer) {
+	: MidiDriver_Emulated(mixer), _engineSoundFontData(nullptr) {
 
 	for (int i = 0; i < ARRAYSIZE(_midiChannels); i++) {
 		_midiChannels[i].init(this, i);
@@ -119,12 +132,53 @@ void MidiDriver_FluidSynth::setStr(const char *name, const char *val) {
 	free(val2);
 }
 
+// Soundfont memory loader callback functions.
+
+#if defined(FLUIDSYNTH_VERSION_MAJOR) && FLUIDSYNTH_VERSION_MAJOR > 1
+static void *SoundFontMemLoader_open(const char *filename) {
+	void *p;
+	if (filename[0] != '&') {
+		return nullptr;
+	}
+	sscanf(filename, "&%p", &p);
+	return p;
+}
+
+static int SoundFontMemLoader_read(void *buf, int count, void *handle) {
+	return ((Common::SeekableReadStream *) handle)->read(buf, count) == (uint32)count ? FLUID_OK : FLUID_FAILED;
+}
+
+static int SoundFontMemLoader_seek(void *handle, long offset, int origin) {
+	return ((Common::SeekableReadStream *) handle)->seek(offset, origin) ? FLUID_OK : FLUID_FAILED;
+}
+
+static int SoundFontMemLoader_close(void *handle) {
+	delete (Common::SeekableReadStream *) handle;
+	return FLUID_OK;
+}
+
+static long SoundFontMemLoader_tell(void *handle) {
+	return ((Common::SeekableReadStream *) handle)->pos();
+}
+#endif
+
 int MidiDriver_FluidSynth::open() {
 	if (_isOpen)
 		return MERR_ALREADY_OPEN;
 
-	if (!ConfMan.hasKey("soundfont"))
-		error("FluidSynth requires a 'soundfont' setting");
+#if defined(FLUIDSYNTH_VERSION_MAJOR) && FLUIDSYNTH_VERSION_MAJOR > 1
+	// When provided with in-memory SoundFont data, only use the configured
+	// SoundFont instead if it's explicitly configured on the current game.
+	bool isUsingInMemorySoundFontData = _engineSoundFontData && !ConfMan.getActiveDomain()->contains("soundfont");
+#else
+	bool isUsingInMemorySoundFontData = false;
+#endif
+
+	if (!isUsingInMemorySoundFontData && !ConfMan.hasKey("soundfont")) {
+		GUI::MessageDialog dialog(_("FluidSynth requires a 'soundfont' setting. Please specify it in ScummVM GUI on MIDI tab. Music is off."));
+		dialog.runModal();
+		return MERR_DEVICE_NOT_AVAILABLE;
+	}
 
 	_settings = new_fluid_settings();
 
@@ -189,26 +243,48 @@ int MidiDriver_FluidSynth::open() {
 
 	fluid_synth_set_interp_method(_synth, -1, interpMethod);
 
-	const char *soundfont = ConfMan.get("soundfont").c_str();
+	const char *soundfont = !isUsingInMemorySoundFontData ?
+			ConfMan.get("soundfont").c_str() : Common::String::format("&%p", (void *)_engineSoundFontData).c_str();
+
+#if defined(FLUIDSYNTH_VERSION_MAJOR) && FLUIDSYNTH_VERSION_MAJOR > 1
+	if (isUsingInMemorySoundFontData) {
+		fluid_sfloader_t *soundFontMemoryLoader = new_fluid_defsfloader(_settings);
+		fluid_sfloader_set_callbacks(soundFontMemoryLoader,
+									 SoundFontMemLoader_open,
+									 SoundFontMemLoader_read,
+									 SoundFontMemLoader_seek,
+									 SoundFontMemLoader_tell,
+									 SoundFontMemLoader_close);
+		fluid_synth_add_sfloader(_synth, soundFontMemoryLoader);
+	}
+#endif
 
 #if defined(IPHONE_IOS7) && defined(IPHONE_SANDBOXED)
-	// HACK: Due to the sandbox on non-jailbroken iOS devices, we need to deal
-	// with the chroot filesystem. All the path selected by the user are
-	// relative to the Document directory. So, we need to adjust the path to
-	// reflect that.
-	Common::String soundfont_fullpath = iOS7_getDocumentsDir();
-	soundfont_fullpath += soundfont;
-	_soundFont = fluid_synth_sfload(_synth, soundfont_fullpath.c_str(), 1);
+	if (!isUsingInMemorySoundFontData) {
+		// HACK: Due to the sandbox on non-jailbroken iOS devices, we need to deal
+		// with the chroot filesystem. All the path selected by the user are
+		// relative to the Document directory. So, we need to adjust the path to
+		// reflect that.
+		Common::String soundfont_fullpath = iOS7_getDocumentsDir();
+		soundfont_fullpath += soundfont;
+		_soundFont = fluid_synth_sfload(_synth, soundfont_fullpath.c_str(), 1);
+	} else {
+		_soundFont = fluid_synth_sfload(_synth, soundfont, 1);
+	}
 #else
 	_soundFont = fluid_synth_sfload(_synth, soundfont, 1);
 #endif
 
-	if (_soundFont == -1)
-		error("Failed loading custom sound font '%s'", soundfont);
+	if (_soundFont == -1) {
+		GUI::MessageDialog dialog(_("FluidSynth: Failed loading custom SoundFont '%s'. Music is off."), soundfont);
+		dialog.runModal();
+		return MERR_DEVICE_NOT_AVAILABLE;
+	}
 
 	MidiDriver_Emulated::open();
 
 	_mixer->playStream(Audio::Mixer::kPlainSoundType, &_mixerSoundHandle, this, -1, Audio::Mixer::kMaxChannelVolume, 0, DisposeAfterUse::NO, true);
+
 	return 0;
 }
 
@@ -227,6 +303,9 @@ void MidiDriver_FluidSynth::close() {
 }
 
 void MidiDriver_FluidSynth::send(uint32 b) {
+	if (!_isOpen)
+		return;
+
 	midiDriverCommonSend(b);
 
 	//byte param3 = (byte) ((b >> 24) & 0xFF);
@@ -280,6 +359,10 @@ MidiChannel *MidiDriver_FluidSynth::getPercussionChannel() {
 
 void MidiDriver_FluidSynth::generateSamples(int16 *data, int len) {
 	fluid_synth_write_s16(_synth, len, data, 0, 2, data, 1, 2);
+}
+
+void MidiDriver_FluidSynth::setEngineSoundFont(Common::SeekableReadStream *soundFontData) {
+	_engineSoundFontData = soundFontData;
 }
 
 

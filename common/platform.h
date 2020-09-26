@@ -56,11 +56,14 @@ enum Platform {
 	kPlatformPC98,
 	kPlatformWii,
 	kPlatformPSX,
+	kPlatformPS2,
+	kPlatformXbox,
 	kPlatformCDi,
 	kPlatformIOS,
 	kPlatformOS2,
 	kPlatformBeOS,
 	kPlatformPocketPC,
+	kPlatformMegaDrive,
 
 	kPlatformUnknown = -1
 };

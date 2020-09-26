@@ -99,10 +99,43 @@ public:
 	bool isEditable() { return _editable; }
 
 	/**
-	 * Method to access the entire surface of the window (e.g. to draw an image).
-	 * @return A pointer to the entire surface of the window.
+	 * Mutator to change the visible state of the window.
+	 * @param visible Target state.
 	 */
-	ManagedSurface *getWindowSurface() { return &_surface; }
+	virtual void setVisible(bool visible, bool silent = false);
+	/**
+	 * Accessor to determine whether a window is active.
+	 * @return True if the window is active.
+	 */
+	bool isVisible();
+
+	/**
+	 * Method to access the entire interior surface of the window (e.g. to draw an image).
+	 * @return A pointer to the entire interior surface of the window.
+	 */
+	ManagedSurface *getWindowSurface() { return _composeSurface; }
+
+	/**
+	 * Method to access the border surface of the window.
+	 * @return A pointer to the border surface of the window.
+	 */
+	virtual ManagedSurface *getBorderSurface() = 0;
+
+	/**
+	 * Accessor to retrieve the dimensions of the inner surface of the window
+	 * (i.e. without taking borders into account).
+	 * Note that the returned dimensions' position is relative to the WM's
+	 * screen, just like in getDimensions().
+	 * @return The inner dimensions of the window.
+	 */
+	virtual const Common::Rect &getInnerDimensions() = 0;
+
+	/**
+	 * Method called to internally draw the window. This relies on the window
+	 * being marked as dirty unless otherwise specified.
+	 * @param forceRedraw Its behavior depends on the subclass.
+	 */
+	virtual bool draw(bool forceRedraw = false) = 0;
 
 	/**
 	 * Method called to draw the window into the target surface.
@@ -123,6 +156,11 @@ public:
 	virtual bool processEvent(Common::Event &event) = 0;
 
 	/**
+	 * Method that checks if the window is needs redrawing.
+	 */
+	virtual bool isDirty() = 0;
+
+	/**
 	 * Set the callback that will be used when an event needs to be processed.
 	 * @param callback A function pointer to a function that accepts:
 	 *					- A WindowClick, the pert of the window that was clicked.
@@ -137,13 +175,10 @@ protected:
 
 	bool _editable;
 
-	ManagedSurface _surface;
-
 	bool (*_callback)(WindowClick, Common::Event &, void *);
 	void *_dataPtr;
 
-public:
-	MacWindowManager *_wm;
+	bool _visible;
 };
 
 /**
@@ -163,7 +198,7 @@ public:
 	 * @param wm See BaseMacWindow.
 	 */
 	MacWindow(int id, bool scrollable, bool resizable, bool editable, MacWindowManager *wm);
-	virtual ~MacWindow();
+	virtual ~MacWindow() {}
 
 	/**
 	 * Change the window's location to fixed coordinates (not delta).
@@ -176,8 +211,9 @@ public:
 	 * Change the width and the height of the window.
 	 * @param w New width of the window.
 	 * @param h New height of the window.
+	 * @param inner True to set the inner dimensions.
 	 */
-	virtual void resize(int w, int h);
+	virtual void resize(int w, int h, bool inner = false);
 
 	/**
 	 * Change the dimensions of the window ([0, 0, 0, 0] by default).
@@ -186,15 +222,6 @@ public:
 	 * @param r The desired dimensions of the window.
 	 */
 	virtual void setDimensions(const Common::Rect &r) override;
-
-	/**
-	 * Accessor to retrieve the dimensions of the inner surface of the window
-	 * (i.e. without taking borders into account).
-	 * Note that the returned dimensions' position is relative to the WM's
-	 * screen, just like in getDimensions().
-	 * @return The inner dimensions of the window.
-	 */
-	const Common::Rect &getInnerDimensions() { return _innerDims; }
 
 	/**
 	 * Set a background pattern for the window.
@@ -212,6 +239,15 @@ public:
 	virtual bool draw(bool forceRedraw = false) override;
 	virtual void blit(ManagedSurface *g, Common::Rect &dest) override;
 
+	virtual const Common::Rect &getInnerDimensions() override { return _innerDims; }
+	virtual ManagedSurface *getBorderSurface() override { return &_borderSurface; }
+
+	/**
+	 * Centers the window using the dimensions of the parent window manager, or undoes this; does
+	 * nothing if WM is null.
+	 */
+	void center(bool toCenter = true);
+
 	/**
 	 * Mutator to change the active state of the window.
 	 * Most often called from the WM.
@@ -226,9 +262,15 @@ public:
 
 	/**
 	 * Mutator to change the title of the window.
-	 * @param title Target title of the window.
+	 * @param title Target title.
 	 */
-	void setTitle(Common::String &title) { _title = title; }
+	void setTitle(const Common::String &title) { _title = title; _borderIsDirty = true; }
+	/**
+	 * Accessor to get the title of the window.
+	 * @return Title.
+	 */
+	Common::String getTitle() { return _title; };
+
 	/**
 	 * Highlight the target part of the window.
 	 * Used for the default borders.
@@ -259,7 +301,9 @@ public:
 	 * @param bo Width of the bottom side of the border, in pixels.
 	 */
 	void loadBorder(Common::SeekableReadStream &file, bool active, int lo = -1, int ro = -1, int to = -1, int bo = -1);
+	void loadBorder(Common::SeekableReadStream &file, bool active, BorderOffsets offsets);
 	void setBorder(TransparentSurface *border, bool active, int lo = -1, int ro = -1, int to = -1, int bo = -1);
+	void setBorder(TransparentSurface *border, bool active, BorderOffsets offsets);
 	void disableBorder();
 
 	/**
@@ -267,6 +311,24 @@ public:
 	 * @param closeable True if the window can be closed.
 	 */
 	void setCloseable(bool closeable);
+
+	/**
+	 * Mutator to change the border type.
+	 * @param borderType Border type.
+	 */
+	void setBorderType(int borderType);
+	/**
+	 * Accessor to get the border type.
+	 * @return Border type.
+	 */
+	int getBorderType() { return _borderType; };
+
+
+	void addDirtyRect(const Common::Rect &r);
+	void markAllDirty();
+	void mergeDirtyRects();
+
+	virtual bool isDirty() override { return _borderIsDirty || _contentIsDirty; }
 
 private:
 	void prepareBorderSurface(ManagedSurface *g);
@@ -277,6 +339,7 @@ private:
 	void fillRect(ManagedSurface *g, int x, int y, int w, int h, int color);
 	const Font *getTitleFont();
 	void updateInnerDims();
+	void updateOuterDims();
 
 	bool isInCloseButton(int x, int y);
 	bool isInResizeButton(int x, int y);
@@ -290,6 +353,9 @@ protected:
 	ManagedSurface _borderSurface;
 
 	bool _borderIsDirty;
+	Common::Rect _innerDims;
+
+	Common::List<Common::Rect> _dirtyRects;
 
 private:
 	MacWindowBorder _macBorder;
@@ -303,7 +369,6 @@ private:
 	bool _closeable;
 
 	int _borderWidth;
-	Common::Rect _innerDims;
 
 	bool _beingDragged, _beingResized;
 	int _draggedX, _draggedY;
@@ -312,9 +377,9 @@ private:
 	float _scrollPos, _scrollSize;
 
 	Common::String _title;
+
+	int _borderType;
 };
-
-
 
 } // End of namespace Graphics
 

@@ -30,6 +30,7 @@
 #include "common/random.h"
 #include "common/sinetables.h"
 #include "common/stream.h"
+#include "common/keyboard.h"
 
 #include "engines/engine.h"
 
@@ -110,6 +111,7 @@ public:
 	static const int kArchiveCount = 12; // +2 to original value (10) to accommodate for SUBTITLES.MIX and one extra resource file, to allow for capability of loading all VQAx.MIX and the MODE.MIX file (debug purposes)
 	static const int kActorCount =  100;
 	static const int kActorVoiceOver = kActorCount - 1;
+
 	// Incremental number to keep track of significant revisions of the ScummVM bladerunner engine
 	// that could potentially introduce incompatibilities with old save files or require special actions to restore compatibility
 	// This is stored in game global variable "kVariableGameVersion"
@@ -126,6 +128,7 @@ public:
 	Common::String   _languageCode;
 	Common::Language _language;
 	bool             _russianCP1251;
+	bool             _noMusicDriver; // If "Music Device" is set to "No Music" from Audio tab
 
 	ActorDialogueQueue *_actorDialogueQueue;
 	ScreenEffects      *_screenEffects;
@@ -250,6 +253,18 @@ public:
 	uint32 _actorUpdateTimeLast;
 
 	uint32 _timeOfMainGameLoopTickPrevious;
+
+	// This addon is to emulate keeping a keyboard key pressed (continuous / repeated firing of the event)
+	// -- code is pretty much identical from our common\events.cpp (KeyboardRepeatEventSourceWrapper)
+	// for continuous events (keyDown)
+	enum {
+		kKeyRepeatInitialDelay = 400,
+		kKeyRepeatSustainDelay = 100
+	};
+
+	Common::KeyState _currentKeyDown;
+	uint32 _keyRepeatTimeLast;
+	uint32 _keyRepeatTimeDelay;
 
 private:
 	MIXArchive _archives[kArchiveCount];

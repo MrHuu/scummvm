@@ -28,41 +28,43 @@
 #undef main
 #endif // main
 
-#include "config.h"
-#include "create_project.h"
-
-#include "cmake.h"
-#include "codeblocks.h"
-#include "msvc.h"
-#include "visualstudio.h"
-#include "msbuild.h"
-#include "xcode.h"
-
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <stack>
-#include <algorithm>
-#include <iomanip>
-#include <iterator>
-
-#include <cstring>
-#include <cstdlib>
-#include <ctime>
-
 #if (defined(_WIN32) || defined(WIN32)) && !defined(__GNUC__)
 #define USE_WIN32_API
 #endif
 
 #if (defined(_WIN32) || defined(WIN32))
+#define _WIN32_WINNT 0x0502
 #include <windows.h>
 #else
+#include <dirent.h>
+#include <errno.h>
 #include <sstream>
 #include <sys/param.h>
 #include <sys/stat.h>
-#include <dirent.h>
-#include <errno.h>
 #endif
+
+#include "create_project.h"
+#include "config.h"
+
+#include "cmake.h"
+#include "codeblocks.h"
+#include "msbuild.h"
+#include "msvc.h"
+#include "visualstudio.h"
+#include "xcode.h"
+
+#include <algorithm>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <iterator>
+#include <sstream>
+#include <stack>
+#include <utility>
+
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 
 namespace {
 /**
@@ -133,7 +135,7 @@ int main(int argc, char *argv[]) {
 	setup.features = getAllFeatures();
 
 	ProjectType projectType = kProjectNone;
-	const MSVCVersion* msvc = NULL;
+	const MSVCVersion *msvc = NULL;
 	int msvcVersion = 0;
 
 	// Parse command line arguments
@@ -141,7 +143,7 @@ int main(int argc, char *argv[]) {
 	for (int i = 2; i < argc; ++i) {
 		if (!std::strcmp(argv[i], "--list-engines")) {
 			cout << " The following enables are available in the " PROJECT_DESCRIPTION " source distribution\n"
-			        " located at \"" << srcDir << "\":\n";
+			     << " located at \"" << srcDir << "\":\n";
 
 			cout << "   state  |       name      |     description\n\n";
 			cout.setf(std::ios_base::left, std::ios_base::adjustfield);
@@ -275,7 +277,7 @@ int main(int argc, char *argv[]) {
 		} else if (!std::strcmp(argv[i], "--build-events")) {
 			setup.runBuildEvents = true;
 		} else if (!std::strcmp(argv[i], "--installer")) {
-			setup.runBuildEvents  = true;
+			setup.runBuildEvents = true;
 			setup.createInstaller = true;
 		} else if (!std::strcmp(argv[i], "--tools")) {
 			setup.devTools = true;
@@ -283,6 +285,8 @@ int main(int argc, char *argv[]) {
 			setup.tests = true;
 		} else if (!std::strcmp(argv[i], "--sdl1")) {
 			setup.useSDL2 = false;
+		} else if (!std::strcmp(argv[i], "--use-canonical-lib-names")) {
+			setup.useCanonicalLibNames = true;
 		} else {
 			std::cerr << "ERROR: Unknown parameter \"" << argv[i] << "\"\n";
 			return -1;
@@ -349,7 +353,6 @@ int main(int argc, char *argv[]) {
 
 	// Setup defines and libraries
 	setup.defines = getEngineDefines(setup.engines);
-	setup.libraries = getFeatureLibraries(setup.features);
 
 	// Add features
 	StringList featureDefines = getFeatureDefines(setup.features);
@@ -379,62 +382,25 @@ int main(int argc, char *argv[]) {
 #endif
 	}
 
-	bool updatesEnabled = false, curlEnabled = false, sdlnetEnabled = false, ttsEnabled = false;
 	for (FeatureList::const_iterator i = setup.features.begin(); i != setup.features.end(); ++i) {
 		if (i->enable) {
-			if (!updatesEnabled && !strcmp(i->name, "updates"))
-				updatesEnabled = true;
-			else if (!curlEnabled && !strcmp(i->name, "libcurl"))
-				curlEnabled = true;
-			else if (!sdlnetEnabled && !strcmp(i->name, "sdlnet"))
-				sdlnetEnabled = true;
-			else if (!ttsEnabled && !strcmp(i->name, "tts"))
-				ttsEnabled = true;
+			if (!strcmp(i->name, "updates"))
+				setup.defines.push_back("USE_SPARKLE");
+			else if (backendWin32 && !strcmp(i->name, "libcurl"))
+				setup.defines.push_back("CURL_STATICLIB");
 		}
-	}
-
-	if (updatesEnabled) {
-		setup.defines.push_back("USE_SPARKLE");
-		if (backendWin32)
-			setup.libraries.push_back("winsparkle");
-		else
-			setup.libraries.push_back("sparkle");
-	}
-
-	if (backendWin32) {
-		if (curlEnabled) {
-			setup.defines.push_back("CURL_STATICLIB");
-			setup.libraries.push_back("ws2_32");
-			setup.libraries.push_back("wldap32");
-			setup.libraries.push_back("crypt32");
-			setup.libraries.push_back("normaliz");
-		}
-		if (sdlnetEnabled) {
-			setup.libraries.push_back("iphlpapi");
-		}
-		if (ttsEnabled) {
-			setup.libraries.push_back("sapi");
-		}
-		setup.libraries.push_back("winmm");
 	}
 
 	setup.defines.push_back("SDL_BACKEND");
 	if (!setup.useSDL2) {
 		cout << "\nBuilding against SDL 1.2\n\n";
-		setup.libraries.push_back("sdl");
 	} else {
 		cout << "\nBuilding against SDL 2.0\n\n";
 		// TODO: This also defines USE_SDL2 in the preprocessor, we don't do
 		// this in our configure/make based build system. Adapt create_project
 		// to replicate this behavior.
 		setup.defines.push_back("USE_SDL2");
-		setup.libraries.push_back("sdl2");
 	}
-
-	// Add additional project-specific library
-#ifdef ADDITIONAL_LIBRARY
-	setup.libraries.push_back(ADDITIONAL_LIBRARY);
-#endif
 
 	// List of global warnings and map of project-specific warnings
 	// FIXME: As shown below these two structures have different behavior for
@@ -474,11 +440,6 @@ int main(int argc, char *argv[]) {
 		addGCCWarnings(globalWarnings);
 
 		provider = new CreateProjectTool::CodeBlocksProvider(globalWarnings, projectWarnings);
-
-
-		// Those libraries are automatically added by MSVC, but we need to add them manually with mingw
-		setup.libraries.push_back("ole32");
-		setup.libraries.push_back("uuid");
 
 		break;
 
@@ -543,6 +504,9 @@ int main(int argc, char *argv[]) {
 		//
 		// 4577 ('noexcept' used with no exception handling mode specified)
 		//
+		// 4589 (Constructor of abstract class 'type' ignores initializer for virtual base class 'type')
+		//   caused by Common::Stream virtual inheritance, should be harmless
+		//
 		// 4702 (unreachable code)
 		//   mostly thrown after error() calls (marked as NORETURN)
 		//
@@ -591,6 +555,7 @@ int main(int argc, char *argv[]) {
 		globalWarnings.push_back("4345");
 		globalWarnings.push_back("4351");
 		globalWarnings.push_back("4512");
+		globalWarnings.push_back("4589");
 		globalWarnings.push_back("4702");
 		globalWarnings.push_back("4706");
 		globalWarnings.push_back("4800");
@@ -665,11 +630,11 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Setup project name and description
-	setup.projectName        = PROJECT_NAME;
+	setup.projectName = PROJECT_NAME;
 	setup.projectDescription = PROJECT_DESCRIPTION;
 
 	if (setup.devTools) {
-		setup.projectName        += "-tools";
+		setup.projectName += "-tools";
 		setup.projectDescription += "Tools";
 	}
 
@@ -704,49 +669,52 @@ void displayHelp(const char *exe) {
 	        " Additionally there are the following switches for changing various settings:\n"
 	        "\n"
 	        "Project specific settings:\n"
-	        " --cmake                  build CMake project files\n"
-	        " --codeblocks             build Code::Blocks project files\n"
-	        " --msvc                   build Visual Studio project files\n"
-	        " --xcode                  build XCode project files\n"
-	        " --file-prefix prefix     allow overwriting of relative file prefix in the\n"
-	        "                          MSVC project files. By default the prefix is the\n"
-	        "                          \"path\\to\\source\" argument\n"
-	        " --output-dir path        overwrite path, where the project files are placed\n"
-	        "                          By default this is \".\", i.e. the current working\n"
-	        "                          directory\n"
+	        " --cmake                    build CMake project files\n"
+	        " --codeblocks               build Code::Blocks project files\n"
+	        " --msvc                     build Visual Studio project files\n"
+	        " --xcode                    build XCode project files\n"
+	        " --file-prefix prefix       allow overwriting of relative file prefix in the\n"
+	        "                            MSVC project files. By default the prefix is the\n"
+	        "                            \"path\\to\\source\" argument\n"
+	        " --output-dir path          overwrite path, where the project files are placed\n"
+	        "                            By default this is \".\", i.e. the current working\n"
+	        "                            directory\n"
 	        "\n"
 	        "MSVC specific settings:\n"
-	        " --msvc-version version   set the targeted MSVC version. Possible values:\n";
+	        " --msvc-version version     set the targeted MSVC version. Possible values:\n";
 
 	const MSVCList msvc = getAllMSVCVersions();
 	for (MSVCList::const_iterator i = msvc.begin(); i != msvc.end(); ++i)
 		cout << "                           " << i->version << " stands for \"" << i->name << "\"\n";
 
-	cout << "                           If no version is set, the latest installed version is used\n"
-	        " --build-events           Run custom build events as part of the build\n"
-	        "                          (default: false)\n"
-	        " --installer              Create installer after the build (implies --build-events)\n"
-	        "                          (default: false)\n"
-	        " --tools                  Create project files for the devtools\n"
-	        "                          (ignores --build-events and --installer, as well as engine settings)\n"
-	        "                          (default: false)\n"
-	        " --tests                  Create project files for the tests\n"
-	        "                          (ignores --build-events and --installer, as well as engine settings)\n"
-	        "                          (default: false)\n"
+	cout << "                            If no version is set, the latest installed version is used\n"
+	        " --build-events             Run custom build events as part of the build\n"
+	        "                            (default: false)\n"
+	        " --installer                Create installer after the build (implies --build-events)\n"
+	        "                            (default: false)\n"
+	        " --tools                    Create project files for the devtools\n"
+	        "                            (ignores --build-events and --installer, as well as engine settings)\n"
+	        "                            (default: false)\n"
+	        " --tests                    Create project files for the tests\n"
+	        "                            (ignores --build-events and --installer, as well as engine settings)\n"
+	        "                            (default: false)\n"
+	        " --use-canonical-lib-names  Use canonical library names for linking. This makes it easy to use\n"
+	        "                            e.g. vcpkg-provided libraries\n"
+	        "                            (default: false)\n"
 	        "\n"
 	        "Engines settings:\n"
-	        " --list-engines           list all available engines and their default state\n"
-	        " --enable-engine=<name>   enable building of the engine with the name \"name\"\n"
-	        " --disable-engine=<name>  disable building of the engine with the name \"name\"\n"
-	        " --enable-all-engines     enable building of all engines\n"
-	        " --disable-all-engines    disable building of all engines\n"
+	        " --list-engines             list all available engines and their default state\n"
+	        " --enable-engine=<name>     enable building of the engine with the name \"name\"\n"
+	        " --disable-engine=<name>    disable building of the engine with the name \"name\"\n"
+	        " --enable-all-engines       enable building of all engines\n"
+	        " --disable-all-engines      disable building of all engines\n"
 	        "\n"
 	        "Optional features settings:\n"
-	        " --enable-<name>          enable inclusion of the feature \"name\"\n"
-	        " --disable-<name>         disable inclusion of the feature \"name\"\n"
+	        " --enable-<name>            enable inclusion of the feature \"name\"\n"
+	        " --disable-<name>           disable inclusion of the feature \"name\"\n"
 	        "\n"
 	        "SDL settings:\n"
-	        " --sdl1                   link to SDL 1.2, instead of SDL 2.0\n"
+	        " --sdl1                     link to SDL 1.2, instead of SDL 2.0\n"
 	        "\n"
 	        " There are the following features available:\n"
 	        "\n";
@@ -952,9 +920,12 @@ bool parseEngine(const std::string &line, EngineDesc &engine) {
 		return false;
 	++token;
 
-	engine.name = *token; ++token;
-	engine.desc = *token; ++token;
-	engine.enable = (*token == "yes"); ++token;
+	engine.name = *token;
+	++token;
+	engine.desc = *token;
+	++token;
+	engine.enable = (*token == "yes");
+	++token;
 	if (token != tokens.end()) {
 		engine.subEngines = tokenize(*token);
 		++token;
@@ -1043,47 +1014,50 @@ TokenList tokenize(const std::string &input, char separator) {
 }
 
 namespace {
+// clang-format off
 const Feature s_features[] = {
-	// Libraries
-	{      "libz",        "USE_ZLIB", "zlib",             true,  "zlib (compression) support" },
-	{       "mad",         "USE_MAD", "libmad",           true,  "libmad (MP3) support" },
-	{   "fribidi",     "USE_FRIBIDI", "fribidi",          true,  "BiDi support" },
-	{       "ogg",         "USE_OGG", "libogg_static",    true,  "Ogg support" },
-	{    "vorbis",      "USE_VORBIS", "libvorbisfile_static libvorbis_static", true, "Vorbis support" },
-	{    "tremor",      "USE_TREMOR", "libtremor", false, "Tremor support" },
-	{      "flac",        "USE_FLAC", "libFLAC_static win_utf8_io_static",   true, "FLAC support" },
-	{       "png",         "USE_PNG", "libpng16",         true,  "libpng support" },
-	{      "faad",        "USE_FAAD", "libfaad",          false, "AAC support" },
-	{     "mpeg2",       "USE_MPEG2", "libmpeg2",         false, "MPEG-2 support" },
-	{    "theora",   "USE_THEORADEC", "libtheora_static", true, "Theora decoding support" },
-	{  "freetype",   "USE_FREETYPE2", "freetype",         true, "FreeType support" },
-	{      "jpeg",        "USE_JPEG", "jpeg-static",      true, "libjpeg support" },
-	{"fluidsynth",  "USE_FLUIDSYNTH", "libfluidsynth",    true, "FluidSynth support" },
-	{   "libcurl",     "USE_LIBCURL", "libcurl",          true, "libcurl support" },
-	{    "sdlnet",     "USE_SDL_NET", "SDL_net",          true, "SDL_net support" },
+	// Libraries (must be added in generators)
+	{      "libz",        "USE_ZLIB", true, true,  "zlib (compression) support" },
+	{       "mad",         "USE_MAD", true, true,  "libmad (MP3) support" },
+	{   "fribidi",     "USE_FRIBIDI", true, true,  "BiDi support" },
+	{       "ogg",         "USE_OGG", true, true,  "Ogg support" },
+	{    "vorbis",      "USE_VORBIS", true, true,  "Vorbis support" },
+	{    "tremor",      "USE_TREMOR", true, false, "Tremor support" },
+	{      "flac",        "USE_FLAC", true, true,  "FLAC support" },
+	{       "png",         "USE_PNG", true, true,  "libpng support" },
+	{      "faad",        "USE_FAAD", true, false, "AAC support" },
+	{     "mpeg2",       "USE_MPEG2", true, false, "MPEG-2 support" },
+	{    "theora",   "USE_THEORADEC", true, true,  "Theora decoding support" },
+	{  "freetype",   "USE_FREETYPE2", true, true,  "FreeType support" },
+	{      "jpeg",        "USE_JPEG", true, true,  "libjpeg support" },
+	{"fluidsynth",  "USE_FLUIDSYNTH", true, true,  "FluidSynth support" },
+	{   "libcurl",     "USE_LIBCURL", true, true,  "libcurl support" },
+	{    "sdlnet",     "USE_SDL_NET", true, true,  "SDL_net support" },
+	{   "discord",     "USE_DISCORD", true, false, "Discord support" },
 
 	// Feature flags
-	{            "bink",                      "USE_BINK",  "", true,  "Bink video support" },
-	{         "scalers",                   "USE_SCALERS",  "", true,  "Scalers" },
-	{       "hqscalers",                "USE_HQ_SCALERS",  "", true,  "HQ scalers" },
-	{           "16bit",                 "USE_RGB_COLOR",  "", true,  "16bit color support" },
-	{         "highres",                   "USE_HIGHRES",  "", true,  "high resolution" },
-	{         "mt32emu",                   "USE_MT32EMU",  "", true,  "integrated MT-32 emulator" },
-	{             "lua",                       "USE_LUA",  "", true,  "lua" },
-	{            "nasm",                      "USE_NASM",  "", true,  "IA-32 assembly support" }, // This feature is special in the regard, that it needs additional handling.
-	{          "opengl",                    "USE_OPENGL",  "", true,  "OpenGL support" },
-	{        "opengles",                      "USE_GLES",  "", true,  "forced OpenGL ES mode" },
-	{         "taskbar",                   "USE_TASKBAR",  "", true,  "Taskbar integration support" },
-	{           "cloud",                     "USE_CLOUD",  "", true,  "Cloud integration support" },
-	{     "translation",               "USE_TRANSLATION",  "", true,  "Translation support" },
-	{          "vkeybd",                 "ENABLE_VKEYBD",  "", false, "Virtual keyboard support"},
-	{   "eventrecorder",          "ENABLE_EVENTRECORDER",  "", false, "Event recorder support"},
-	{         "updates",                   "USE_UPDATES",  "", false, "Updates support"},
-	{         "dialogs",                "USE_SYSDIALOGS",  "", true,  "System dialogs support"},
-	{      "langdetect",                "USE_DETECTLANG",  "", true,  "System language detection support" }, // This feature actually depends on "translation", there
-	                                                                                                         // is just no current way of properly detecting this...
-	{    "text-console", "USE_TEXT_CONSOLE_FOR_DEBUGGER",  "", false, "Text console debugger" }, // This feature is always applied in xcode projects
-	{             "tts",                       "USE_TTS",  "", true,  "Text to speech support"}
+	{             "bink",                      "USE_BINK", false, true,  "Bink video support" },
+	{          "scalers",                   "USE_SCALERS", false, true,  "Scalers" },
+	{        "hqscalers",                "USE_HQ_SCALERS", false, true,  "HQ scalers" },
+	{            "16bit",                 "USE_RGB_COLOR", false, true,  "16bit color support" },
+	{          "highres",                   "USE_HIGHRES", false, true,  "high resolution" },
+	{          "mt32emu",                   "USE_MT32EMU", false, true,  "integrated MT-32 emulator" },
+	{              "lua",                       "USE_LUA", false, true,  "lua" },
+	{             "nasm",                      "USE_NASM", false, true,  "IA-32 assembly support" }, // This feature is special in the regard, that it needs additional handling.
+	{           "opengl",                    "USE_OPENGL", false, true,  "OpenGL support" },
+	{         "opengles",                      "USE_GLES", false, true,  "forced OpenGL ES mode" },
+	{          "taskbar",                   "USE_TASKBAR", false, true,  "Taskbar integration support" },
+	{            "cloud",                     "USE_CLOUD", false, true,  "Cloud integration support" },
+	{      "translation",               "USE_TRANSLATION", false, true,  "Translation support" },
+	{           "vkeybd",                 "ENABLE_VKEYBD", false, false, "Virtual keyboard support"},
+	{    "eventrecorder",          "ENABLE_EVENTRECORDER", false, false, "Event recorder support"},
+	{          "updates",                   "USE_UPDATES", false, false, "Updates support"},
+	{          "dialogs",                "USE_SYSDIALOGS", false, true,  "System dialogs support"},
+	{       "langdetect",                "USE_DETECTLANG", false, true,  "System language detection support" }, // This feature actually depends on "translation", there
+	                                                                                                           // is just no current way of properly detecting this...
+	{     "text-console", "USE_TEXT_CONSOLE_FOR_DEBUGGER", false, false, "Text console debugger" }, // This feature is always applied in xcode projects
+	{              "tts",                       "USE_TTS", false, true,  "Text to speech support"},
+	{"builtin-resources",             "BUILTIN_RESOURCES", false, true,  "include resources (e.g. engine data, fonts) into the binary"}
 };
 
 const Tool s_tools[] = {
@@ -1111,7 +1085,19 @@ const MSVCVersion s_msvc[] = {
 	{ 15,    "Visual Studio 2017",    "12.00",            "15",    "15.0",    "v141",    "llvm"        },
 	{ 16,    "Visual Studio 2019",    "12.00",    "Version 16",    "16.0",    "v142",    "llvm"        }
 };
+
+const char *s_msvc_arch_names[] = {"arm64", "x86", "x64"};
+const char *s_msvc_config_names[] = {"arm64", "Win32", "x64"};
+// clang-format on
 } // End of anonymous namespace
+
+std::string getMSVCArchName(MSVC_Architecture arch) {
+	return s_msvc_arch_names[arch];
+}
+
+std::string getMSVCConfigName(MSVC_Architecture arch) {
+	return s_msvc_config_names[arch];
+}
 
 FeatureList getAllFeatures() {
 	const size_t featureCount = sizeof(s_features) / sizeof(s_features[0]);
@@ -1134,19 +1120,6 @@ StringList getFeatureDefines(const FeatureList &features) {
 	return defines;
 }
 
-StringList getFeatureLibraries(const FeatureList &features) {
-	StringList libraries;
-
-	for (FeatureList::const_iterator i = features.begin(); i != features.end(); ++i) {
-		if (i->enable && i->libraries && i->libraries[0]) {
-			StringList fLibraries = tokenize(i->libraries);
-			libraries.splice(libraries.end(), fLibraries);
-		}
-	}
-
-	return libraries;
-}
-
 bool setFeatureBuildState(const std::string &name, FeatureList &features, bool enable) {
 	FeatureList::iterator i = std::find(features.begin(), features.end(), name);
 	if (i != features.end()) {
@@ -1164,6 +1137,20 @@ bool getFeatureBuildState(const std::string &name, FeatureList &features) {
 	} else {
 		return false;
 	}
+}
+
+BuildSetup removeFeatureFromSetup(BuildSetup setup, const std::string &feature) {
+	// TODO: disable feature instead of removing from setup
+	for (FeatureList::iterator i = setup.features.begin(); i != setup.features.end(); ++i) {
+		if (i->enable && feature == i->name) {
+			if (i->define && i->define[0]) {
+				setup.defines.remove(i->define);
+			}
+			setup.features.erase(i);
+			break;
+		}
+	}
+	return setup;
 }
 
 ToolList getAllTools() {
@@ -1214,7 +1201,7 @@ int getInstalledMSVC() {
 	// Use the registry to get the latest version
 	if (latest == 0) {
 		HKEY key;
-		LSTATUS err = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VS7", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &key);
+		LONG err = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VS7", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &key);
 		if (err == ERROR_SUCCESS && key != NULL) {
 			const MSVCList msvc = getAllMSVCVersions();
 			for (MSVCList::const_reverse_iterator i = msvc.rbegin(); i != msvc.rend(); ++i) {
@@ -1260,7 +1247,8 @@ void splitFilename(const std::string &fileName, std::string &name, std::string &
 
 std::string basename(const std::string &fileName) {
 	const std::string::size_type slash = fileName.find_last_of('/');
-	if (slash == std::string::npos) return fileName;
+	if (slash == std::string::npos)
+		return fileName;
 	return fileName.substr(slash + 1);
 }
 
@@ -1420,7 +1408,6 @@ void createDirectory(const std::string &dir) {
 		}
 	}
 #endif
-
 }
 
 /**
@@ -1485,7 +1472,7 @@ FileNode *scanFiles(const std::string &dir, const StringList &includeList, const
 // Project Provider methods
 //////////////////////////////////////////////////////////////////////////
 ProjectProvider::ProjectProvider(StringList &global_warnings, std::map<std::string, StringList> &project_warnings, const int version)
-	: _version(version), _globalWarnings(global_warnings), _projectWarnings(project_warnings) {
+    : _version(version), _globalWarnings(global_warnings), _projectWarnings(project_warnings) {
 }
 
 void ProjectProvider::createProject(BuildSetup &setup) {
@@ -1511,7 +1498,8 @@ void ProjectProvider::createProject(BuildSetup &setup) {
 		if (i->first == setup.projectName)
 			continue;
 		// Retain the files between engines if we're creating a single project
-		in.clear(); ex.clear();
+		in.clear();
+		ex.clear();
 
 		const std::string moduleDir = setup.srcDir + targetFolder + i->first;
 
@@ -1521,7 +1509,8 @@ void ProjectProvider::createProject(BuildSetup &setup) {
 
 	if (setup.tests) {
 		// Create the main project file.
-		in.clear(); ex.clear();
+		in.clear();
+		ex.clear();
 		createModuleList(setup.srcDir + "/backends", setup.defines, setup.testDirs, in, ex);
 		createModuleList(setup.srcDir + "/backends/platform/sdl", setup.defines, setup.testDirs, in, ex);
 		createModuleList(setup.srcDir + "/base", setup.defines, setup.testDirs, in, ex);
@@ -1535,7 +1524,8 @@ void ProjectProvider::createProject(BuildSetup &setup) {
 		createProjectFile(setup.projectName, svmUUID, setup, setup.srcDir, in, ex);
 	} else if (!setup.devTools) {
 		// Last but not least create the main project file.
-		in.clear(); ex.clear();
+		in.clear();
+		ex.clear();
 		// File list for the Project file
 		createModuleList(setup.srcDir + "/backends", setup.defines, setup.testDirs, in, ex);
 		createModuleList(setup.srcDir + "/backends/platform/sdl", setup.defines, setup.testDirs, in, ex);
@@ -1628,8 +1618,10 @@ std::string ProjectProvider::createUUID() const {
 	for (int i = 0; i < kUUIDLen; ++i)
 		uuid[i] = (unsigned char)((std::rand() / (double)(RAND_MAX)) * 0xFF);
 
-	uuid[8] &= 0xBF; uuid[8] |= 0x80;
-	uuid[6] &= 0x4F; uuid[6] |= 0x40;
+	uuid[8] &= 0xBF;
+	uuid[8] |= 0x80;
+	uuid[6] &= 0x4F;
+	uuid[6] |= 0x40;
 
 	return UUIDToString(uuid);
 #endif
@@ -1641,7 +1633,7 @@ std::string ProjectProvider::createUUID(const std::string &name) const {
 	if (!CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
 		error("CryptAcquireContext failed");
 	}
-	
+
 	// Use MD5 hashing algorithm
 	HCRYPTHASH hHash = NULL;
 	if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash)) {
@@ -1651,7 +1643,7 @@ std::string ProjectProvider::createUUID(const std::string &name) const {
 
 	// Hash unique ScummVM namespace {5f5b43e8-35ff-4f1e-ad7e-a2a87e9b5254}
 	const BYTE uuidNs[kUUIDLen] =
-		{ 0x5f, 0x5b, 0x43, 0xe8, 0x35, 0xff, 0x4f, 0x1e, 0xad, 0x7e, 0xa2, 0xa8, 0x7e, 0x9b, 0x52, 0x54 };
+	    {0x5f, 0x5b, 0x43, 0xe8, 0x35, 0xff, 0x4f, 0x1e, 0xad, 0x7e, 0xa2, 0xa8, 0x7e, 0x9b, 0x52, 0x54};
 	if (!CryptHashData(hHash, uuidNs, kUUIDLen, 0)) {
 		CryptDestroyHash(hHash);
 		CryptReleaseContext(hProv, 0);
@@ -1675,8 +1667,10 @@ std::string ProjectProvider::createUUID(const std::string &name) const {
 	}
 
 	// Add version and variant
-	uuid[6] &= 0x0F; uuid[6] |= 0x30;
-	uuid[8] &= 0x3F; uuid[8] |= 0x80;
+	uuid[6] &= 0x0F;
+	uuid[6] |= 0x30;
+	uuid[8] &= 0x3F;
+	uuid[8] |= 0x80;
 
 	CryptDestroyHash(hHash);
 	CryptReleaseContext(hProv, 0);
@@ -1727,7 +1721,8 @@ void ProjectProvider::addFilesToProject(const std::string &dir, std::ofstream &p
 			continue;
 
 		// Search for duplicates
-		StringList::const_iterator j = i; ++j;
+		StringList::const_iterator j = i;
+		++j;
 		for (; j != includeList.end(); ++j) {
 			std::string candidateFileName = getLastPathComponent(*j);
 			std::transform(candidateFileName.begin(), candidateFileName.end(), candidateFileName.begin(), tolower);
@@ -1998,7 +1993,7 @@ void ProjectProvider::createEnginePluginsTable(const BuildSetup &setup) {
 		                   << "#endif\n";
 	}
 }
-} // End of anonymous namespace
+} // namespace CreateProjectTool
 
 void error(const std::string &message) {
 	std::cerr << "ERROR: " << message << "!" << std::endl;

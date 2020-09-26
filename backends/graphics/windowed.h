@@ -77,6 +77,8 @@ public:
 		_forceRedraw = true;
 	}
 
+	virtual bool isOverlayVisible() const override { return _overlayVisible; }
+
 	virtual void setShakePos(int shakeXOffset, int shakeYOffset) override {
 		if (_gameScreenShakeXOffset != shakeXOffset || _gameScreenShakeYOffset != shakeYOffset) {
 			_gameScreenShakeXOffset = shakeXOffset;
@@ -223,7 +225,7 @@ protected:
 	 */
 	virtual void setSystemMousePosition(const int x, const int y) = 0;
 
-	virtual bool showMouse(const bool visible) override {
+	virtual bool showMouse(bool visible) override {
 		if (_cursorVisible == visible) {
 			return visible;
 		}
@@ -240,7 +242,7 @@ protected:
 	 * @param x	The new X position of the mouse in virtual screen coordinates.
 	 * @param y	The new Y position of the mouse in virtual screen coordinates.
 	 */
-	void warpMouse(const int x, const int y) override {
+	void warpMouse(int x, int y) override {
 		// Check active coordinate instead of window coordinate to avoid warping
 		// the mouse if it is still within the same virtual pixel
 		const Common::Point virtualCursor = convertWindowToVirtual(_cursorX, _cursorY);

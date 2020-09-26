@@ -36,15 +36,49 @@ Common::String toLowercaseMac(const Common::String &s);
 
 Common::String convertPath(Common::String &path);
 
+Common::String unixToMacPath(const Common::String &path);
+
 Common::String getPath(Common::String path, Common::String cwd);
 
-Common::String pathMakeRelative(Common::String path, bool recursive = true, bool addexts = true);
+bool testPath(Common::String &path, bool directory = false);
+
+Common::String pathMakeRelative(Common::String path, bool recursive = true, bool addexts = true, bool directory = false);
+
+Common::String testExtensions(Common::String component, Common::String initialPath, Common::String convPath);
+
+Common::String getFileName(Common::String path);
 
 Common::String stripMacPath(const char *name);
 
 Common::String convertMacFilename(const char *name);
 
+Common::String dumpScriptName(const char *prefix, int type, int id, const char *ext);
+
 bool processQuitEvent(bool click = false); // events.cpp
+
+class RandomState {
+public:
+    uint32 _seed;
+    uint32 _mask;
+    uint32 _len;
+
+    RandomState() {
+        _seed = _mask = _len = 0;
+    }
+
+    void setSeed(int seed);
+    uint32 getSeed() { return _seed; }
+    int32 getRandom(int32 range);
+
+private:
+    void init(int len);
+    int32 genNextRandom();
+    int32 perlin(int32 val);
+};
+
+uint32 readVarInt(Common::SeekableReadStream &stream);
+
+Common::SeekableReadStreamEndian *readZlibData(Common::SeekableReadStream &stream, unsigned long len, unsigned long *outLen, bool bigEndian);
 
 } // End of namespace Director
 

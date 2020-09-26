@@ -33,7 +33,6 @@
 #include "common/rect.h"
 #include "common/events.h"
 #include "backends/base-backend.h"
-#include "graphics/colormasks.h"
 #include "graphics/palette.h"
 #include "graphics/surface.h"
 #include "audio/mixer_intern.h"
@@ -85,9 +84,9 @@ private:
 	s32 _configGraphicsMode;
 	s32 _actualGraphicsMode;
 	bool _bilinearFilter;
-#ifdef USE_RGB_COLOR
 	const Graphics::PixelFormat _pfRGB565;
 	const Graphics::PixelFormat _pfRGB3444;
+#ifdef USE_RGB_COLOR
 	Graphics::PixelFormat _pfGame;
 	Graphics::PixelFormat _pfGameTexture;
 	Graphics::PixelFormat _pfCursor;
@@ -177,6 +176,7 @@ public:
 
 	virtual void showOverlay();
 	virtual void hideOverlay();
+	virtual bool isOverlayVisible() const { return _overlayVisible; }
 	virtual void clearOverlay();
 	virtual void grabOverlay(void *buf, int pitch);
 	virtual void copyRectToOverlay(const void *buf, int pitch,

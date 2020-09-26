@@ -92,9 +92,6 @@ struct TransparentSurface : public Graphics::Surface {
 		return PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0);
 	}
 
-	void setColorKey(char r, char g, char b);
-	void disableColorKey();
-
 	/**
 	 @brief renders the surface to another surface
 	 @param target a pointer to the target surface. In most cases this is the framebuffer.
@@ -145,12 +142,10 @@ struct TransparentSurface : public Graphics::Surface {
 	 *
 	 * @param newWidth the resulting width.
 	 * @param newHeight the resulting height.
+	 * @param filtering Whether or not to use bilinear filtering.
 	 * @see TransformStruct
 	 */
-	template <TFilteringMode filteringMode>
-	TransparentSurface *scaleT(uint16 newWidth, uint16 newHeight) const;
-
-	TransparentSurface *scale(uint16 newWidth, uint16 newHeight) const;
+	TransparentSurface *scale(uint16 newWidth, uint16 newHeight, bool filtering = false) const;
 
 	/**
 	 * @brief Rotoscale function; this returns a transformed version of this surface after rotation and
@@ -177,9 +172,6 @@ struct TransparentSurface : public Graphics::Surface {
 	void setAlphaMode(AlphaType);
 private:
 	AlphaType _alphaMode;
-
-	template <typename Size>
-	void scaleNN(int *scaleCacheX, TransparentSurface *target) const;
 };
 
 /**

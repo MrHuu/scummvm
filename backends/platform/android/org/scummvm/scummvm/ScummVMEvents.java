@@ -1,8 +1,10 @@
 package org.scummvm.scummvm;
 
+//import androidx.annotation.NonNull;
 import android.os.Handler;
 import android.os.Message;
 import android.content.Context;
+//import android.util.Log;
 import android.view.KeyEvent;
 import android.view.KeyCharacterMap;
 import android.view.MotionEvent;
@@ -11,6 +13,8 @@ import android.view.ViewConfiguration;
 import android.view.GestureDetector;
 import android.view.InputDevice;
 import android.view.inputmethod.InputMethodManager;
+
+//import java.lang.ref.WeakReference;
 
 public class ScummVMEvents implements
 		android.view.View.OnKeyListener,
@@ -48,6 +52,30 @@ public class ScummVMEvents implements
 	final protected int _longPress;
 	final protected MouseHelper _mouseHelper;
 
+	// Reverted code back to using the native Handler function instead of a static custom,
+	// since that had issues detecting the long-presses for some reason
+	// So for now we shall ignore the Android Studio warning for "This Handler class should be static or leaks might occur (anonymous android.os.Handler)"
+	//
+	// TODO investigate further why our static custom Handler based on https://stackoverflow.com/a/57926736 was not receiving messages *especially* on a recent enough Android 9 device (Huawei MediaPad M5 CMR-W09)
+	//
+	final private Handler _keyHandler = new Handler() {
+		@Override
+		public void handleMessage(Message msg) {
+			if (msg.what == MSG_SMENU_LONG_PRESS) {
+				// this displays the android keyboard (see showVirtualKeyboard() in ScummVMActivity.java)
+				// when menu key is long-pressed
+				InputMethodManager imm = (InputMethodManager)
+					_context.getSystemService(Context.INPUT_METHOD_SERVICE);
+
+				if (imm != null)
+					imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+			} else if (msg.what == MSG_SBACK_LONG_PRESS) {
+				_scummvm.pushEvent(JE_SYS_KEY, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MENU, 0, 0, 0, 0);
+				_scummvm.pushEvent(JE_SYS_KEY, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MENU, 0, 0, 0, 0);
+			}
+		}
+	};
+
 	public ScummVMEvents(Context context, ScummVM scummvm, MouseHelper mouseHelper) {
 		_context = context;
 		_scummvm = scummvm;
@@ -59,6 +87,8 @@ public class ScummVMEvents implements
 
 		_longPress = ViewConfiguration.getLongPressTimeout();
 	}
+
+	public void clearEventHandler() { }
 
 	final public void sendQuitEvent() {
 		_scummvm.pushEvent(JE_QUIT, 0, 0, 0, 0, 0, 0);
@@ -78,24 +108,6 @@ public class ScummVMEvents implements
 
 	final static int MSG_SMENU_LONG_PRESS = 1;
 	final static int MSG_SBACK_LONG_PRESS = 2;
-
-	final private Handler keyHandler = new Handler() {
-		@Override
-		public void handleMessage(Message msg) {
-			if (msg.what == MSG_SMENU_LONG_PRESS) {
-				// this displays the android keyboard (see showVirtualKeyboard() in ScummVMActivity.java)
-				// when menu key is long-pressed
-				InputMethodManager imm = (InputMethodManager)
-					_context.getSystemService(Context.INPUT_METHOD_SERVICE);
-
-				if (imm != null)
-					imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
-			} else if (msg.what == MSG_SBACK_LONG_PRESS) {
-				_scummvm.pushEvent(JE_SYS_KEY, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MENU, 0, 0, 0, 0);
-				_scummvm.pushEvent(JE_SYS_KEY, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MENU, 0, 0, 0, 0);
-			}
-		}
-	};
 
 	// OnKeyListener
 	@Override
@@ -144,13 +156,12 @@ public class ScummVMEvents implements
 					typeOfLongPressMessage = MSG_SBACK_LONG_PRESS;
 				}
 
-				final boolean fired = !keyHandler.hasMessages(typeOfLongPressMessage);
+				final boolean fired = !_keyHandler.hasMessages(typeOfLongPressMessage);
 
-				keyHandler.removeMessages(typeOfLongPressMessage);
+				_keyHandler.removeMessages(typeOfLongPressMessage);
 
 				if (action == KeyEvent.ACTION_DOWN) {
-					keyHandler.sendMessageDelayed(keyHandler.obtainMessage(
-									typeOfLongPressMessage), _longPress);
+					_keyHandler.sendMessageDelayed(_keyHandler.obtainMessage(typeOfLongPressMessage), _longPress);
 					return true;
 				} else if (action != KeyEvent.ACTION_UP) {
 					return true;

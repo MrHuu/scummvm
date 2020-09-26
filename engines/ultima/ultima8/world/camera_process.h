@@ -30,15 +30,14 @@
 namespace Ultima {
 namespace Ultima8 {
 
-//
-// The camera process. This works in 3 ways
-//
-// It can be set to stay where it currently is
-// It can be set to follow an item.
-// It can be set to scroll to an item
-// It can be set to stay at a location
-//
-
+/**
+* The camera process. This works in 4 ways:
+*
+* It can be set to stay where it currently is
+* It can be set to follow an item.
+* It can be set to scroll to an item
+* It can be set to stay at a location
+*/
 class CameraProcess : public Process {
 public:
 	CameraProcess();
@@ -62,10 +61,13 @@ public:
 	uint16 FindRoof(int32 factor);
 
 	INTRINSIC(I_setCenterOn);
-	INTRINSIC(I_move_to);
+	INTRINSIC(I_moveTo);
 	INTRINSIC(I_scrollTo);
 	INTRINSIC(I_startQuake);
 	INTRINSIC(I_stopQuake);
+	INTRINSIC(I_getCameraX);
+	INTRINSIC(I_getCameraY);
+	INTRINSIC(I_getCameraZ);
 
 	static void             GetCameraLocation(int32 &x, int32 &y, int32 &z);
 	static CameraProcess   *GetCameraProcess() {
@@ -84,9 +86,9 @@ public:
 	void terminate() override;   // Terminate NOW!
 
 	bool loadData(Common::ReadStream *rs, uint32 version);
-private:
 	void saveData(Common::WriteStream *ws) override;
 
+private:
 	int32 _sx, _sy, _sz;
 	int32 _ex, _ey, _ez;
 	int32 _time;

@@ -97,7 +97,7 @@ static const char HELP_STRING[] =
 	"  -g, --gfx-mode=MODE      Select graphics scaler (1x,2x,3x,2xsai,super2xsai,\n"
 	"                           supereagle,advmame2x,advmame3x,hq2x,hq3x,tv2x,\n"
 	"                           dotmatrix)\n"
-	"  --stretch-mode=MODE      Select stretch mode (center, integral, fit, stretch)"
+	"  --stretch-mode=MODE      Select stretch mode (center, integral, fit, stretch)\n"
 	"  --filtering              Force filtered graphics mode\n"
 	"  --no-filtering           Force unfiltered graphics mode\n"
 	"  --gui-theme=THEME        Select GUI theme\n"
@@ -169,7 +169,8 @@ static const char HELP_STRING[] =
 	"  --demo-mode              Start demo mode of Maniac Mansion or The 7th Guest\n"
 #endif
 #if defined(ENABLE_DIRECTOR)
-	"  --start-movie=NAME       Start movie for Director\n"
+	"  --start-movie=NAME@NUM   Start movie at frame for Director\n"
+	"							Either can be specified without the other.\n"
 #endif
 #ifdef ENABLE_SCUMM
 	"  --tempo=NUM              Set music tempo (in percent, 50-200) for SCUMM games\n"
@@ -916,7 +917,7 @@ static Common::Error listSaves(const Common::String &singleTarget) {
 					   "  ---- ------------------------------------------------------\n");
 
 			for (SaveStateList::const_iterator x = saveList.begin(); x != saveList.end(); ++x) {
-				printf("  %-4d %s\n", x->getSaveSlot(), x->getDescription().c_str());
+				printf("  %-4d %s\n", x->getSaveSlot(), x->getDescription().encode().c_str());
 				// TODO: Could also iterate over the full hashmap, printing all key-value pairs
 			}
 			atLeastOneFound = true;
@@ -979,8 +980,8 @@ static DetectedGames getGameList(const Common::FSNode &dir) {
 	DetectionResults detectionResults = EngineMan.detectGames(files);
 
 	if (detectionResults.foundUnknownGames()) {
-		Common::String report = detectionResults.generateUnknownGameReport(false, 80);
-		g_system->logMessage(LogMessageType::kInfo, report.c_str());
+		Common::U32String report = detectionResults.generateUnknownGameReport(false, 80);
+		g_system->logMessage(LogMessageType::kInfo, report.encode().c_str());
 	}
 
 	return detectionResults.listRecognizedGames();

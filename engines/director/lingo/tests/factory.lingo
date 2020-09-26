@@ -14,7 +14,7 @@ method mMove x, y
     global aimCopy
     set the locH of sprite 15 to x
     set the locV of sprite 15 to y-250
-    aimCopy = me
+    set aimCopy = me
 method mAtFrame
     dontpassevent
     me(mMove, the mouseH, the mouseV)
@@ -94,3 +94,7 @@ Method mAtFrame2 frame, subFrame
 macro KillIt2
 global KillLoc
 set the locH of sprite 3 to KillLoc
+
+on aim2 test
+    put "fallback worked!"
+end

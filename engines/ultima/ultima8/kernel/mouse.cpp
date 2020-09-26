@@ -30,6 +30,7 @@
 #include "ultima/ultima8/gumps/gump.h"
 #include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/misc/direction.h"
+#include "ultima/ultima8/misc/direction_util.h"
 #include "ultima/ultima8/misc/rect.h"
 #include "ultima/ultima8/world/get_object.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
@@ -37,12 +38,16 @@
 namespace Ultima {
 namespace Ultima8 {
 
-Mouse *Mouse::_instance;
+Mouse *Mouse::_instance = nullptr;
 
 Mouse::Mouse() : _flashingCursorTime(0), _mouseOverGump(0), _defaultMouse(nullptr),
 		_dragging(DRAG_NOT), _dragging_objId(0), _draggingItem_startGump(0),
 		_draggingItem_lastGump(0) {
 	_instance = this;
+}
+
+Mouse::~Mouse() {
+	_instance = nullptr;
 }
 
 void Mouse::setup() {
@@ -140,8 +145,8 @@ int Mouse::getMouseLength(int mx, int my) {
 	screen->GetSurfaceDims(dims);
 
 	// For now, reference point is (near) the center of the screen
-	int dx = abs(mx - dims.w / 2);
-	int dy = abs((dims.h / 2 + (dims.h * 14 / 200)) - my); //! constant
+	int dx = abs(mx - dims.width() / 2);
+	int dy = abs((dims.height() / 2 + (dims.height() * 14 / 200)) - my); //! constant
 
 	//
 	// The original game switches cursors from small -> medium -> large on
@@ -151,10 +156,10 @@ int Mouse::getMouseLength(int mx, int my) {
 	// Modern players may be in a window so give them a little bit more
 	// space to make the large cursor without having to hit the edge.
 	//
-	int xshort = (dims.w * 30 / 320);
-	int xmed = (dims.w * 100 / 320);
-	int yshort = (dims.h * 30 / 320);
-	int ymed = (dims.h * 100 / 320);
+	int xshort = (dims.width() * 30 / 320);
+	int xmed = (dims.width() * 100 / 320);
+	int yshort = (dims.height() * 30 / 320);
+	int ymed = (dims.height() * 100 / 320);
 
 	// determine length of arrow
 	if (dx > xmed || dy > ymed) {
@@ -166,20 +171,20 @@ int Mouse::getMouseLength(int mx, int my) {
 	}
 }
 
-int Mouse::getMouseDirectionWorld(int mx, int my) {
+Direction Mouse::getMouseDirectionWorld(int mx, int my) {
 	Rect dims;
 	RenderSurface *screen = Ultima8Engine::get_instance()->getRenderScreen();
 	screen->GetSurfaceDims(dims);
 
 	// For now, reference point is (near) the center of the screen
-	int dx = mx - dims.w / 2;
-	int dy = (dims.h / 2 + (dims.h * 14 / 200)) - my; //! constant
+	int dx = mx - dims.width() / 2;
+	int dy = (dims.height() / 2 + (dims.height() * 14 / 200)) - my; //! constant
 
-	return Get_direction(dy * 2, dx);
+	return Direction_Get(dy * 2, dx, dirmode_8dirs);
 }
 
-int Mouse::getMouseDirectionScreen(int mx, int my) {
-	return ((getMouseDirectionWorld(mx, my)) + 1) % 8;
+Direction Mouse::getMouseDirectionScreen(int mx, int my) {
+	return Direction_OneRight(getMouseDirectionWorld(mx, my), dirmode_8dirs);
 }
 
 int Mouse::getMouseFrame() {
@@ -217,7 +222,8 @@ int Mouse::getMouseFrame() {
 		}
 
 		// Calculate frame based on direction
-		int frame = getMouseDirectionScreen(_mousePos.x, _mousePos.y);
+		Direction mousedir = getMouseDirectionScreen(_mousePos.x, _mousePos.y);
+		int frame = mouseFrameForDir(mousedir);
 
 		/** length --- frame offset
 		 *    0              0
@@ -252,20 +258,34 @@ int Mouse::getMouseFrame() {
 	}
 }
 
+int Mouse::mouseFrameForDir(Direction mousedir) const {
+	switch (mousedir) {
+		case dir_north:		return 0;
+		case dir_northeast: return 1;
+		case dir_east:		return 2;
+		case dir_southeast: return 3;
+		case dir_south:		return 4;
+		case dir_southwest: return 5;
+		case dir_west:		return 6;
+		case dir_northwest: return 7;
+		default:			return 0;
+	}
+}
+
 void Mouse::setMouseCoords(int mx, int my) {
 	Rect dims;
 	RenderSurface *screen = Ultima8Engine::get_instance()->getRenderScreen();
 	screen->GetSurfaceDims(dims);
 
-	if (mx < dims.x)
-		mx = dims.x;
-	else if (mx > dims.w)
-		mx = dims.w;
+	if (mx < dims.left)
+		mx = dims.left;
+	else if (mx > dims.width())
+		mx = dims.width();
 
-	if (my < dims.y)
-		my = dims.y;
-	else if (my > dims.h)
-		my = dims.h;
+	if (my < dims.top)
+		my = dims.top;
+	else if (my > dims.height())
+		my = dims.height();
 
 	_mousePos.x = mx;
 	_mousePos.y = my;

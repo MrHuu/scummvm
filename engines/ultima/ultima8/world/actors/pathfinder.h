@@ -24,7 +24,7 @@
 #define ULTIMA8_WORLD_ACTORS_PATHFINDER_H
 
 #include "ultima/shared/std/containers.h"
-#include "ultima/shared/std/containers.h"
+#include "ultima/ultima8/misc/direction.h"
 #include "ultima/ultima8/world/actors/animation.h"
 
 namespace Ultima {
@@ -34,12 +34,12 @@ class Actor;
 class Item;
 
 struct PathfindingState {
-	PathfindingState() : _x(0), _y(0), _z(0),  _direction(0),
+	PathfindingState() : _x(0), _y(0), _z(0),  _direction(dir_north),
 		_lastAnim(Animation::walk), _flipped(false),
 		_firstStep(true), _combat(false) {};
 	int32 _x, _y, _z;
 	Animation::Sequence _lastAnim;
-	uint32 _direction;
+	Direction _direction;
 	bool _flipped;
 	bool _firstStep;
 	bool _combat;
@@ -52,7 +52,7 @@ struct PathfindingState {
 
 struct PathfindingAction {
 	Animation::Sequence _action;
-	uint32 _direction;
+	Direction _direction;
 	uint32 _steps;
 };
 
@@ -96,14 +96,15 @@ protected:
 	Std::list<PathfindingState> _visited;
 	Std::priority_queue<PathNode *, Std::vector<PathNode *>, PathNodeCmp> _nodes;
 
-	Std::list<PathNode *> _nodeList;
+	/** List of nodes for garbage collection later and order is not important */
+	Std::vector<PathNode *> _cleanupNodes;
 
 	bool alreadyVisited(int32 x, int32 y, int32 z) const;
 	void newNode(PathNode *oldnode, PathfindingState &state,
 				 unsigned int steps);
 	void expandNode(PathNode *node);
 	unsigned int costHeuristic(PathNode *node);
-	bool checkTarget(PathNode *node) const;
+	bool checkTarget(const PathNode *node) const;
 };
 
 } // End of namespace Ultima8

@@ -33,9 +33,9 @@
 namespace Ultima {
 namespace Ultima8 {
 
-AVIPlayer::AVIPlayer(Common::SeekableReadStream *rs, int width, int height)
+AVIPlayer::AVIPlayer(Common::SeekableReadStream *rs, int width, int height, const byte *overridePal)
 	: MoviePlayer(), _playing(false), _width(width), _height(height),
-	  _doubleSize(false) {
+	  _doubleSize(false), _overridePal(overridePal) {
 	_decoder = new Video::AVIDecoder();
 	_decoder->loadStream(rs);
 	uint32 vidWidth = _decoder->getWidth();
@@ -77,7 +77,12 @@ void AVIPlayer::paint(RenderSurface *surf, int /*lerp*/) {
 			return;
 		}
 		if (frame->format.bytesPerPixel == 1) {
-			const byte *pal = _decoder->getPalette();
+			const byte *pal;
+			if (_overridePal)
+				pal = _overridePal;
+			else
+				pal = _decoder->getPalette();
+
 			_currentFrame.loadSurface8Bit(frame, pal);
 		} else {
 			_currentFrame.loadSurface(frame);
@@ -88,9 +93,10 @@ void AVIPlayer::paint(RenderSurface *surf, int /*lerp*/) {
 	// movies too (eg, T02 for the intro).  For now just point-scale.
 	if (_doubleSize) {
 		const Scaler *pointScaler = &Ultima8Engine::get_instance()->point_scaler;
-		surf->ScalerBlit(&_currentFrame, 0, 0, _currentFrame.w, _currentFrame.h,
-						_xoff, _yoff, _currentFrame.w * 2, _currentFrame.h * 2,
-						pointScaler, false);
+		bool ok = surf->ScalerBlit(&_currentFrame, 0, 0, _currentFrame.w, _currentFrame.h,
+								   _xoff, _yoff, _currentFrame.w * 2, _currentFrame.h * 2,
+								   pointScaler, false);
+		assert(ok);
 	} else {
 		surf->Blit(&_currentFrame, 0, 0, _currentFrame.w, _currentFrame.h,
 				   _xoff, _yoff);

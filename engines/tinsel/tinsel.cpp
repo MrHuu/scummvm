@@ -308,7 +308,7 @@ static void MouseProcess(CORO_PARAM, const void *) {
 		_vm->_mouseButtons.pop_front();
 
 		int xp, yp;
-		GetCursorXYNoWait(&xp, &yp, true);
+		_vm->_cursor->GetCursorXYNoWait(&xp, &yp, true);
 		const Common::Point mousePos(xp, yp);
 
 		switch (type) {
@@ -786,7 +786,7 @@ const char *const TinselEngine::_sampleIndices[][3] = {
 	{ "english.idx", "english1.idx", "english2.idx" },	// Spanish
 	{ "english.idx", "english1.idx", "english2.idx" },	// Hebrew (FIXME: not sure if this is correct)
 	{ "english.idx", "english1.idx", "english2.idx" },	// Hungarian (FIXME: not sure if this is correct)
-	{ "english.idx", "english1.idx", "english2.idx" },	// Japanese (FIXME: not sure if this is correct)
+	{ "japanese.idx", "japanese1.idx", "japanese2.idx" },	// Japanese
 	{ "us.idx", "us1.idx", "us2.idx" }					// US English
 };
 const char *const TinselEngine::_sampleFiles[][3] = {
@@ -797,7 +797,7 @@ const char *const TinselEngine::_sampleFiles[][3] = {
 	{ "english.smp", "english1.smp", "english2.smp" },	// Spanish
 	{ "english.smp", "english1.smp", "english2.smp" },	// Hebrew (FIXME: not sure if this is correct)
 	{ "english.smp", "english1.smp", "english2.smp" },	// Hungarian (FIXME: not sure if this is correct)
-	{ "english.smp", "english1.smp", "english2.smp" },	// Japanese (FIXME: not sure if this is correct)
+	{ "japanese.smp", "japanese1.smp", "japanese2.smp" },	// Japanese
 	{ "us.smp", "us1.smp", "us2.smp" },					// US English
 };
 const char *const TinselEngine::_textFiles[][3] = {
@@ -808,7 +808,7 @@ const char *const TinselEngine::_textFiles[][3] = {
 	{ "spanish.txt", "spanish1.txt", "spanish2.txt" },	// Spanish
 	{ "english.txt", "english1.txt", "english2.txt" },	// Hebrew (FIXME: not sure if this is correct)
 	{ "english.txt", "english1.txt", "english2.txt" },	// Hungarian (FIXME: not sure if this is correct)
-	{ "english.txt", "english1.txt", "english2.txt" },	// Japanese (FIXME: not sure if this is correct)
+	{ "japanese.txt", "japanese1.txt", "japanese2.txt" },	// Japanese
 	{ "us.txt", "us1.txt", "us2.txt" }					// US English
 };
 
@@ -849,6 +849,7 @@ TinselEngine::TinselEngine(OSystem *syst, const TinselGameDescription *gameDesc)
 
 TinselEngine::~TinselEngine() {
 	_system->getAudioCDManager()->stop();
+	delete _cursor;
 	delete _bg;
 	delete _font;
 	delete _bmv;
@@ -896,6 +897,7 @@ Common::Error TinselEngine::run() {
 	_bmv = new BMVPlayer();
 	_font = new Font();
 	_bg = new Background(_font);
+	_cursor = new Cursor();
 
 	// Initialize backend
 	if (getGameID() == GID_DW2) {
@@ -927,7 +929,7 @@ Common::Error TinselEngine::run() {
 	// It may have to be adjusted a bit
 	CountOut = 1;
 
-	RebootCursor();
+	_vm->_cursor->RebootCursor();
 	RebootDeadTags();
 	RebootMovers();
 	resetUserEventTime();
@@ -1109,7 +1111,7 @@ void TinselEngine::RestartGame() {
 	// -> reset the count used by ChangeScene
 	CountOut = 1;
 
-	RebootCursor();
+	_vm->_cursor->RebootCursor();
 	RebootDeadTags();
 	RebootMovers();
 	RebootTimers();
@@ -1229,7 +1231,8 @@ const char *TinselEngine::getSampleIndex(LANGUAGE lang) {
 
 	} else {
 		cd = 0;
-		lang = TXT_ENGLISH;
+		if (lang != TXT_JAPANESE)
+			lang = TXT_ENGLISH;
 	}
 
 	return _sampleIndices[lang][cd];
@@ -1249,7 +1252,8 @@ const char *TinselEngine::getSampleFile(LANGUAGE lang) {
 
 	} else {
 		cd = 0;
-		lang = TXT_ENGLISH;
+		if (lang != TXT_JAPANESE)
+			lang = TXT_ENGLISH;
 	}
 
 	return _sampleFiles[lang][cd];

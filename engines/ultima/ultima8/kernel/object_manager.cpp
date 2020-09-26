@@ -46,6 +46,8 @@
 #include "ultima/ultima8/gumps/widgets/sliding_widget.h"
 #include "ultima/ultima8/gumps/mini_stats_gump.h"
 #include "ultima/ultima8/gumps/minimap_gump.h"
+#include "ultima/ultima8/gumps/cru_pickup_gump.h"
+#include "ultima/ultima8/gumps/cru_pickup_area_gump.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -227,7 +229,7 @@ void ObjectManager::save(Common::WriteStream *ws) {
 		// FIXME: This leaks _objIDs. See comment in ObjectManager::load().
 		if (gump && !gump->mustSave(true)) continue;
 
-		object->save(ws);
+		saveObject(ws, object);
 	}
  
 	ws->writeUint16LE(0);
@@ -286,6 +288,20 @@ bool ObjectManager::load(Common::ReadStream *rs, uint32 version) {
 	pout << "Reclaimed " << count << " _objIDs on load." << Std::endl;
 
 	return true;
+}
+
+void ObjectManager::saveObject(Common::WriteStream *ws, Object *obj) const {
+	const Std::string & classname = obj->GetClassType()._className; // note: virtual
+
+	Std::map<Common::String, ObjectLoadFunc>::iterator iter;
+	iter = _objectLoaders.find(classname);
+	if (iter == _objectLoaders.end()) {
+		error("Object class cannot save without registered loader: %s", classname.c_str());
+	}
+
+	ws->writeUint16LE(classname.size());
+	ws->write(classname.c_str(), classname.size());
+	obj->saveData(ws);
 }
 
 Object *ObjectManager::loadObject(Common::ReadStream *rs, uint32 version) {
@@ -355,6 +371,8 @@ void ObjectManager::setupLoaders() {
 	addObjectLoader("SlidingWidget", ObjectLoader<SlidingWidget>::load);
 	addObjectLoader("MiniStatsGump", ObjectLoader<MiniStatsGump>::load);
 	addObjectLoader("MiniMapGump", ObjectLoader<MiniMapGump>::load);
+	addObjectLoader("CruPickupAreaGump", ObjectLoader<CruPickupAreaGump>::load);
+	addObjectLoader("CruPickupGump", ObjectLoader<CruPickupGump>::load);
 }
 
 } // End of namespace Ultima8

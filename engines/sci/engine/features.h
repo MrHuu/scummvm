@@ -172,6 +172,18 @@ public:
 			 g_sci->getGameId() == GID_SQ6);
 	}
 
+	inline bool useMacGammaLevel() const {
+		// SCI32 Mac interpreters were hard-coded to use gamma level 2 until
+		//  Torin's Passage, PQSWAT, and the 2.1 Late games. The colors in
+		//  the game resources are significantly darker than their PC versions.
+		//  Confirmed in disassembly of all Mac interpreters.
+		return g_sci->getPlatform() == Common::kPlatformMacintosh &&
+			getSciVersion() >= SCI_VERSION_2 &&
+			getSciVersion() < SCI_VERSION_2_1_LATE &&
+			g_sci->getGameId() != GID_PQSWAT &&
+			g_sci->getGameId() != GID_TORIN;
+	}
+
 	inline bool usesAlternateSelectors() const {
 		return g_sci->getGameId() == GID_PHANTASMAGORIA2;
 	}
@@ -187,16 +199,12 @@ public:
 	 */
 	bool supportsTextSpeed() const {
 		switch (g_sci->getGameId()) {
-#ifdef ENABLE_SCI32
 		case GID_GK1:
 		case GID_SQ6:
 			return true;
-#endif
 		default:
-			break;
+			return false;
 		}
-
-		return false;
 	}
 
 	/**

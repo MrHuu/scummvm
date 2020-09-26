@@ -1039,8 +1039,8 @@ enum Flags {
 	kFlagUG16FolderFound                      = 597,
 	kFlagUG07ClovisCaughtMcCoy                = 598,
 	kFlagKIAPrivacyAddonIntro                 = 599,
-	kFlagUG16LutherLanceTalkReplicants1       = 600,
-	kFlagUG16LutherLanceTalkReplicants2       = 601,
+	kFlagUG16LutherLanceTalkReplicants        = 600,
+	kFlagUG16LutherLanceTalkHumans            = 601,
 	// 602 is never used
 	kFlagSteeleAimingAtGordo                  = 603,
 	kFlagNR03McCoyThrownOut                   = 604,
@@ -1095,7 +1095,7 @@ enum Flags {
 	kFlagMcCoyIsHelpingReplicants             = 653,
 	kFlagMA02Chapter5Started                  = 654,
 	kFlagMA02RajifTalk                        = 655,
-	kFlagUG02RagiationGooglesTaken            = 656,
+	kFlagUG02RadiationGogglesTaken            = 656,
 	kFlagNotUsed657                           = 657, // is never set
 	kFlagKP07Entered                          = 658,
 	kFlagNR11BreakWindow                      = 659,

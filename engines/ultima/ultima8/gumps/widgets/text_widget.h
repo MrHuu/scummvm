@@ -93,6 +93,10 @@ public:
 	//! get the RenderedText's vlead
 	int getVlead();
 
+	const Std::string &getText() const {
+		return _text;
+	}
+
 protected:
 	void renderText();
 
@@ -100,8 +104,6 @@ protected:
 
 public:
 	bool loadData(Common::ReadStream *rs, uint32 version);
-
-protected:
 	void saveData(Common::WriteStream *ws) override;
 };
 

@@ -29,7 +29,10 @@
 #include "ultima/ultima8/world/item_factory.h"
 #include "ultima/ultima8/world/actors/actor.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
+#include "ultima/ultima8/world/loop_script.h"
+#include "ultima/ultima8/usecode/uc_list.h"
 #include "ultima/ultima8/misc/id_man.h"
+#include "ultima/ultima8/misc/direction_util.h"
 #include "ultima/ultima8/games/game_data.h"
 #include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/kernel/object_manager.h"
@@ -40,6 +43,7 @@
 #include "ultima/ultima8/world/get_object.h"
 #include "ultima/ultima8/audio/audio_process.h"
 #include "ultima/ultima8/filesys/idata_source.h"
+#include "ultima/ultima8/usecode/intrinsics.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -48,7 +52,8 @@ namespace Ultima8 {
 
 World *World::_world = nullptr;
 
-World::World() : _currentMap(nullptr) {
+World::World() : _currentMap(nullptr), _alertActive(false), _difficulty(1),
+				 _controlledNPCNum(1) {
 	debugN(MM_INFO, "Creating World...\n");
 
 	_world = this;
@@ -276,7 +281,7 @@ void World::loadItemCachNPCData(Common::SeekableReadStream *itemcach, Common::Se
 		actor->setDex(npcds->readByte()); // 0x01: dexterity
 		actor->setInt(npcds->readByte()); // 0x02: intelligence
 		actor->setHP(npcds->readByte());  // 0x03: hitpoints
-		actor->setDir(npcds->readByte()); // 0x04: direction
+		actor->setDir(Direction_FromUsecodeDir(npcds->readByte())); // 0x04: direction
 		uint16 la = npcds->readUint16LE();    // 0x05,0x06: last anim
 		actor->setLastAnim(static_cast<Animation::Sequence>(la));
 		npcds->skip(1); // 0x07: high byte of framenum
@@ -286,7 +291,7 @@ void World::loadItemCachNPCData(Common::SeekableReadStream *itemcach, Common::Se
 		uint8 align = npcds->readByte(); // 0x0B: alignments
 		actor->setAlignment(align & 0x0F);
 		actor->setEnemyAlignment(align & 0xF0);
-		actor->setUnk0C(npcds->readByte()); // 0x0C: unknown;
+		actor->setUnkByte(npcds->readByte()); // 0x0C: unknown;
 		// 0x0C is almost always zero, except for
 		// the avatar (0xC0) and
 		// Malchir, Vardion, Gorgrond, Beren (0xE0)
@@ -337,6 +342,11 @@ void World::save(Common::WriteStream *ws) {
 
 	ws->writeUint16LE(_currentMap->_eggHatcher);
 
+	if (GAME_IS_CRUSADER) {
+		ws->writeByte(_alertActive ? 0 : 1);
+		ws->writeByte(_difficulty);
+	}
+
 	uint16 es = static_cast<uint16>(_ethereal.size());
 	ws->writeUint32LE(es);
 
@@ -362,6 +372,11 @@ bool World::load(Common::ReadStream *rs, uint32 version) {
 
 	_currentMap->_eggHatcher = rs->readUint16LE();
 
+	if (GAME_IS_CRUSADER) {
+		_alertActive = (rs->readByte() != 0);
+		_difficulty = rs->readByte();
+	}
+
 	uint32 etherealcount = rs->readUint32LE();
 	for (unsigned int i = 0; i < etherealcount; ++i) {
 		_ethereal.push_front(rs->readUint16LE());
@@ -377,7 +392,6 @@ void World::saveMaps(Common::WriteStream *ws) {
 	}
 }
 
-
 bool World::loadMaps(Common::ReadStream *rs, uint32 version) {
 	uint32 mapcount = rs->readUint32LE();
 
@@ -388,6 +402,85 @@ bool World::loadMaps(Common::ReadStream *rs, uint32 version) {
 	}
 
 	return true;
+}
+
+void World::setAlertActive(bool active)
+{
+	assert(GAME_IS_CRUSADER);
+    _alertActive = active;
+
+	// Replicate the behavior of the original game.
+	LOOPSCRIPT(script,
+		LS_OR(
+			LS_OR(
+				LS_OR(
+					LS_OR(LS_SHAPE_EQUAL(0x49), LS_SHAPE_EQUAL(0x21)),
+					LS_SHAPE_EQUAL(0x174)),
+				LS_SHAPE_EQUAL(0x271)),
+			  LS_SHAPE_EQUAL(0x477))
+	);
+
+	UCList itemlist(2);
+	_world->getCurrentMap()->areaSearch(&itemlist, script, sizeof(script),
+										nullptr, 0xffff, false);
+	for (uint32 i = 0; i < itemlist.getSize(); i++) {
+		uint16 itemid = itemlist.getuint16(i);
+		Item *item = getItem(itemid);
+		int frame = item->getFrame();
+		if (_alertActive) {
+			if (item->getShape() == 0x477) {
+				if (frame < 2)
+					item->setFrame(frame + 2);
+			} else if (frame == 0) {
+				item->setFrame(1);
+			}
+		} else {
+			if (item->getShape() == 0x477) {
+				if (frame > 1)
+					item->setFrame(frame - 2);
+			} else if (frame == 1) {
+				item->setFrame(0);
+			}
+		}
+	}
+}
+
+void World::setControlledNPCNum(uint16 num) {
+	warning("TODO: World::setControlledNPCNum(%d): IMPLEMENT ME", num);
+}
+
+uint32 World::I_getAlertActive(const uint8 * /*args*/,
+	unsigned int /*argsize*/) {
+	return get_instance()->_world->isAlertActive() ? 1 : 0;
+}
+
+uint32 World::I_setAlertActive(const uint8 * /*args*/,
+	unsigned int /*argsize*/) {
+	get_instance()->_world->setAlertActive(true);
+	return 0;
+}
+
+uint32 World::I_clrAlertActive(const uint8 * /*args*/,
+	unsigned int /*argsize*/) {
+	get_instance()->_world->setAlertActive(false);
+	return 0;
+}
+
+uint32 World::I_gameDifficulty(const uint8 * /*args*/,
+	unsigned int /*argsize*/) {
+	return get_instance()->_world->getGameDifficulty();
+}
+
+uint32 World::I_getControlledNPCNum(const uint8 * /*args*/,
+	unsigned int /*argsize*/) {
+	return get_instance()->_world->getControlledNPCNum();
+}
+
+uint32 World::I_setControlledNPCNum(const uint8 *args,
+	unsigned int /*argsize*/) {
+	ARG_UINT16(num);
+	get_instance()->_world->setControlledNPCNum(num);
+	return 0;
 }
 
 } // End of namespace Ultima8

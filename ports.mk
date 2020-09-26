@@ -269,6 +269,7 @@ ios7bundle: iphone
 		s==0 {print $$0}\
 		s > 0 { s-- }' $(srcdir)/dists/ios7/Info.plist >$(bundle_name)/Info.plist
 	sed -i'' -e 's/$$(PRODUCT_BUNDLE_IDENTIFIER)/org.scummvm.scummvm/' $(bundle_name)/Info.plist
+	sed -i'' -e '/UILaunchStoryboardName/{N;d;}' $(bundle_name)/Info.plist
 	cp $(DIST_FILES_DOCS) $(bundle_name)/
 	cp $(DIST_FILES_THEMES) $(bundle_name)/
 ifdef DIST_FILES_NETWORKING
@@ -407,6 +408,10 @@ ifdef USE_ZLIB
 OSX_ZLIB ?= $(STATICLIBPATH)/lib/libz.a
 endif
 
+ifdef USE_DISCORD
+OSX_STATIC_LIBS += $(STATICLIBPATH)/lib/libdiscord-rpc.a
+endif
+
 ifdef USE_SPARKLE
 ifdef MACOSX
 ifneq ($(SPARKLEPATH),)
@@ -501,7 +506,7 @@ endif
 	@echo Creating Code::Blocks project files...
 	@cd $(srcdir)/dists/codeblocks && ../../devtools/create_project/create_project ../.. --codeblocks >/dev/null && git add -f engines/plugins_table.h *.workspace *.cbp
 	@echo Creating MSVC project files...
-	@cd $(srcdir)/dists/msvc && ../../devtools/create_project/create_project ../.. --msvc-version 12 --msvc >/dev/null && git add -f engines/plugins_table.h *.sln *.vcxproj *.vcxproj.filters *.props
+	@cd $(srcdir)/dists/msvc && ../../devtools/create_project/create_project ../.. --use-canonical-lib-names --msvc-version 12 --msvc >/dev/null && git add -f engines/plugins_table.h *.sln *.vcxproj *.vcxproj.filters *.props
 	@echo
 	@echo All is done.
 	@echo Now run

@@ -47,12 +47,11 @@ static const int PX_GAP = 17;			//! gap (x) between boxes in status bar
 
 static const int FRAME_GUMP_SHAPE = 1;
 
+CruStatusGump *CruStatusGump::_instance = nullptr;
+
 CruStatusGump::CruStatusGump() : Gump() {
-
-}
-
-CruStatusGump::CruStatusGump(int x, int y, uint32 flags, int32 layer)
-	: Gump(0, 0, 5, 5, 0, flags, layer) {
+	assert(!_instance);
+	_instance = this;
 }
 
 CruStatusGump::~CruStatusGump() {
@@ -88,8 +87,8 @@ void CruStatusGump::InitGump(Gump *newparent, bool take_focus) {
 	Gump *energyGump = new CruEnergyGump(frameShape, xoff + (w + PX_GAP) * 4);
 	energyGump->InitGump(this);
 
-	_dims.w = w * 5 + PX_GAP * 4;
-	_dims.h = h;
+	_dims.setWidth(w * 5 + PX_GAP * 4);
+	_dims.setHeight(h);
 	setRelativePosition(BOTTOM_LEFT, PX_FROM_LEFT, -PX_FROM_BOTTOM);
 }
 
@@ -105,6 +104,26 @@ void CruStatusGump::saveData(Common::WriteStream *ws) {
 
 bool CruStatusGump::loadData(Common::ReadStream *rs, uint32 version) {
 	return Gump::loadData(rs, version);
+}
+
+uint32 CruStatusGump::I_hideStatusGump(const uint8 * /*args*/,
+unsigned int /*argsize*/) {
+	CruStatusGump *instance = get_instance();
+	if (instance) {
+		instance->Close();
+		_instance = nullptr;
+	}
+	return 0;
+}
+
+uint32 CruStatusGump::I_showStatusGump(const uint8 * /*args*/,
+	unsigned int /*argsize*/) {
+	CruStatusGump *instance = get_instance();
+	if (!instance) {
+		instance = new CruStatusGump();
+		instance->InitGump(nullptr, false);
+	}
+	return 0;
 }
 
 } // End of namespace Ultima8

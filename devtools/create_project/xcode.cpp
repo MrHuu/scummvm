@@ -497,6 +497,9 @@ void XcodeProvider::setupFrameworksBuildPhase(const BuildSetup &setup) {
 	if (CONTAINS_DEFINE(setup.defines, "USE_ZLIB")) {
 		DEF_SYSTBD("libz");
 	}
+	if (CONTAINS_DEFINE(setup.defines, "USE_DISCORD")) {
+		DEF_LOCALLIB_STATIC("libdiscord-rpc");
+	}
 
 	if (setup.useSDL2) {
 		DEF_LOCALLIB_STATIC("libSDL2main");
@@ -745,7 +748,7 @@ void XcodeProvider::setupProject() {
 
 	Object *project = new Object(this, "PBXProject", "PBXProject", "PBXProject", "", "Project object");
 
-	project->addProperty("buildConfigurationList", getHash("XCConfigurationList_scummvm"), "Build configuration list for PBXProject \"" PROJECT_NAME "\"", kSettingsNoValue);
+	project->addProperty("buildConfigurationList", getHash("XCConfigurationList_" PROJECT_NAME), "Build configuration list for PBXProject \"" PROJECT_NAME "\"", kSettingsNoValue);
 	project->addProperty("compatibilityVersion", "Xcode 3.2", "", kSettingsNoValue | kSettingsQuoteVariable);
 	project->addProperty("developmentRegion", "English", "", kSettingsNoValue);
 	project->addProperty("hasScannedForEncodings", "1", "", kSettingsNoValue);
@@ -793,6 +796,8 @@ XcodeProvider::ValueList& XcodeProvider::getResourceFiles() const {
 		files.push_back("dists/engine-data/hugo.dat");
 		files.push_back("dists/engine-data/kyra.dat");
 		files.push_back("dists/engine-data/lure.dat");
+		files.push_back("dists/engine-data/macgui.dat");
+		files.push_back("dists/engine-data/macventure.dat");
 		files.push_back("dists/engine-data/mort.dat");
 		files.push_back("dists/engine-data/neverhood.dat");
 		files.push_back("dists/engine-data/queen.tbl");
@@ -804,8 +809,8 @@ XcodeProvider::ValueList& XcodeProvider::getResourceFiles() const {
 		files.push_back("dists/engine-data/toon.dat");
 		files.push_back("dists/engine-data/ultima.dat");
 		files.push_back("dists/engine-data/wintermute.zip");
-		files.push_back("dists/engine-data/macventure.dat");
 		files.push_back("dists/engine-data/xeen.ccs");
+		files.push_back("dists/ios7/LaunchScreen_ios.storyboard");
 		files.push_back("dists/pred.dic");
 		files.push_back("dists/networking/wwwroot.zip");
 		files.push_back("icons/scummvm.icns");
@@ -977,6 +982,10 @@ void XcodeProvider::setupBuildConfiguration(const BuildSetup &setup) {
 	REMOVE_SETTING(scummvm_Release, "GCC_WARN_UNUSED_VARIABLE");
 	REMOVE_SETTING(scummvm_Release, "ONLY_ACTIVE_ARCH");
 	REMOVE_SETTING(scummvm_Release, "ENABLE_TESTABILITY");
+	REMOVE_SETTING(scummvm_Release, "GCC_PREPROCESSOR_DEFINITIONS");
+	ValueList scummvm_Release_defines(scummvm_defines);
+	ADD_DEFINE(scummvm_Release_defines, "RELEASE_BUILD");
+	ADD_SETTING_LIST(scummvm_Release, "GCC_PREPROCESSOR_DEFINITIONS", scummvm_Release_defines, kSettingsNoQuote | kSettingsAsList, 5);
 
 	scummvm_Release_Object->addProperty("name", "Release", "", kSettingsNoValue);
 	scummvm_Release_Object->_properties["buildSettings"] = scummvm_Release;

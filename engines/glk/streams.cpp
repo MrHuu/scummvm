@@ -977,7 +977,13 @@ void IOStream::setPosition(int pos, uint seekMode) {
 	if (_inStream) {
 		_inStream->seek(pos, SEEK_SET);
 	} else {
-		error("seek not supported for writing files");
+		Common::SeekableWriteStream *ws =
+			dynamic_cast<Common::SeekableWriteStream *>(_outStream);
+
+		if (ws)
+			ws->seek(pos, SEEK_SET);
+		else
+			error("seek not supported for writing files");
 	}
 }
 
@@ -1407,6 +1413,9 @@ void Streams::removeStream(Stream *stream) {
 		if ((*i)->_echoStream == stream)
 			(*i)->_echoStream = nullptr;
 	}
+
+	if (_currentStream == stream)
+		_currentStream = nullptr; 
 }
 
 Stream *Streams::getFirst(uint *rock) {

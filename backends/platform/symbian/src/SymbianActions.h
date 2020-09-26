@@ -24,7 +24,11 @@
 #define SYMBIANACTIONS_H
 
 #include "common/scummsys.h"
+
+#ifdef GUI_ENABLE_KEYSDIALOG
+
 #include "common/system.h"
+#include "common/ustr.h"
 #include "gui/Key.h"
 #include "gui/Actions.h"
 
@@ -59,7 +63,7 @@ class SymbianActions : public Actions {
 public:
 	// Actions
 	bool perform(ActionType action, bool pushed = true);
-	Common::String actionName(ActionType action);
+	Common::String actionName(ActionType action) override;
 	int size();
 	static void init();
 	void initInstanceMain(OSystem *mainSystem);
@@ -76,5 +80,7 @@ private:
 };
 
 } // namespace GUI
+
+#endif
 
 #endif

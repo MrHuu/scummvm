@@ -46,6 +46,7 @@ protected:
 
 public:
 	MusicProcess();
+	~MusicProcess() override;
 
 	// p_dynamic_cast stuff
 	ENABLE_RUNTIME_CLASSTYPE()
@@ -72,7 +73,9 @@ public:
 	virtual void restoreTrackState() = 0;
 
 	INTRINSIC(I_playMusic);
-	INTRINSIC(I_musicStop);
+	INTRINSIC(I_stopMusic);
+	INTRINSIC(I_pauseMusic);
+	INTRINSIC(I_unpauseMusic);
 
 };
 
