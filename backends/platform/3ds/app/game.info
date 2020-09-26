@@ -11,7 +11,7 @@ else ifneq ($(GAME),)
 	APP_DESCRIPTION := $(TARGET)
 	APP_ICON        := $(srcdir)/backends/platform/3ds/app/$(GAME)/icon.png
 	APP_BANNER_IMAGE:= $(srcdir)/backends/platform/3ds/app/$(GAME)/banner.png
-	CXXFLAGS += -D_GAME -DGAMEID=\"$(GAME)\" -DGAMEPATH=\"/3ds/data/ScummVM/$(GAME)/\" -DSAVEPATH=\"/3ds/data/ScummVM/$(GAME)\" -DCONFPATH=\"/3ds/data/ScummVM/$(GAME)/scummvm.ini\"
+	CXXFLAGS        += -D_GAME -DGAMEID=\"$(GAME)\" -DGAMEPATH=\"/3ds/data/ScummVM/$(GAME)/\" -DSAVEPATH=\"/3ds/data/ScummVM/$(GAME)\" -DCONFPATH=\"/3ds/data/ScummVM/$(GAME)/scummvm.ini\"
 
 endif
 
@@ -82,13 +82,13 @@ else ifeq ($(GAME), NEVERHOOD)
 
 else ifeq ($(GAME), PERIL)
 	APP_TITLE       := The Pink Panther: Passport to Peril
-	APP_UNIQUE_ID   := 0xFF335
+	APP_UNIQUE_ID   := 0xFF337
 
 else ifeq ($(GAME), PHANTASMAGORIA)
 	APP_TITLE       := Phantasmagoria
 	APP_UNIQUE_ID   := 0xFF332
 
-else ifeq ($(GAME), POCUS)
+else ifeq ($(GAME), POKUS)
 	APP_TITLE       := The Pink Panther: Hokus Pokus Pink
 	APP_UNIQUE_ID   := 0xFF336
 

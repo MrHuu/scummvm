@@ -105,7 +105,7 @@ elif [ $GAMEID = "PHANTASMAGORIA" ] ; then
 
 	./configure --host=3ds --disable-all-engines --enable-engine=sci32
 
-elif [ $GAMEID = "POCUS" ] ; then
+elif [ $GAMEID = "POKUS" ] ; then
 
 	./configure --host=3ds --disable-all-engines --enable-engine=pink
 
@@ -147,7 +147,7 @@ else
 	echo
 	echo Arguments available: 
 	echo  BBDOU BBVS BLADERUNNER COMI DIG DUCKMAN DW DW2 FT LSL1 MANIAC MONKEY MONKEY2 MYST
-	echo  NEVERHOOD PERIL PHANTASMAGORIA POCUS QFG4 QUEEN RIVEN SAMNMAX TENTACLE TOON
+	echo  NEVERHOOD PERIL PHANTASMAGORIA POKUS QFG4 QUEEN RIVEN SAMNMAX TENTACLE TOON
 	echo
 	echo -------------------------------------------------------------------------------------------
 	echo
